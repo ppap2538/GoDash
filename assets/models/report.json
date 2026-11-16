@@ -1,0 +1,122 @@
+{
+ "plastic_monobloc_chair_01": {
+  "tris_before": 3356,
+  "tris_after": 3356,
+  "materials": 1,
+  "size_m": [
+   0.642,
+   0.88,
+   0.628
+  ],
+  "height_studs": 3.14,
+  "mb": 1.95
+ },
+ "utility_box_01": {
+  "tris_before": 4404,
+  "tris_after": 4404,
+  "materials": 1,
+  "size_m": [
+   0.52,
+   1.12,
+   0.432
+  ],
+  "height_studs": 4.0,
+  "mb": 1.98
+ },
+ "potted_plant_04": {
+  "tris_before": 8929,
+  "tris_after": 6196,
+  "materials": 1,
+  "size_m": [
+   0.168,
+   0.267,
+   0.185
+  ],
+  "height_studs": 0.95,
+  "mb": 2.06
+ },
+ "metal_trash_can": {
+  "tris_before": 13960,
+  "tris_after": 6995,
+  "materials": 3,
+  "size_m": [
+   2.023,
+   1.71,
+   0.555
+  ],
+  "height_studs": 6.11,
+  "mb": 4.83
+ },
+ "street_lamp_02": {
+  "tris_before": 20338,
+  "tris_after": 8000,
+  "materials": 3,
+  "size_m": [
+   0.387,
+   1.675,
+   0.807
+  ],
+  "height_studs": 5.98,
+  "mb": 2.37
+ },
+ "exterior_aircon_unit": {
+  "tris_before": 18986,
+  "tris_after": 6000,
+  "materials": 4,
+  "size_m": [
+   1.8,
+   0.928,
+   0.375
+  ],
+  "height_studs": 3.31,
+  "mb": 7.04
+ },
+ "water_manhole_cover": {
+  "tris_before": 6301,
+  "tris_after": 1997,
+  "materials": 1,
+  "size_m": [
+   0.692,
+   0.068,
+   0.692
+  ],
+  "height_studs": 0.24,
+  "mb": 2.22
+ },
+ "CoffeeCart_01": {
+  "tris_before": 27659,
+  "tris_after": 9998,
+  "materials": 3,
+  "size_m": [
+   2.168,
+   1.718,
+   1.074
+  ],
+  "height_studs": 6.14,
+  "mb": 1.38
+ },
+ "shrub_03": {
+  "tris_before": 8287,
+  "tris_after": 7996,
+  "materials": 1,
+  "size_m": [
+   1.367,
+   0.403,
+   0.151
+  ],
+  "height_studs": 1.44,
+  "mb": 2.4
+ },
+ "jacaranda_tree": {
+  "tris_before": 3863832,
+  "tris_after": 77276,
+  "materials": 3,
+  "size_m": [
+   24.347,
+   19.439,
+   19.16
+  ],
+  "height_studs": 69.43,
+  "mb": 17.12
+ }
+}

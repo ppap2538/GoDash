@@ -1,0 +1,7 @@
+[out:json][timeout:60];
+(
+  way["highway"~"^(trunk|primary|secondary|tertiary)$"](16.400,102.795,16.485,102.870);
+  way["natural"="water"](16.400,102.795,16.485,102.870);
+  way["railway"="rail"](16.400,102.795,16.485,102.870);
+);
+out geom;
