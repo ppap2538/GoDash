@@ -20,7 +20,11 @@ end
 
 -- the share (0..1) of a bill ("bills") or a repair ("repair") the insurer pays for this player now
 function Service.share(player: Player, what: string): number
-	local p = Service.plan(player)
+	-- QA hook (clip recording in Studio): Workspace QaNoInsurance = true -> as if uninsured
+	-- and QaInsurePlan = "c3" | "c2" | "c1" -> as if on that plan (no profile change: Studio Play uses the real one)
+	local studio = game:GetService("RunService"):IsStudio()
+	if studio and workspace:GetAttribute("QaNoInsurance") then return 0 end
+	local p = studio and Insurance.BY_ID[workspace:GetAttribute("QaInsurePlan") or ""] or Service.plan(player)
 	if not p then return 0 end
 	return math.clamp(tonumber(p[what]) or 0, 0, 1)
 end

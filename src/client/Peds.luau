@@ -1188,6 +1188,9 @@ function Peds.start()
 			local dist = Workspace:GetAttribute("QaPedAhead")
 			if type(dist) ~= "number" then return end
 			Workspace:SetAttribute("QaPedAhead", nil)
+			-- (a negative distance: a target that DOES step out of the way, for recording the dodge)
+			local dodgeTest = dist < 0
+			dist = math.abs(dist)
 			local char = Players.LocalPlayer.Character
 			local hum = char and char:FindFirstChildOfClass("Humanoid")
 			local seat = hum and hum.SeatPart
@@ -1210,7 +1213,7 @@ function Peds.start()
 			best.look = -look
 			best.idleUntil = os.clock() + 12
 			best.dodge, best.noticeAt = nil, nil
-			best.noDodgeUntil = os.clock() + 12 -- (a test target stays put: it would step out of the way)
+			best.noDodgeUntil = not dodgeTest and os.clock() + 12 or nil -- (a test target stays put: it would step out of the way)
 		end)
 	end
 end

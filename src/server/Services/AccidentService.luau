@@ -41,7 +41,8 @@ function Service.start()
 		Data.touch(player, "happiness")
 		-- (2026-11-19, owner: "a cutscene for when they let it go") a light bump at little more than walking
 		-- pace: about one in three people let it go. The client plays the scene with "it's fine" instead.
-		if speed < 10 and math.random() < 0.3 then
+		-- (QaWaive in Studio: always let it go, for recording that scene)
+		if (speed < 10 and math.random() < 0.3) or (game:GetService("RunService"):IsStudio() and workspace:GetAttribute("QaWaive")) then
 			return true, "", { amount = 0, waived = true }
 		end
 		-- (2026-11-19) insurance (server/InsuranceService): the insurer pays its share of the bill; fully covered =

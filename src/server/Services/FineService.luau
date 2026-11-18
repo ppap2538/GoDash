@@ -50,6 +50,11 @@ function Fines.charge(player: Player, kind: string, amount: number, reason: stri
 	if type(qaGap) == "number" then gap = qaGap end
 	local d = Data.get(player)
 	if not d then return false, 0, "limit", k.n, limit end
+	-- QA hook (clip recording in Studio): Workspace QaNoLimit = true -> every fine "charges" its full amount on
+	-- the card, but no money moves and nothing is counted (Studio Play uses the real profile)
+	if RunService:IsStudio() and Workspace:GetAttribute("QaNoLimit") then
+		return true, math.max(0, math.floor(amount)), nil, math.min(k.n + 1, limit), limit
+	end
 	if k.n >= limit then return false, 0, "limit", k.n, limit end
 	if os.clock() - k.at < gap then return false, 0, "gap", k.n, limit end
 	Economy.rollDay(d)

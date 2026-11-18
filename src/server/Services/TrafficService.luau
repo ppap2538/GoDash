@@ -104,7 +104,10 @@ function Service.start(world, deps)
 								if bestLink and not bestLink.edge.minor then
 									col, since = Traffic.timing(s.node.id, s.groups[bestLink.edge], Workspace:GetServerTimeNow())
 								end
-								if col == "red" and since > RED_GRACE and os.clock() - (st.fined[j.id] or 0) > 8 then
+								-- (QA hook, Studio only: Workspace QaRedGrace = seconds, for recording a red-light run before the
+								-- cross traffic moves off)
+								local grace = game:GetService("RunService"):IsStudio() and tonumber(Workspace:GetAttribute("QaRedGrace")) or RED_GRACE
+								if col == "red" and since > grace and os.clock() - (st.fined[j.id] or 0) > 8 then
 									st.pending = { j = j, heading = -dir } -- decided on the way out of the junction
 								end
 							end
