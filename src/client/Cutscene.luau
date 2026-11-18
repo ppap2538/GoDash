@@ -802,7 +802,8 @@ end
 -- info = { reason = "checkpoint" | "redlight", amount }. The vehicle brakes to a stop (State.cutscene
 -- holds it), a police officer walks up to the rider (the kerb side on a two-wheeler, the driver's
 -- window on the right of a car), holds out the ticket, and the ticket card shows the charge and fine.
-local function ticketCard(reason: string, amount: number, n: number?, limit: number?, waived: boolean?): Frame
+local function ticketCard(reason: string, amount: number, n: number?, limit: number?, waived: boolean?, insured: number?): Frame
+	local ins = (insured or 0) > 0 and not waived
 	local card = Instance.new("Frame")
 	card.Name = "Ticket"
 	card.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -815,7 +816,7 @@ local function ticketCard(reason: string, amount: number, n: number?, limit: num
 	local claim = reason:sub(1, 4) == "hit_" -- a damage claim after an accident (client/Accident), not a police ticket
 	local band = Instance.new("Frame")
 	band.Size = UDim2.new(1, 0, 0, 40)
-	band.BackgroundColor3 = waived and Color3.fromRGB(40, 150, 80) or (claim and Color3.fromRGB(214, 110, 20) or Color3.fromRGB(190, 28, 36))
+	band.BackgroundColor3 = waived and Color3.fromRGB(40, 150, 80) or (ins and Color3.fromRGB(30, 100, 190)) or (claim and Color3.fromRGB(214, 110, 20) or Color3.fromRGB(190, 28, 36))
 	band.ZIndex = 4
 	band.Parent = card
 	local bc = Instance.new("UICorner"); bc.CornerRadius = UDim.new(0, 10); bc.Parent = band
@@ -834,7 +835,7 @@ local function ticketCard(reason: string, amount: number, n: number?, limit: num
 		t.Parent = parent
 		return t
 	end
-	text(band, waived and L("🤝 THEY LET IT GO", "🤝 คู่กรณีไม่เอาเรื่อง") or (claim and L("🧾 DAMAGE CLAIM", "🧾 ใบเรียกค่าเสียหาย") or L("🚔 TRAFFIC TICKET", "🚔 ใบสั่ง · TRAFFIC TICKET")), 0, 40, 18, Color3.new(1, 1, 1), Enum.Font.GothamBlack)
+	text(band, waived and L("🤝 THEY LET IT GO", "🤝 คู่กรณีไม่เอาเรื่อง") or (ins and L("🛡 INSURANCE CLAIM", "🛡 เคลมประกัน")) or (claim and L("🧾 DAMAGE CLAIM", "🧾 ใบเรียกค่าเสียหาย") or L("🚔 TRAFFIC TICKET", "🚔 ใบสั่ง · TRAFFIC TICKET")), 0, 40, 18, Color3.new(1, 1, 1), Enum.Font.GothamBlack)
 	local CHARGE = {
 		redlight = L("Ran a red light", "ฝ่าสัญญาณไฟแดง"), sidewalk = L("Riding on the pavement", "ขับขี่บนทางเท้า"),
 		nolicence = L("No driving licence", "ไม่มีใบอนุญาตขับขี่"),
@@ -847,6 +848,8 @@ local function ticketCard(reason: string, amount: number, n: number?, limit: num
 	text(card, reason == "hit_ped" and L("Hospital bill", "ค่ารักษา") or (claim and L("Repair bill", "ค่าซ่อม") or L("Fine", "ค่าปรับ")), 96, 16, 12, Color3.fromRGB(120, 120, 128), Enum.Font.GothamMedium)
 	if waived then
 		text(card, L("฿0 · settled, no bill", "฿0 · ยอมความ ไม่ต้องจ่าย"), 110, 34, 24, Color3.fromRGB(28, 120, 60), Enum.Font.GothamBlack)
+	elseif ins then
+		text(card, L(("Insurer pays ฿%d · you pay ฿%d"):format(insured, amount), ("ประกันจ่าย ฿%d · คุณจ่าย ฿%d"):format(insured, amount)), 110, 34, 20, Color3.fromRGB(30, 100, 190), Enum.Font.GothamBlack)
 	else
 		text(card, amount > 0 and ("฿" .. amount) or L("No cash on you", "ไม่มีเงินสดติดตัว"), 110, 34, 30, Color3.fromRGB(190, 28, 36), Enum.Font.GothamBlack)
 	end
@@ -874,13 +877,14 @@ local function ticketCard(reason: string, amount: number, n: number?, limit: num
 	stamp.Position = UDim2.fromScale(0.78, 0.66)
 	stamp.Size = UDim2.fromOffset(110, 40)
 	stamp.Rotation = -14
-	stamp.Text = waived and L("SETTLED", "ยอมความ") or (amount > 0 and L("PAID", "ชำระแล้ว") or L("NOTED", "บันทึกแล้ว"))
+	if ins then stamp.Position = UDim2.fromScale(0.8, 0.86) end -- (below the two amounts, not over them)
+	stamp.Text = waived and L("SETTLED", "ยอมความ") or (ins and L("CLAIMED", "เคลมแล้ว")) or (amount > 0 and L("PAID", "ชำระแล้ว") or L("NOTED", "บันทึกแล้ว"))
 	stamp.TextSize = 24
 	stamp.Font = Enum.Font.GothamBlack
-	stamp.TextColor3 = waived and Color3.fromRGB(28, 130, 60) or Color3.fromRGB(190, 28, 36)
+	stamp.TextColor3 = waived and Color3.fromRGB(28, 130, 60) or (ins and Color3.fromRGB(30, 100, 190)) or Color3.fromRGB(190, 28, 36)
 	stamp.TextTransparency = 1
 	stamp.ZIndex = 6
-	local sk = Instance.new("UIStroke"); sk.Color = waived and Color3.fromRGB(28, 130, 60) or Color3.fromRGB(190, 28, 36); sk.Thickness = 2.5; sk.Transparency = 1
+	local sk = Instance.new("UIStroke"); sk.Color = waived and Color3.fromRGB(28, 130, 60) or (ins and Color3.fromRGB(30, 100, 190)) or Color3.fromRGB(190, 28, 36); sk.Thickness = 2.5; sk.Transparency = 1
 	sk.ApplyStrokeMode = Enum.ApplyStrokeMode.Border; sk.Parent = stamp
 	local sc = Instance.new("UICorner"); sc.CornerRadius = UDim.new(0, 6); sc.Parent = stamp
 	stamp.Parent = card
@@ -891,7 +895,8 @@ end
 -- (2026-11-19) The police motorbike that pulls up behind you for a red light or the zebra crossing (owner:
 -- "the other scenes too": the officer used to walk up from nowhere). A motorbike from the local traffic kit
 -- with its rider in uniform, a POLICE box on the back and a light bar flashing red and blue.
-local function policeBike(): (Model?, Model?)
+local function policeBike(kind: string?): (Model?, Model?)
+	local insurer = kind == "insurance" -- (2026-11-19) the insurance surveyor rides the same kind of bike
 	local kit = ReplicatedStorage:FindFirstChild("GoDashTrafficKit")
 	if not kit then return nil, nil end
 	local bikes = {}
@@ -906,7 +911,9 @@ local function policeBike(): (Model?, Model?)
 	for _, ch in ipairs(bike:GetChildren()) do
 		if ch:IsA("Model") and (ch:FindFirstChildOfClass("Humanoid") or ch.Name == "Rider") then rider = ch end
 	end
-	if rider then pcall(RiderPose.policeUniform, rider) end
+	if rider then
+		if insurer then pcall(RiderPose.dress, rider, Color3.fromRGB(244, 246, 250), Color3.fromRGB(30, 40, 70)) else pcall(RiderPose.policeUniform, rider) end
+	end
 	for _, d in ipairs(bike:GetDescendants()) do
 		if d:IsA("BasePart") then d.Anchored = true; d.CanCollide = false; d.CanQuery = false; d.CanTouch = false
 		elseif d:IsA("LuaSourceContainer") or d:IsA("Sound") then d:Destroy() end
@@ -925,7 +932,11 @@ local function policeBike(): (Model?, Model?)
 		return p
 	end
 	local box = part(Vector3.new(1.7, 1.3, 1.3), CFrame.new(0, 1.15, len * 0.36), Color3.fromRGB(244, 244, 240))
-	part(Vector3.new(1.74, 0.28, 1.34), CFrame.new(0, 1.05, len * 0.36), Color3.fromRGB(40, 70, 150))
+	part(Vector3.new(1.74, 0.28, 1.34), CFrame.new(0, 1.05, len * 0.36), insurer and Color3.fromRGB(30, 120, 210) or Color3.fromRGB(40, 70, 150))
+	if insurer then
+		bike:SetAttribute("Insurer", true)
+		return bike, rider -- (no light bar for the surveyor)
+	end
 	local sg = Instance.new("SurfaceGui")
 	sg.Face = Enum.NormalId.Back
 	sg.CanvasSize = Vector2.new(170, 130)
@@ -933,7 +944,7 @@ local function policeBike(): (Model?, Model?)
 	local t = Instance.new("TextLabel")
 	t.BackgroundTransparency = 1
 	t.Size = UDim2.fromScale(1, 0.62)
-	t.Text = "ตำรวจ\nPOLICE"
+	t.Text = insurer and "ประกันภัย\nINSURANCE" or "ตำรวจ\nPOLICE"
 	t.Font = Enum.Font.GothamBlack
 	t.TextScaled = true
 	t.TextColor3 = Color3.fromRGB(30, 50, 120)
@@ -996,6 +1007,8 @@ local function fineScene(info: any)
 	local reason = info and info.reason or "checkpoint"
 	local amount = tonumber(info and info.amount) or 0
 	local waived = info and info.waived == true
+	local insured = tonumber(info and info.insured) or 0 -- (2026-11-19) what the insurer pays (server/InsuranceService)
+	local surveyorBike: Model? = nil
 	local claim = reason:sub(1, 4) == "hit_"
 	local def = vehicle and Vehicles.ById[vehicle:GetAttribute("VehicleId") or ""]
 	local car = def ~= nil and def.class == "car"
@@ -1373,7 +1386,15 @@ local function fineScene(info: any)
 		-- 4. what they say
 		if claim then
 			local lines
-			if waived then
+			if insured > 0 and not waived then
+				lines = reason == "hit_ped" and {
+					L("Ow... you have insurance? Fine, let them sort it out.", "โอ๊ย... มีประกันใช่ไหม งั้นให้ประกันจัดการเลย"),
+					L("Lucky you're insured!", "ดีนะที่มีประกัน!"),
+				} or {
+					L("You're insured? OK, call them.", "มีประกันใช่ไหม โอเค เรียกประกันมาเลย"),
+					L("Fine, let the insurance handle my car.", "ได้ ให้ประกันจัดการรถฉันละกัน"),
+				}
+			elseif waived then
 				lines = reason == "hit_ped" and {
 					L("It's OK, it's OK. I won't make a fuss. Just ride carefully!", "ไม่เป็นไรๆ ไม่เอาเรื่องหรอก แต่คราวหน้าขับดีๆ นะ"),
 					L("Only a scrape. Never mind, but watch out!", "เจ็บนิดหน่อยเอง ไม่เป็นไร ระวังด้วยล่ะ"),
@@ -1400,6 +1421,32 @@ local function fineScene(info: any)
 			Feedback.bubble((head and head.Position or (pos + Vector3.new(0, 5, 0))) + Vector3.new(0, 1.6, 0), reason == "hit_ped" and L("Pedestrian", "คนเดินถนน") or L("Other driver", "คู่กรณี"),
 				lines[math.random(1, #lines)])
 		end
+		-- 4b. insured (2026-11-19): the insurer's surveyor rides up behind and takes it from here
+		if claim and insured > 0 and not waived then
+			local sb, srider = policeBike("insurance")
+			if sb then
+				surveyorBike = sb
+				local yOff = (sb:GetAttribute("Y") or 2.4) - 0.3
+				local stop = sp - fwd * 8 + right * -side * 2.4
+				local startP = sp - fwd * 42 + right * -side * 2.4
+				local function put(p: Vector3)
+					local gp = ground(p, ignore)
+					sb:PivotTo(CFrame.lookAt(gp + Y * yOff, gp + Y * yOff + fwd))
+				end
+				put(startP)
+				sb.Parent = Workspace
+				table.insert(ignore, sb)
+				local tt = 0
+				while tt < 2.2 and not skip do
+					tt += RunService.RenderStepped:Wait()
+					put(startP:Lerp(stop, 1 - (1 - math.clamp(tt / 2.2, 0, 1)) ^ 2.4))
+				end
+				local shead = srider and srider:FindFirstChild("Head") :: BasePart?
+				Feedback.bubble((shead and shead.Position or (stop + Y * 5)) + Vector3.new(0, 1.6, 0), L("Insurance surveyor", "พนักงานเคลมประกัน"),
+					L("Good afternoon! Isan Safe Insurance. We'll take care of the other side.", "สวัสดีครับ อีสานเซฟประกันภัย เดี๋ยวทางเราดูแลคู่กรณีให้เองครับ"))
+				waitFor(1.6)
+			end
+		end
 		-- 5. hold out the ticket / the bill, or wave it off
 		local rs = joint(actor, "RightUpperArm", "RightShoulder")
 		local re = joint(actor, "RightLowerArm", "RightElbow")
@@ -1414,7 +1461,7 @@ local function fineScene(info: any)
 		end
 		local hand = actor:FindFirstChild("RightHand") :: BasePart?
 		local t = 0
-		card = ticketCard(reason, amount, tonumber(info and info.n), tonumber(info and info.limit), waived)
+		card = ticketCard(reason, amount, tonumber(info and info.n), tonumber(info and info.limit), waived, insured)
 		card.Position = UDim2.fromScale(0.74, 1.4)
 		card.Parent = gui
 		local hold = (RunService:IsStudio() and Workspace:GetAttribute("QaSceneHold")) and 14 or 4.4 -- QaSceneHold: keep the ticket up for screenshots
@@ -1465,6 +1512,7 @@ local function fineScene(info: any)
 		if d.Parent then d.LocalTransparencyModifier = 0 end
 	end
 	if bike then bike:Destroy() end
+	if surveyorBike then surveyorBike:Destroy() end
 	if card then card:Destroy() end
 	if onFoot then
 		if footRoot and footRoot.Parent then footRoot.Anchored = footWasAnchored == true end

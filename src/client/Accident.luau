@@ -52,6 +52,7 @@ local function claim(kind: string, speed: number, extra: any?)
 			reason = kind == "ped" and "hit_ped" or "hit_car", amount = amount, waived = waived,
 			claimant = extra and extra.template, ped = extra and extra.ped, carModel = extra and extra.model,
 			holdCar = Street.hold, hitAt = hitAt,
+			insured = type(res) == "table" and tonumber(res.insured) or nil, -- (2026-11-19) the insurer's share: the surveyor comes
 			n = type(res) == "table" and res.n or nil, limit = type(res) == "table" and res.limit or nil,
 		})
 		played = State.cutscene -- the scene starts synchronously; false = it could not run here

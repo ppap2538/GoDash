@@ -8,6 +8,7 @@ local Net = require(Shared.Net)
 local Data = require(script.Parent.PlayerDataService)
 local Fines = require(script.Parent.FineService)
 local City = require(script.Parent.CityRemote)
+local Insurance = require(script.Parent.InsuranceService)
 
 local Service = {}
 local last = {} :: { [Player]: number }
@@ -43,14 +44,20 @@ function Service.start()
 		if speed < 10 and math.random() < 0.3 then
 			return true, "", { amount = 0, waived = true }
 		end
+		-- (2026-11-19) insurance (server/InsuranceService): the insurer pays its share of the bill; fully covered =
+		-- nothing counts against your daily limit, and the claim scene brings the surveyor
+		local insured = math.floor(amount * Insurance.share(player, "bills") + 0.5)
+		if insured >= amount then
+			return true, "", { amount = 0, insured = insured }
+		end
 		-- (2026-11-19) the daily limit (server/FineService): past it the other side lets it go, and the
 		-- client plays the same "let it go" scene
-		local ok, took, _, n, limit = Fines.charge(player, "bill", amount, kind == "ped" and "accident:ped" or "accident:car")
+		local ok, took, _, n, limit = Fines.charge(player, "bill", amount - insured, kind == "ped" and "accident:ped" or "accident:car")
 		if not ok then
 			Fines.warn(player, "bill", nil, "", "")
 			return true, "", { amount = 0, waived = true }
 		end
-		return true, "", { amount = took, n = n, limit = limit }
+		return true, "", { amount = took, insured = insured > 0 and insured or nil, n = n, limit = limit }
 	end)
 end
 

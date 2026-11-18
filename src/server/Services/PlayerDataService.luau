@@ -53,6 +53,7 @@ local function template()
 		badges = {}, -- [badge key] = true once awarded
 		seenNews = "", -- the "What's new" version this rider has seen
 		pet = false, -- or { look, name (Config/Pets.NAMES index), out = true, since } (server/PetService, 2026-11-19)
+		insurance = false, -- or { plan = "c1" | "c2" | "c3", untilT = os.time() } (server/InsuranceService, 2026-11-19)
 		lapWeek = false, -- or { id = week, cs }: this week's best lake lap (server/TimeTrialService); all-time best = stats.bestLap
 		firstJoin = 0, lastSeen = 0,
 	}

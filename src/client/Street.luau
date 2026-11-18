@@ -455,6 +455,10 @@ local function moveCars(t: number, dt: number, camPos: Vector3)
 	for _, c in ipairs(locals) do
 		if c.active and c.at then table.insert(obstacles, { pos = c.at, half = c.len / 2, owner = c }) end
 	end
+	-- (2026-11-19) a broken-down car, a crash or a pop-up market (server/CityEventService) blocks the lane
+	for _, b in ipairs(CollectionService:GetTagged("GoDashObstacle")) do
+		if b:IsA("BasePart") then table.insert(obstacles, { pos = b.Position, half = math.max(b.Size.X, b.Size.Z) / 2 }) end
+	end
 	-- people on foot: a car waits for someone crossing in front of it
 	local walkers = Workspace:FindFirstChild("GoDashPedestrians")
 	if walkers then

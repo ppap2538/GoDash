@@ -90,6 +90,8 @@ safe("Stunts", require(Services.StuntService).start, deps) -- 2026-11-19: wheeli
 safe("TimeTrial", require(Services.TimeTrialService).start, world, deps) -- 2026-11-19: lap of Bueng Kaen Nakhon against the clock
 safe("CarMeet", require(Services.CarMeetService).start, world, deps) -- 2026-11-19: night car meet at the KK Plaza car park
 safe("Accidents", require(Services.AccidentService).start) -- 2026-11-18: hitting people or cars costs money
+safe("Insurance", require(Services.InsuranceService).start) -- 2026-11-19: vehicle insurance class 1 / 2+ / 3
+safe("CityEvents", require(Services.CityEventService).start, world, deps) -- 2026-11-19: breakdowns, crashes, pop-up markets
 safe("Health", require(Services.HealthService).start) -- 2026-11-18: falls add up to injuries; the hospital treats them
 safe("Street", StreetService.start, world, deps)
 safe("Finance", FinanceService.start, world, deps)

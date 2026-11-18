@@ -410,7 +410,17 @@ local function garage(player: Player, op: string, vehicleId: string?, arg: any)
 		local home = nearService(player, { "home" })
 		if not home and not nearService(player, { "dealer", "gas" }) then return false, "Repairs are done at KK Motors or a fuel station" end
 		local cost = math.ceil(need * Game.REPAIR_PRICE * (home and 0.5 or 1) * math.max(0.6, math.sqrt(math.max(def.price, 3000) / 30000)))
-		if not Economy.spend(player, cost, "repair") then return false, "Repair costs " .. Util.money(cost) end
+		-- (2026-11-19) insurance class 2+ / 1 pays half / all of it (server/InsuranceService)
+		local covered = math.floor(cost * require(script.Parent.InsuranceService).share(player, "repair") + 0.5)
+		cost -= covered
+		if cost > 0 and not Economy.spend(player, cost, "repair") then return false, "Repair costs " .. Util.money(cost) end
+		if covered > 0 then
+			owned.condition = 100
+			Data.touch(player, "vehicles")
+			local v = active[player]
+			if v and v.id == def.id then sync(v); v.stats = Vehicles.computeStats(def, owned) end
+			return true, ("Repaired: insurance paid %s, you paid %s"):format(Util.money(covered), Util.money(cost))
+		end
 		owned.condition = 100
 		Data.touch(player, "vehicles")
 		local v = active[player]

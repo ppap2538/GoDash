@@ -527,6 +527,13 @@ ghost scene are still to take.
 | 34 | Order meter (`client/Spill`, server `VehicleService` + `JobService`): while carrying food (or a passenger) a card shows the order's condition; the server now also counts a hard corner (> ~1.5 g sideways) and a big vertical bump as a jolt and tells the client each one (Notify "harsh": brake / gas / turn / bump) -> the card shakes, says what did it, slosh (or the passenger's "oof"). Untouched orders get "🍜 อาหารไม่หกเลยสักหยด +6 %" on the slip; jolts are listed | PASS: fake job + two jolts -> "อาหาร: หกไปบ้างแล้ว 65 %" under the turn hint. NOT TESTED on a real delivery |
 | 35 | Instant replay (`client/Replay.instant`): L, or ⏪ in clip mode, after pulling up: the last 10 s with your vehicle, the people and the AI cars around you; cameras TV / chase / low / front / drone / roadside (N), pause (Space), half speed, loops; in clip mode the controls sit on the black bar | PASS: replay plays, TV and low cameras, controls. Clip-mode layout NOT TESTED |
 
+**Batch 3b (2026-11-19, same request)**
+
+| # | What | State |
+|---|---|---|
+| 36 | Insurance (`Config/Insurance`, `server/InsuranceService`, phone app `client/InsuranceApp`, d.insurance): a made-up insurer "อีสานเซฟ ประกันภัย", class 3 ฿49 (half the bill), 2+ ฿99 (the bill + half your repairs), 1 ฿169 (the bill + all repairs), 24 real hours per purchase, up to 3 days ahead. AccidentService takes the insured share off the bill (fully covered = nothing counts toward the daily limit); the claim scene brings the insurer's surveyor on a motorbike with a blue box and a blue "เคลมประกัน · ประกันจ่าย ฿x · คุณจ่าย ฿y" card; VehicleService repairs cost less | PASS: bought class 1 through the City remote, insured pedestrian hit -> surveyor + card "ประกันจ่าย ฿290 · คุณจ่าย ฿0". NOT TESTED: the phone app screen by eye, repairs with cover |
+| 37 | City events (`server/CityEventService`): every 5-9 min, 250-650 studs from a rider who is driving, one of: a broken-down car (hazards, triangle, driver waving), a crash (two cars, debris, cones, an officer waving traffic past, a blue lamp), a pop-up market closing a soi in the evening (barriers, stalls, shoppers). 3-5 minutes each, at most two; AI traffic stops for the "GoDashObstacle" boxes (client/Street); riders within 900 studs get a toast; ⚠️ marker overhead. QA: Workspace QaCityEvent = "breakdown" / "crash" / "market" | PASS: crash and market built and seen. The market then got a 16-stud minimum width (the first one stood in a 12-stud lane). NOT TESTED: breakdown by eye, AI cars queuing |
+
 **Still to do:** the first 10 minutes with gradual unlocks (needs a design pass with the owner: it changes what new riders
 see first); random city events.
 
