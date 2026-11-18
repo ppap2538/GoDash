@@ -339,6 +339,17 @@ local function complete(player: Player, st)
 	-- Tier-A plan: season XP, Rush Hour race, badges, rank-up
 	SeasonSvc.addXp(player, SeasonCfg.XP.job + (stars >= 4.8 and SeasonCfg.XP.fiveStar or 0))
 	Events.job(player)
+	-- the first ten minutes (2026-11-19, owner: "เพิ่มตามแนะนำ"): the third finished job brings a starter gift toward
+	-- the first motorbike (once per profile; riders who were past three jobs already never cross it again)
+	if jobsNow == 3 and not (type(d.onboard) == "table" and d.onboard.gift) then
+		d.onboard = type(d.onboard) == "table" and d.onboard or {}
+		d.onboard.gift = true
+		Economy.add(player, 1500, "starter_gift", true)
+		Data.touch(player, "onboard")
+		task.delay(3, function()
+			Net.fire(player, "Notify", "bigwin", { title = "Starter gift!", text = "฿1,500 toward your first motorbike · KK Motors", icon = "🎁" })
+		end)
+	end
 	if jobsNow >= 1 then StoreSvc.badge(player, "first") end
 	if jobsNow >= 10 then StoreSvc.badge(player, "ten") end
 	if jobsNow >= 100 then StoreSvc.badge(player, "hundred") end

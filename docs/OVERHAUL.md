@@ -534,8 +534,16 @@ ghost scene are still to take.
 | 36 | Insurance (`Config/Insurance`, `server/InsuranceService`, phone app `client/InsuranceApp`, d.insurance): a made-up insurer "อีสานเซฟ ประกันภัย", class 3 ฿49 (half the bill), 2+ ฿99 (the bill + half your repairs), 1 ฿169 (the bill + all repairs), 24 real hours per purchase, up to 3 days ahead. AccidentService takes the insured share off the bill (fully covered = nothing counts toward the daily limit); the claim scene brings the insurer's surveyor on a motorbike with a blue box and a blue "เคลมประกัน · ประกันจ่าย ฿x · คุณจ่าย ฿y" card; VehicleService repairs cost less | PASS: bought class 1 through the City remote, insured pedestrian hit -> surveyor + card "ประกันจ่าย ฿290 · คุณจ่าย ฿0". NOT TESTED: the phone app screen by eye, repairs with cover |
 | 37 | City events (`server/CityEventService`): every 5-9 min, 250-650 studs from a rider who is driving, one of: a broken-down car (hazards, triangle, driver waving), a crash (two cars, debris, cones, an officer waving traffic past, a blue lamp), a pop-up market closing a soi in the evening (barriers, stalls, shoppers). 3-5 minutes each, at most two; AI traffic stops for the "GoDashObstacle" boxes (client/Street); riders within 900 studs get a toast; ⚠️ marker overhead. QA: Workspace QaCityEvent = "breakdown" / "crash" / "market" | PASS: crash and market built and seen. The market then got a 16-stud minimum width (the first one stood in a 12-stud lane). NOT TESTED: breakdown by eye, AI cars queuing |
 
-**Still to do:** the first 10 minutes with gradual unlocks (needs a design pass with the owner: it changes what new riders
-see first); random city events.
+**Batch 3c (2026-11-19, same request)**
+
+| # | What | State |
+|---|---|---|
+| 38 | Rush hour (`client/Street`): 07:00-09:30 and 16:30-19:30 the local traffic is 1.7x (was 1.4x) and drives at 66 % (was 80 %): the streets fill and crawl | compiles; NOT verified as busier (Studio's Perf tier kept 7 local vehicles at 08:30) |
+| 39 | AI motorbikes keep to the kerb side of the lane and filter past cars and pickups (a car still follows a bike ahead); AI cars choose their next street ~45 studs before the junction and blink that side's indicator through the turn (the traffic kit had no indicator lamps: client/Street adds four small ones to each local clone); hazards still win when stalled | PASS: SignalR/FR blinking on a car turning right at 08:30. Filtering NOT TESTED by eye |
+| 40 | The first ten minutes (`client/Guide` onboardTip, `server/JobService`, City op "onboard", d.onboard): the third finished job brings a ฿1,500 starter gift (once, only when crossing 3); between orders a new rider (1-13 jobs) sees one suggestion at a time: the first motorbike (route to KK Motors when affordable) -> the Styling app -> Bueng Kaen Nakhon (route to the lake-lap start) -> clip mode and the replay | compiles; NOT TESTED by eye (the Studio profile is past 13 jobs) |
+| 41 | Bug found while testing: a fresh server took 30.8 s to build the city, the client waited only 20 s for the traffic kit and the first rider on that server saw NO local traffic all session. client/Street now waits up to 300 s (client/Dogs and the GPS checkpoints 60 -> 300 s too) | PASS: local traffic appeared after the fix |
+
+**Still to do:** a phone pass of everything above (touch layouts of the order meter, replay controls and the Insurance app).
 
 **Batch 3 (all ages):** plates from presets instead of typed text, content check (crash and injury = mild, ghosts =
 mild fear), the maturity questionnaire, the refundable 1,000 R$ fee (ask the owner first), a full phone test.

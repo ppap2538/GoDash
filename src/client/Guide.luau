@@ -187,6 +187,76 @@ local function needCard(want: string, d, pos: Vector3?, driving: boolean)
 end
 
 ---------------------------------------------------------------------------------------------------
+-- The first ten minutes (2026-11-19, owner: "เพิ่มตามแนะนำได้เลย"). After the first deliveries, while a new rider
+-- waits for the next order, the card suggests the next good thing to try, one at a time:
+--   the first motorbike (the third job brings a ฿1,500 starter gift: server/JobService) -> styling it ->
+--   Bueng Kaen Nakhon (swan boats, soi dogs, the lake lap) -> clip mode and the replay.
+-- A tip goes away once it is done (or its button pressed: City op "onboard"); riders with 14+ jobs see none.
+---------------------------------------------------------------------------------------------------
+local cheapestBike = math.huge
+for _, v in pairs(Vehicles.ById) do
+	if v.class == "bike" and not v.pedal and (v.price or 0) > 0 then cheapestBike = math.min(cheapestBike, v.price) end
+end
+
+local function seen(d, id: string): boolean
+	return type(d.onboard) == "table" and d.onboard[id] == true
+end
+
+local function markSeen(id: string)
+	task.spawn(function() Net.call("City", "onboard", id) end)
+end
+
+local function onboardTip(d, pos: Vector3?)
+	local jobs = (d.stats.deliveries or 0) + (d.stats.rides or 0)
+	if jobs < 1 or jobs >= 14 then return nil end
+	local motorbike = false
+	for id in pairs(d.vehicles or {}) do
+		local def = Vehicles.ById[id]
+		if def and not def.pedal then motorbike = true break end
+	end
+	if not motorbike then
+		if jobs < 3 or (d.money or 0) < cheapestBike then
+			return { icon = "🛵", title = L("Your first motorbike is close", "อีกนิดจะได้มอไซคันแรก"),
+				detail = jobs < 3 and L(("Finish %d more job%s: a ฿1,500 starter gift is waiting"):format(3 - jobs, 3 - jobs > 1 and "s" or ""),
+					("ส่งอีก %d งาน รับของขวัญไรเดอร์ใหม่ ฿1,500"):format(3 - jobs))
+					or L(("Save up ฿%d for a motorbike at KK Motors"):format(cheapestBike), ("เก็บเงินให้ถึง ฿%d แล้วไปซื้อมอไซที่ KK Motors"):format(cheapestBike)) }
+		end
+		local dealer = pos and nearestPoi(pos, "dealer")
+		return { icon = "🛵", color = C.green, title = L("Buy your first motorbike!", "ไปซื้อมอไซคันแรกกัน!"),
+			detail = L(("You have enough. KK Motors sells one from ฿%d: much faster than pedalling."):format(cheapestBike),
+				("เงินพอแล้ว ที่ KK Motors มีมอไซเริ่มต้น ฿%d เร็วกว่าปั่นจักรยานเยอะ"):format(cheapestBike)),
+			button = dealer and { text = L("Route to KK Motors", "นำทางไป KK Motors"), fn = function() GPS.setTarget(dealer.pos, placeName(dealer)) end } or nil }
+	end
+	if not seen(d, "style") then
+		return { icon = "🎨", title = L("Make it yours", "แต่งรถให้เป็นของเรา"),
+			detail = L("Paint, stickers, underglow, a lucky plate, a funny horn: the Styling app.", "เปลี่ยนสี ติดสติกเกอร์ ไฟใต้ท้อง ป้ายทะเบียนเลขสวย แตรเพลง ในแอปแต่งซิ่ง"),
+			button = { text = L("Open Styling", "เปิดแอปแต่งซิ่ง"), fn = function() markSeen("style"); Phone.setOpen(true); Phone.go("styling") end } }
+	end
+	if jobs >= 6 and not seen(d, "lake") then
+		local gates = ReplicatedStorage:FindFirstChild("GoDashTrial")
+		local g1 = gates and gates:FindFirstChild("Gate1")
+		local lake = g1 and g1:GetAttribute("Pos")
+		return { icon = "🦢", title = L("Take a break at Bueng Kaen Nakhon", "แวะพักที่บึงแก่นนคร"),
+			detail = L("Pedal a swan boat, adopt a soi dog, race the lake lap.", "ปั่นเรือเป็ด รับเลี้ยงหมาซอย ลองแข่งรอบบึง"),
+			button = { text = L("Route to the lake", "นำทางไปบึง"), fn = function()
+				markSeen("lake")
+				if typeof(lake) == "Vector3" then GPS.setTarget(lake, L("Bueng Kaen Nakhon", "บึงแก่นนคร")) end
+			end } }
+	end
+	if jobs >= 9 and not seen(d, "clip") then
+		return { icon = "🎬", title = L("Make a clip", "ถ่ายคลิปเท่ๆ"),
+			detail = touch and L("The Clip app frames 9:16 for TikTok; ⏪ replays your last 10 seconds.", "แอปถ่ายคลิปจัดภาพ 9:16 ลง TikTok ได้เลย ⏪ ดูรีเพลย์ 10 วิล่าสุด")
+				or L("B = clip mode 9:16 for TikTok · L = replay your last 10 seconds", "B = โหมดถ่ายคลิป 9:16 · L = ดูรีเพลย์ 10 วิล่าสุด"),
+			button = { text = L("Try it", "ลองเลย"), fn = function()
+				markSeen("clip")
+				local ok, Clip = pcall(require, script.Parent.ClipMode)
+				if ok and Clip and Clip.open then Clip.open() end
+			end } }
+	end
+	return nil
+end
+
+---------------------------------------------------------------------------------------------------
 -- the objective: what should the player do right now?
 --   returns { icon, title, detail, step?, target?, button? = { text, fn }, color?, warn? }
 ---------------------------------------------------------------------------------------------------
@@ -326,6 +396,9 @@ local function compute()
 	if t and not t.job then
 		return { icon = "📍", target = t.pos, title = L("Going to ", "กำลังไป ") .. Lang.t(t.name), detail = L("Follow the green line on the road.", "ขี่ตามเส้นสีเขียวบนถนน") }
 	end
+	-- (2026-11-19) a new rider between orders: the next thing worth trying
+	local tip = onboardTip(d, pos)
+	if tip then return tip end
 	return { step = 3, icon = "📡", title = L("Looking for an order near you…", "กำลังหาออร์เดอร์ใกล้คุณ…"),
 		detail = L("Ride around freely. A new order pops up in a few seconds.", "ขี่เล่นไปรอบๆ ได้เลย ออร์เดอร์ใหม่จะเด้งขึ้นมาในไม่กี่วินาที") }
 end

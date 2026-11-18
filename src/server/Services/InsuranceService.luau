@@ -26,6 +26,15 @@ function Service.share(player: Player, what: string): number
 end
 
 function Service.start()
+	-- (2026-11-19) client/Guide's first-ten-minutes tips: a tip the rider has followed is not shown again
+	City.register("onboard", function(player, arg)
+		local d = Data.get(player)
+		if not d or (arg ~= "style" and arg ~= "lake" and arg ~= "clip") then return false, "" end
+		d.onboard = type(d.onboard) == "table" and d.onboard or {}
+		d.onboard[arg] = true
+		Data.touch(player, "onboard")
+		return true, ""
+	end)
 	City.register("insure", function(player, arg)
 		local d = Data.get(player)
 		local p = type(arg) == "string" and Insurance.BY_ID[arg]

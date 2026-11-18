@@ -108,13 +108,19 @@ local localFolder
 
 local function lamps(model: Model)
 	local brakes, signals = {}, {}
+	local sigL, sigR = {}, {} -- (2026-11-19) indicators by side for AI turn signals (VehicleFactory: SignalL / SignalFL / SignalR / SignalFR)
 	for _, d in ipairs(model:GetDescendants()) do
 		if d:IsA("BasePart") then
 			if CollectionService:HasTag(d, "BrakeLight") then table.insert(brakes, { part = d, mat = d.Material, color = d.Color }) end
-			if d.Name:sub(1, 6) == "Signal" then table.insert(signals, { part = d, mat = d.Material, color = d.Color }) end
+			if d.Name:sub(1, 6) == "Signal" then
+				local rec = { part = d, mat = d.Material, color = d.Color }
+				table.insert(signals, rec)
+				if d.Name == "SignalL" or d.Name == "SignalFL" then table.insert(sigL, rec) end
+				if d.Name == "SignalR" or d.Name == "SignalFR" then table.insert(sigR, rec) end
+			end
 		end
 	end
-	return brakes, signals
+	return brakes, signals, sigL, sigR
 end
 
 local function prepare(model: Instance)
@@ -241,6 +247,8 @@ local function lookAhead(c, here: Vector3, dir: Vector3, left: Vector3, target: 
 			local along, side = rel:Dot(dir), math.abs(rel:Dot(left))
 			local gap = c.len / 2 + o.half + 3 + c.v * 0.55
 			local reach = c.wid / 2 + (o.half <= 1 and 0.8 or 1.8)
+			-- (2026-11-19) a motorbike filters past cars and pickups on the kerb side, the Thai way
+			if c.bike and o.owner and not o.owner.bike then reach = c.wid / 2 + 0.4 end
 			if along > 0 and along < gap and side < reach then
 				if o.person then byPlayer = true end
 				if o.owner then byAI = true end
@@ -317,8 +325,17 @@ local function drive(c, target: number, byPlayer: boolean, here: Vector3, dir: V
 	if not c.model:GetAttribute("ReplayHold") then c.model:PivotTo(CFrame.lookAt(c.vis, c.vis + c.look)) end
 	local braking = c.v < c.base - 1 and (dv < -0.5 or c.v < 1)
 	if braking ~= c.braking then c.braking = braking; setLamps(c.brakes, braking, Color3.fromRGB(255, 40, 30)) end
-	local hazard = stalled and blink
-	if hazard ~= c.hazard then c.hazard = hazard; setLamps(c.signals, hazard, Color3.fromRGB(255, 170, 40)) end
+	-- hazards when stalled; otherwise the indicator of the side it is about to turn to (c.turn, local traffic)
+	local amber = Color3.fromRGB(255, 170, 40)
+	if c.sigL and c.sigR and (#c.sigL > 0 or #c.sigR > 0) then
+		local wantL = blink and (stalled or c.turn == "L")
+		local wantR = blink and (stalled or c.turn == "R")
+		if wantL ~= c.litL then c.litL = wantL; setLamps(c.sigL, wantL, amber) end
+		if wantR ~= c.litR then c.litR = wantR; setLamps(c.sigR, wantR, amber) end
+	else
+		local hazard = stalled and blink
+		if hazard ~= c.hazard then c.hazard = hazard; setLamps(c.signals, hazard, amber) end
+	end
 end
 
 ---------------------------------------------------------------------------------------------------
@@ -326,7 +343,8 @@ end
 ---------------------------------------------------------------------------------------------------
 local function busy(): number -- how full the streets are right now (rush hours, quiet nights)
 	local ct = Lighting.ClockTime
-	if (ct >= 7 and ct < 9.5) or (ct >= 16.5 and ct < 19.5) then return 1.4 end
+	-- (2026-11-19, owner: "รถติดชั่วโมงเร่งด่วน") morning and evening rush: many more cars, crawling (see moveCars)
+	if (ct >= 7 and ct < 9.5) or (ct >= 16.5 and ct < 19.5) then return 1.7 end
 	if ct >= 22.5 or ct < 5 then return 0.45 end
 	return 1
 end
@@ -337,6 +355,7 @@ local function laneOf(c): (Vector3, Vector3, Vector3)
 	local dir = Vector3.new(e.dx, 0, e.dz) * c.sign
 	local left = Vector3.new(dir.Z, 0, -dir.X)
 	local off = math.clamp(e.def.width / 4, 3.2, 9)
+	if c.bike then off = math.min(off + 2, e.def.width / 2 - 1.6) end -- (2026-11-19) motorbikes keep to the kerb side of the lane
 	return Vector3.new(e.a.x + e.dx * sa, 0, e.a.z + e.dz * sa) + left * off, dir, left
 end
 
@@ -365,6 +384,7 @@ local function spawnLocal(c, around: Vector3, obstacles): boolean
 			c.v = c.base * 0.7
 			c.vis, c.look, c.at = nil, nil, nil
 			c.stallUntil, c.blockedFor, c.stuckFor, c.stillFor, c.ghostUntil = 0, 0, 0, 0, 0
+			c.planned, c.turn = nil, nil
 			return true
 		end
 	end
@@ -373,7 +393,7 @@ end
 
 -- At the end of its street a local car picks the next one: mostly straight on, sometimes a turn,
 -- rarely into a soi, never into a lane; a dead end turns it round.
-local function nextStreet(c)
+local function chooseNext(c)
 	local e = c.e
 	local node = c.sign > 0 and e.b or e.a
 	local dx, dz = e.dx * c.sign, e.dz * c.sign
@@ -388,22 +408,72 @@ local function nextStreet(c)
 			table.insert(options, { o, sgn, w })
 		end
 	end
-	if #options == 0 then
-		c.sign = -c.sign
-		c.s = 0
-		return
-	end
+	if #options == 0 then return nil end
 	local r = rng:NextNumber() * total
 	local pick = options[1]
 	for _, it in ipairs(options) do
 		r -= it[3]
 		if r <= 0 then pick = it break end
 	end
+	return pick
+end
+
+-- (2026-11-19, owner: AI vehicles signal before they turn) the next street is chosen ~45 studs before the
+-- junction, so the indicator of that side can blink on the way in; c.turn = "L" / "R" / nil
+local function planTurn(c)
+	local pick = chooseNext(c)
+	c.planned = pick or false
+	c.turn = nil
+	if pick then
+		local e = c.e
+		local dx, dz = e.dx * c.sign, e.dz * c.sign
+		local o, sgn = pick[1], pick[2]
+		local cross = dx * (o.dz * sgn) - dz * (o.dx * sgn) -- > 0 = to the right (Roblox: X right, Z toward the viewer)
+		if cross > 0.45 then c.turn = "R" elseif cross < -0.45 then c.turn = "L" end
+	end
+end
+
+local function nextStreet(c)
+	local pick = c.planned
+	if pick == nil then pick = chooseNext(c) end
+	c.planned = nil
+	c.turnOffAt = os.clock() + 1.2 -- keep blinking round the corner a moment
+	if not pick then
+		c.sign = -c.sign
+		c.s = 0
+		return
+	end
 	c.e, c.sign, c.s = pick[1], pick[2], 0
 end
 
+-- The traffic kit's vehicles come without indicator lamps: four small ones at the corners (local -Z is the way
+-- it drives, -X its left), picked up by lamps() as SignalL / SignalFL / SignalR / SignalFR (2026-11-19)
+local function addIndicators(model: Model)
+	local pv = model:GetPivot()
+	local bcf, size = model:GetBoundingBox()
+	local rel = pv:ToObjectSpace(bcf).Position
+	local ext = model:GetExtentsSize()
+	local hl, hw = math.max(ext.X, ext.Z) / 2, math.min(ext.X, ext.Z) / 2
+	local bike = model:GetAttribute("HasRider") == true
+	local y = rel.Y - size.Y / 2 + size.Y * (bike and 0.45 or 0.38)
+	for _, sx in ipairs({ -1, 1 }) do
+		for _, sz in ipairs({ -1, 1 }) do
+			local p = Instance.new("Part")
+			p.Anchored = true; p.CanCollide = false; p.CanQuery = false; p.CanTouch = false; p.CastShadow = false
+			p.Size = bike and Vector3.new(0.22, 0.18, 0.18) or Vector3.new(0.34, 0.24, 0.12)
+			p.Color = Color3.fromRGB(170, 105, 25)
+			p.Material = Enum.Material.SmoothPlastic
+			p.Name = "Signal" .. (sz < 0 and "F" or "") .. (sx < 0 and "L" or "R")
+			p.CFrame = pv * CFrame.new(rel.X + sx * (hw - (bike and 0.45 or 0.12)), y, rel.Z + sz * (hl + 0.04))
+			p.Parent = model
+		end
+	end
+end
+
 local function startLocals()
-	local kit = ReplicatedStorage:WaitForChild("GoDashTrafficKit", 20)
+	-- (2026-11-19: a fresh server can take 30 s and more to build the city; with a 20 s wait the first rider
+	-- on it gave up and saw no local traffic at all for the whole session)
+	local kit = ReplicatedStorage:WaitForChild("GoDashTrafficKit", 300)
 	if not kit then return end
 	-- A folder arrives before what is inside it. Cloning at once copied half-arrived models: bikes
 	-- whose rider was only a helmet (2026-11-16). Wait until everything the server made is here.
@@ -415,16 +485,18 @@ local function startLocals()
 	localFolder = Instance.new("Folder")
 	localFolder.Name = "GoDashLocalTraffic"
 	localFolder.Parent = Workspace
-	local n = math.ceil(LOCAL_COUNT * 1.4)
+	local n = math.ceil(LOCAL_COUNT * 1.7)
 	for i = 1, n do
 		local model = templates[(i - 1) % #templates + 1]:Clone()
 		model.Name = "LocalCar"
+		pcall(addIndicators, model)
 		local size = model:GetExtentsSize()
-		local brakes, signals = lamps(model)
+		local brakes, signals, sigL, sigR = lamps(model)
 		local base = (model:GetAttribute("Speed") or 40) * rng:NextNumber(0.85, 1.15)
 		table.insert(locals, {
 			model = model, base = base, v = base, y = model:GetAttribute("Y") or 2.5, smooth = true,
-			len = math.max(size.Z, size.X), wid = math.min(size.X, size.Z), brakes = brakes, signals = signals,
+			len = math.max(size.Z, size.X), wid = math.min(size.X, size.Z), brakes = brakes, signals = signals, sigL = sigL, sigR = sigR,
+			bike = model:GetAttribute("HasRider") == true,
 			stallUntil = 0, blockedFor = 0, honkAt = 0, active = false,
 		})
 	end
@@ -508,7 +580,7 @@ local function moveCars(t: number, dt: number, camPos: Vector3)
 	-- local traffic
 	if me and #locals > 0 then
 		local want = math.floor(LOCAL_COUNT * busy() * Perf.scale * Perf.limit("locals") + 0.5)
-		local slow = busy() > 1.2 and 0.8 or 1
+		local slow = busy() > 1.2 and 0.66 or 1
 		for i, c in ipairs(locals) do
 			if i > want then
 				if c.active then c.active = false; c.at = nil; c.model.Parent = nil end
@@ -529,6 +601,8 @@ local function moveCars(t: number, dt: number, camPos: Vector3)
 				local node = c.sign > 0 and e.b or e.a
 				local here, dir, left = laneOf(c)
 				local target = c.base * slow
+				if toNext < 45 and c.planned == nil then planTurn(c) end
+				if c.turnOffAt and os.clock() > c.turnOffAt and c.s > 10 then c.turn, c.turnOffAt = nil, nil end
 				if toNext < 30 and #node.links >= 3 then target = math.min(target, c.base * 0.55) end -- ease into junctions
 				if mustStop(node, e, toNext, c.v, t) then
 					target = 0

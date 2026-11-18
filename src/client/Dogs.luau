@@ -135,7 +135,7 @@ end
 
 function Dogs.start()
 	task.spawn(function()
-		local folder = ReplicatedStorage:WaitForChild("GoDashDogs", 60)
+		local folder = ReplicatedStorage:WaitForChild("GoDashDogs", 300) -- (a slow fresh server: see client/Street startLocals)
 		if not folder then return end
 		local store = ReplicatedStorage:FindFirstChild("GoDashModels")
 		local template = store and store:FindFirstChild("Dog1")

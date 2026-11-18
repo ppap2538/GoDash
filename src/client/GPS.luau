@@ -359,7 +359,7 @@ function GPS.start()
 	HUD.gps = GPS
 	State.onWorld(function() mm.origin = Vector3.new(1e9, 0, 0) end) -- redraw icons
 	task.spawn(function() -- checkpoints move: redraw the icons when they do
-		local f = ReplicatedStorage:WaitForChild("GoDashCheckpoints", 60)
+		local f = ReplicatedStorage:WaitForChild("GoDashCheckpoints", 300)
 		if not f then return end
 		local function dirty() mm.origin = Vector3.new(1e9, 0, 0) end
 		f.ChildAdded:Connect(dirty)
