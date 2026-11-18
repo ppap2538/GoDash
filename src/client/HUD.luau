@@ -35,6 +35,7 @@ local HUD = {}
 HUD.onPhone = nil :: (() -> ())? -- set by Phone
 HUD.gps = nil :: any -- set by GPS: { distance, name }
 HUD.mapHolder = nil :: Frame? -- the minimap frame GPS draws into
+HUD.topLeft = nil :: Frame? -- the top-left column (client/Guide adds its card there)
 HUD.mapSize = Vector2.new(190, 150) -- its size in layout px (changes with the breakpoint)
 
 local isTouch = Layout.isTouch
@@ -60,6 +61,7 @@ local function build()
 	-- top-left column
 	StatusWidget.build(topLeft) -- layout orders 1..3
 	JobCard.build(topLeft, 4, HUD)
+	HUD.topLeft = topLeft -- client/Guide puts the "what to do now" card under these (order 20)
 
 	-- top-right cluster
 	NavWidget.build(topRight, HUD)

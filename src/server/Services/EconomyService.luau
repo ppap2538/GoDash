@@ -5,6 +5,7 @@ local Game = require(Shared.Config.Game)
 local Util = require(Shared.Util)
 local Net = require(Shared.Net)
 local Data = require(script.Parent.PlayerDataService)
+local Metrics = require(script.Parent.MetricsService)
 
 local Economy = {}
 local levelHooks = {}
@@ -24,7 +25,17 @@ function Economy.add(player: Player, amount: number, reason: string, income: boo
 	local d = Data.get(player)
 	if not d or not Util.isFinite(amount) or amount <= 0 then return false end
 	amount = math.floor(amount + 0.5)
-	d.money += amount
+	-- a KK Bank loan in arrears takes its share of job pay first (server/FinanceService, Config/Credit);
+	-- the job still counts in full for income and earnings
+	local took = 0
+	if income and d.bankLoan and d.bankLoan.missed and d.bankLoan.missed > 0 then
+		took = require(script.Parent.FinanceService).garnish(player, d, amount)
+		if took > 0 then
+			Metrics.money(player, took, "bank_garnish", true)
+			Net.fire(player, "Notify", "toast", { text = ("🏦 −฿%d to KK Bank (overdue loan)"):format(took), th = ("🏦 หัก ฿%d ชำระหนี้ธนาคารที่ค้าง"):format(took), bad = true })
+		end
+	end
+	d.money += amount - took
 	if income then
 		rollDay(d)
 		d.daily.income += amount
@@ -32,6 +43,7 @@ function Economy.add(player: Player, amount: number, reason: string, income: boo
 		Data.touch(player, "daily", "stats")
 	end
 	Data.touch(player, "money")
+	Metrics.money(player, amount, reason, false)
 	if Game.DEBUG then print(("[Eco] +%d %s (%s)"):format(amount, player.Name, reason)) end
 	return true
 end
@@ -48,6 +60,7 @@ function Economy.spend(player: Player, amount: number, reason: string): boolean
 	if d.money < amount then return false end
 	d.money -= amount
 	Data.touch(player, "money")
+	Metrics.money(player, amount, reason, true)
 	if Game.DEBUG then print(("[Eco] -%d %s (%s)"):format(amount, player.Name, reason)) end
 	return true
 end
@@ -63,6 +76,7 @@ function Economy.addExp(player: Player, amount: number)
 		leveled = true
 		local bonus = 100 + d.level * 50
 		d.money += bonus
+		Metrics.money(player, bonus, "levelup", false)
 		Net.fire(player, "Notify", "levelup", { level = d.level, bonus = bonus })
 		for _, fn in ipairs(levelHooks) do task.spawn(fn, player, d.level) end
 	end

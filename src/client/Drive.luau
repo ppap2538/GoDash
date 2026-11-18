@@ -16,11 +16,22 @@ local Sounds = require(Shared.Config.Sounds)
 local Net = require(Shared.Net)
 local State = require(script.Parent.State)
 local Feedback = require(script.Parent.Feedback)
+local Crash = require(script.Parent.Crash)
+local EngineSound = require(script.Parent.EngineSound)
 
 local Drive = {}
 local player = Players.LocalPlayer
 local cur = nil -- the vehicle being driven
 Drive.touch = { throttle = 0, steer = 0, handbrake = false } -- written by the HUD pedals
+-- client/AutoDrive sets this: (c, ctx) -> throttle, steer, handbrake (or nil when it lets go)
+Drive.autopilot = nil :: ((any, any) -> (number?, number?, boolean?))?
+-- client/Cutscene sets this: called once when a hard crash throws the rider off (see the hard-hit check)
+Drive.onCrash = nil :: ((any) -> ())?
+Drive.onHorn = nil :: (() -> ())? -- client/StreetLife
+Drive.fx = nil :: ((any, number, any) -> ())? -- client/DriveFx: per-step effects
+Drive.onHit = nil :: ((any) -> ())? -- client/Accident: { instance, dv, at, model } for every hard hit
+Drive.onExit = nil :: ((any) -> ())? -- client/DriveFx: clean up when you get off
+Drive.stallUntil = 0 -- client/StreetLife: the engine is dead until then (water in the exhaust)
 Drive.info = { driving = false, speed = 0, fuel = 0, fuelCap = 0, condition = 100, lights = false, signal = 0, pedal = false, name = "" }
 
 local GRAVITY = Workspace.Gravity
@@ -53,12 +64,39 @@ local function sendState(force: boolean?)
 	end
 end
 
+-- Get off: step down beside the vehicle on the seat's side (left on a motorbike, the way Thai
+-- riders get off; the driver's door side in a car) instead of hopping into the air (2026-11-18).
 local function leave()
-	local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
-	if hum then
-		hum.Sit = false
+	local char = player.Character
+	local hum = char and char:FindFirstChildOfClass("Humanoid")
+	local root = char and char:FindFirstChild("HumanoidRootPart") :: BasePart?
+	if not hum then return end
+	local seat = hum.SeatPart
+	local model = seat and seat.Parent
+	local chassis = model and model:IsA("Model") and model.PrimaryPart
+	hum.Sit = false
+	if not (seat and chassis and root) then
 		hum:ChangeState(Enum.HumanoidStateType.GettingUp)
+		return
 	end
+	local def = Vehicles.ById[model:GetAttribute("VehicleId")]
+	local lx = chassis.CFrame:PointToObjectSpace(seat.Position).X
+	local sideSign = (def and def.class == "car") and (lx >= 0 and 1 or -1) or -1
+	local out = (def and def.class == "car") and ((def.wid or 6) / 2 + 1.6) or 2.3
+	local look = Vector3.new(chassis.CFrame.LookVector.X, 0, chassis.CFrame.LookVector.Z)
+	if look.Magnitude < 0.1 then look = Vector3.new(0, 0, -1) end
+	local spot = (chassis.CFrame * CFrame.new(sideSign * out, 0, 0)).Position
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	params.FilterDescendantsInstances = { model, char }
+	local g = Workspace:Raycast(spot + Vector3.new(0, 6, 0), Vector3.new(0, -14, 0), params)
+	local y = (g and g.Position.Y or spot.Y) + hum.HipHeight + root.Size.Y / 2
+	task.defer(function()
+		if root.Parent then
+			root.AssemblyLinearVelocity = Vector3.zero
+			root.CFrame = CFrame.lookAt(Vector3.new(spot.X, y, spot.Z), Vector3.new(spot.X, y, spot.Z) + look.Unit)
+		end
+	end)
 end
 Drive.leave = leave
 
@@ -67,7 +105,9 @@ local function exit()
 	local c = cur
 	cur = nil
 	Drive.info.driving = false
-	if c.engine then c.engine:Destroy() end
+	Drive.info.auto = false
+	if Drive.onExit then pcall(Drive.onExit, c) end
+	if c.audio then c.audio:stop() end
 	if c.skid then c.skid:Destroy() end
 	if c.bodyWeld and c.bodyWeld.Parent then c.bodyWeld.C0 = c.bodyBase end
 	for _, s in ipairs(c.spin or {}) do
@@ -112,20 +152,20 @@ local function enter(model: Model, seat: VehicleSeat)
 		end
 	end
 	c.crank = 0
-	c.joints = nil -- found lazily: the character may still be loading its limbs
+	c.lastVel = nil
+	-- paint colour for crash shards: the biggest visible body part
+	local best, bv = nil, 0
+	for _, p in ipairs(model:GetDescendants()) do
+		if p:IsA("BasePart") and p.Transparency < 0.5 then
+			local v = p.Size.X * p.Size.Y * p.Size.Z
+			if v > bv then best, bv = p, v end
+		end
+	end
+	c.paint = best and best.Color or nil
 	c.lights = model:GetAttribute("Lights") == true
 	rayParams.FilterDescendantsInstances = { model, player.Character }
 
-	local eng = Instance.new("Sound")
-	eng.Name = "Engine"
-	eng.Looped = true
-	eng.SoundId = def.pedal and "" or (def.class == "bike" and Sounds.engineBike or Sounds.engineCar)
-	eng.Volume = 0
-	eng.RollOffMaxDistance = 200
-	eng.SoundGroup = Feedback.sfxGroup
-	eng.Parent = chassis
-	if eng.SoundId ~= "" then eng:Play() end
-	c.engine = eng
+	c.audio = EngineSound.new(def, chassis) -- revs, gears, load, wind, brakes, horn (client/EngineSound)
 	local skid = Instance.new("Sound")
 	skid.Looped = true
 	skid.SoundId = Sounds.skid
@@ -146,7 +186,9 @@ local function enter(model: Model, seat: VehicleSeat)
 		elseif k == Enum.KeyCode.Z then Drive.setSignal(cur.signal == -1 and 0 or -1)
 		elseif k == Enum.KeyCode.C then Drive.setSignal(cur.signal == 1 and 0 or 1)
 		elseif k == Enum.KeyCode.X then Drive.setSignal(cur.signal == 2 and 0 or 2)
-		elseif k == Enum.KeyCode.H then Feedback.play("tick", 0.9, 0.55, 0.3)
+		elseif k == Enum.KeyCode.H then
+			if cur.audio then cur.audio:horn() end
+			if Drive.onHorn then Drive.onHorn() end -- client/StreetLife: the live-streamer steps back
 		end
 		return Enum.ContextActionResult.Sink
 	end, false, Enum.KeyCode.E, Enum.KeyCode.F, Enum.KeyCode.Z, Enum.KeyCode.C, Enum.KeyCode.X, Enum.KeyCode.H)
@@ -203,15 +245,52 @@ local function step(dt: number)
 	if type(qaT) == "number" then throttle = qaT end
 	if type(qaS) == "number" then steerIn = qaS end
 	local handbrake = t.handbrake or UserInputService:IsKeyDown(Enum.KeyCode.Space)
+	local ap = Drive.autopilot
+	if ap and Drive.info.auto then
+		local fr = math.clamp(math.abs(speedF) / math.max(c.stats.topSpeed, 1), 0, 1)
+		local aT, aS, aH = ap(c, {
+			cf = cf, fwd = fwd, right = right, speedF = speedF, dt = dt, manualT = throttle, manualS = steerIn, manualH = handbrake,
+			maxAngle = math.rad(c.def.steer + (6.5 - c.def.steer) * fr ^ 0.65),
+		})
+		if aT then throttle, steerIn, handbrake = aT, aS or 0, aH == true end
+	end
+	if State.cutscene then throttle, steerIn, handbrake = 0, 0, true end -- parked while the rider is off the bike in a scene
 	local boost = UserInputService:IsKeyDown(Enum.KeyCode.LeftShift)
 
+	-- hard hits: a big change of velocity within one step is a collision, not the brakes. Sparks,
+	-- shards and sound at the contact point; a real smash throws the rider off (client/Cutscene "crash",
+	-- owner 2026-11-17) and the vehicle stays where it stopped.
+	if c.lastVel then
+		local dv = Vector3.new(c.lastVel.X - vel.X, 0, c.lastVel.Z - vel.Z).Magnitude
+		if dv > 11 and os.clock() - (c.hitAt or 0) > 0.4 then
+			c.hitAt = os.clock()
+			local dir = Vector3.new(c.lastVel.X, 0, c.lastVel.Z)
+			dir = dir.Magnitude > 0.1 and dir.Unit or fwd
+			local half = (c.def.len or 6) / 2
+			local r = Workspace:Raycast(chassis.Position, dir * (half + 3), rayParams)
+			local at = r and r.Position or (chassis.Position + dir * half)
+			Crash.effect(at, math.clamp((dv - 11) / 34, 0.12, 1), { normal = r and r.Normal or -dir, mine = true, color = c.paint })
+			if Drive.onHit then task.spawn(Drive.onHit, { instance = r and r.Instance, dv = dv, at = at, model = c.model, car = c.def.class == "car" }) end
+			local hard = c.def.class == "car" and 38 or 24
+			if dv > hard and not State.cutscene and Drive.onCrash and os.clock() - (c.thrownAt or 0) > 4 then
+				c.thrownAt = os.clock()
+				local hv = Vector3.new(c.lastVel.X, 0, c.lastVel.Z)
+				Net.send("VehicleFall", hv.Magnitude) -- (the speed sets how badly the rider is hurt: server/HealthService)
+				Drive.onCrash({ dir = dir, speed = hv.Magnitude, at = at, model = c.model, car = c.def.class == "car" })
+			end
+		end
+	end
+	c.lastVel = vel
+	Crash.sweep(chassis, (c.def.len or 6) / 2)
+
 	local fuel = attr(c.model, "Fuel", 0)
-	local hasPower = c.def.pedal or fuel > 0
-	if not hasPower and throttle > 0 and os.clock() - (c.fuelWarn or 0) > 8 then
+	local hasPower = (c.def.pedal or fuel > 0) and (c.def.pedal or os.clock() >= Drive.stallUntil) -- client/StreetLife floods stall small engines
+	-- (the Guide card already shows low fuel with a route button, so these toasts stay rare)
+	if not hasPower and throttle > 0 and os.clock() - (c.fuelWarn or 0) > 25 then
 		c.fuelWarn = os.clock()
 		Feedback.toast("⛽ Out of fuel! Open Garage on your phone for emergency fuel.", "bad")
 	end
-	if not c.def.pedal and c.def.fuelCap > 0 and fuel > 0 and fuel / c.def.fuelCap < 0.15 and os.clock() - (c.lowFuelWarn or 0) > 45 then
+	if not c.def.pedal and c.def.fuelCap > 0 and fuel > 0 and fuel / c.def.fuelCap < 0.15 and not c.lowFuelWarn then
 		c.lowFuelWarn = os.clock()
 		Feedback.toast("⛽ Fuel is low. Phone > Maps > Nearest fuel station.", "bad")
 	end
@@ -240,11 +319,18 @@ local function step(dt: number)
 	local slip = 0
 	local braking = false
 
+	c.contacts = c.contacts or {}
 	for i = 1, n do
 		local lp = c.wheels[i]
 		local origin = cf:PointToWorldSpace(Vector3.new(lp.X, 0, lp.Z))
 		local hit = Workspace:Raycast(origin, -up * (c.ride + 1.3), rayParams)
+		local contact = c.contacts[i] or {}
+		c.contacts[i] = contact
+		contact.ok = hit ~= nil
+		contact.front = lp.Z < 0
 		if hit then
+			contact.pos, contact.normal = hit.Position, hit.Normal
+			contact.lat = chassis:GetVelocityAtPosition(origin):Dot(lp.Z < 0 and (right * cosS - fwd * sinS) or right)
 			grounded += 1
 			local comp = c.ride - hit.Distance
 			local pv = chassis:GetVelocityAtPosition(origin)
@@ -305,29 +391,9 @@ local function step(dt: number)
 	local bike = c.def.class == "bike"
 	local kr, cr = bike and 110 or 26, bike and 16 or 5
 	-- a positive turn about the forward axis lowers the right side, so a raised right side (roll > 0) needs positive torque
-	-- cornering too hard for the speed: a bike goes down, a car rolls (driving assist gives more margin)
-	local aLat = angVel:Dot(up) * speedF
-	-- (studs/s²; full lock near top speed on a motorbike goes over, a bicycle never does)
-	local overLimit = (bike and 52 * gripMult or 80) * (assist and 1.15 or 1)
-	if grounded > 0 and math.abs(aLat) > overLimit and speed > (bike and 16 or 34) then
-		c.overT = (c.overT or 0) + dt
-	else
-		c.overT = math.max(0, (c.overT or 0) - dt * 2)
-	end
-	if (c.overT or 0) > (bike and 0.3 or 0.45) and not c.fallen then
-		c.fallen = os.clock()
-		c.fallDir = aLat >= 0 and 1 or -1
-		c.overT = 0
-		Net.send("VehicleFall")
-		Feedback.toast(bike and "💥 Too fast into the corner: you went down!" or "💥 Rolled it! Slow down for corners.", "bad")
-	end
-	local torque
-	if c.fallen then
-		torque = fwd * (c.fallDir * (bike and 60 or 42) * mass)
-		if os.clock() - c.fallen > 2.4 then c.fallen = nil end
-	else
-		torque = fwd * ((roll * kr - angVel:Dot(fwd) * cr) * mass)
-	end
+	-- (2026-11-17, owner: "take out the physics where you fall over in a corner". Bikes and cars stay on
+	-- their wheels however hard they turn; only a real crash throws the rider off.)
+	local torque = fwd * ((roll * kr - angVel:Dot(fwd) * cr) * mass)
 	if grounded == 0 then
 		torque -= right * (angVel:Dot(right) * mass * 0.6) -- calm the tumbling while airborne
 	end
@@ -337,7 +403,7 @@ local function step(dt: number)
 
 	-- driving assist: the vehicle turns the way its front wheel points and slides less sideways,
 	-- so steering feels direct instead of scrubbing speed (Settings > Driving assist turns it off)
-	if assist and grounded > 0 and not c.fallen and math.abs(speedF) > 1.5 then
+	if assist and grounded > 0 and math.abs(speedF) > 1.5 then
 		local wantYaw = -speedF * math.tan(c.steer) / c.wheelbase
 		local av = chassis.AssemblyAngularVelocity
 		local yawNow = av:Dot(up)
@@ -382,23 +448,30 @@ local function step(dt: number)
 		s.weld.C0 = s.base * CFrame.Angles(-s.angle, 0, 0)
 	end
 	if c.def.pedal then
-		local cadence = throttle > 0.05 and math.clamp(3 + math.abs(speedF) * 0.35, 3, 11) or 0
+		-- pedal while pushing on; slow turns when barely moving (stuck against a wall)
+		local cadence = throttle > 0.05 and math.clamp(1.2 + math.abs(speedF) * 0.4, 1.2, 11) or 0
 		c.crank = (c.crank + cadence * dt) % (math.pi * 2)
 	end
 	c.steerNow = steerIn
 
 	-- sound and camera
 	local rev = math.clamp(math.abs(speedF) / math.max(top, 1), 0, 1.1)
-	if c.engine then
-		c.engine.PlaybackSpeed = 0.75 + rev * 1.1 + math.abs(throttle) * 0.12
-		c.engine.Volume = hasPower and (0.18 + rev * 0.3 + math.abs(throttle) * 0.12) or 0
+	if c.audio then
+		c.audio:update(dt, { speed = speedF, throttle = throttle, braking = braking, hasPower = hasPower, top = top, grounded = grounded, signal = c.signal })
+		Drive.info.gear = c.audio:gearNow()
 	end
 	if c.skid then
 		local want = (slip > mass * 2 and speed > 12) and math.clamp(slip / (mass * 40), 0.15, 0.6) or 0
 		c.skid.Volume += (want - c.skid.Volume) * math.min(1, dt * 10)
 	end
 	local cam = Workspace.CurrentCamera
-	if cam then cam.FieldOfView += ((70 + rev * 12) - cam.FieldOfView) * math.min(1, dt * 3) end
+	if cam and not State.cutscene then cam.FieldOfView += ((70 + rev * 12) - cam.FieldOfView) * math.min(1, dt * 3) end
+	-- skid marks, tyre smoke, exhaust, speed streaks, headlight beams (client/DriveFx)
+	if Drive.fx then
+		local ok, err = pcall(Drive.fx, c, dt, { speed = speed, speedF = speedF, top = top, throttle = throttle, braking = braking,
+			handbrake = handbrake, slip = slip, mass = mass, grounded = grounded, wet = wet, hasPower = hasPower, boost = boost })
+		if not ok and not c.fxWarned then c.fxWarned = true; warn("[DriveFx] " .. tostring(err)) end
+	end
 
 	c.braking = braking
 	Drive.info.speed = speed
@@ -451,54 +524,9 @@ local function watch(model: Instance)
 	model.Destroying:Connect(function() blinkers[model] = nil end)
 end
 
--- Rider pose on two wheels: lean in, hands on the bars, legs pedalling on a bicycle.
--- Added on top of the sit animation every frame (R15 avatars; others keep the plain sit).
-local function findJoints(char: Model)
-	local function j(partName: string, jointName: string)
-		local p = char:FindFirstChild(partName)
-		local m = p and p:FindFirstChild(jointName)
-		return (m and m:IsA("Motor6D")) and m or nil
-	end
-	local t = {
-		waist = j("UpperTorso", "Waist"),
-		rs = j("RightUpperArm", "RightShoulder"), ls = j("LeftUpperArm", "LeftShoulder"),
-		re = j("RightLowerArm", "RightElbow"), le = j("LeftLowerArm", "LeftElbow"),
-		rh = j("RightUpperLeg", "RightHip"), lh = j("LeftUpperLeg", "LeftHip"),
-		rk = j("RightLowerLeg", "RightKnee"), lk = j("LeftLowerLeg", "LeftKnee"),
-	}
-	return (t.waist and t.rs and t.ls) and t or false
-end
-
-local function riderPose()
-	local c = cur
-	if not c or c.def.class ~= "bike" then return end
-	local char = player.Character
-	if not char then return end
-	if c.joints == nil then c.joints = findJoints(char) end
-	local J = c.joints
-	if not J then return end
-	local A = CFrame.Angles
-	local steer = (c.steerNow or 0) * 0.16
-	local sport = c.def.style == "sport" or c.def.style == "bigbike"
-	J.waist.Transform *= A(math.rad(sport and -24 or -11), 0, 0)
-	local reach = math.rad(sport and 78 or 66)
-	J.rs.Transform *= A(reach + steer, 0, math.rad(-7))
-	J.ls.Transform *= A(reach - steer, 0, math.rad(7))
-	if J.re then J.re.Transform *= A(math.rad(16), 0, 0) end
-	if J.le then J.le.Transform *= A(math.rad(16), 0, 0) end
-	if c.def.pedal and J.rh and J.lh then
-		local s = math.sin(c.crank)
-		J.rh.Transform *= A(math.rad(-22) + math.rad(24) * s, 0, 0)
-		J.lh.Transform *= A(math.rad(-22) - math.rad(24) * s, 0, 0)
-		if J.rk then J.rk.Transform *= A(math.rad(-26) - math.rad(26) * s, 0, 0) end
-		if J.lk then J.lk.Transform *= A(math.rad(-26) + math.rad(26) * s, 0, 0) end
-	elseif J.rh and J.lh then
-		-- feet down on the pegs instead of straight out
-		J.rh.Transform *= A(math.rad(-14), 0, 0)
-		J.lh.Transform *= A(math.rad(-14), 0, 0)
-		if J.rk then J.rk.Transform *= A(math.rad(-18), 0, 0) end
-		if J.lk then J.lk.Transform *= A(math.rad(-18), 0, 0) end
-	end
+-- The vehicle this client is driving (nil on foot). Rider reads the crank and steering from it.
+function Drive.current()
+	return cur
 end
 
 -- V switches between third person and first person (works on foot and on a vehicle).
@@ -506,14 +534,18 @@ function Drive.toggleView()
 	local first = player.CameraMode == Enum.CameraMode.LockFirstPerson
 	player.CameraMode = first and Enum.CameraMode.Classic or Enum.CameraMode.LockFirstPerson
 	if first then
-		player.CameraMinZoomDistance = 0.5
+		-- Leaving first person keeps the zoom at 0.5, so the view did not change at all (owner, 2026-11-16:
+		-- "cannot go back to third person"). A minimum zoom pushes the camera back out; then free it again.
 		player.CameraMaxZoomDistance = 60
+		player.CameraMinZoomDistance = 16
+		task.delay(0.3, function()
+			if player.CameraMode == Enum.CameraMode.Classic then player.CameraMinZoomDistance = 0.5 end
+		end)
 	end
 	Feedback.toast(first and "Third-person view" or "First-person view (V to switch back)")
 end
 
 function Drive.start()
-	RunService.Stepped:Connect(riderPose)
 	UserInputService.InputBegan:Connect(function(input, processed)
 		if not processed and input.KeyCode == Enum.KeyCode.V then Drive.toggleView() end
 	end)

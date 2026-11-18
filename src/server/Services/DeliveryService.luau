@@ -4,6 +4,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage.Shared
 local Jobs = require(Shared.Config.Jobs)
 local Items = require(Shared.Config.Items)
+local Civic = require(script.Parent.CivicJobs)
 
 local Delivery = {}
 Delivery.mode = "food"
@@ -13,16 +14,65 @@ Delivery.stat = "deliveries"
 
 local FIRST = { "Khun Somchai", "Khun Malee", "Khun Nok", "Khun Lek", "Khun Ploy", "Khun Art", "Khun Fah", "Khun Boom", "Khun Mint", "Khun Tee", "Khun Aom", "Khun Bank" }
 
+-- Every place an order can come from: restaurants, cafés, convenience stores and the markets.
+local FOOD_POI = { market = true, nightmarket = true, reststop = true }
+-- Opening hours on the game clock (2026-11-18, owner: "orders should follow the time of day"): late at
+-- night only the 24-hour GoMart, the night market and the rest stop still cook; the fresh market sells
+-- cooked food in the morning; cafés close in the evening.
+local HOURS = {
+	restaurant = { { 6.5, 22 } }, cafe = { { 6.5, 18 } }, convenience = nil, market = { { 4.5, 13 } },
+	nightmarket = { { 16.5, 24 }, { 0, 2 } }, reststop = nil,
+}
+local function isOpen(kind: string, clock: number): boolean
+	local h = HOURS[kind]
+	if not h then return true end
+	for _, w in ipairs(h) do
+		if clock >= w[1] and clock < w[2] then return true end
+	end
+	return false
+end
+local pool
+local function kitchens(world)
+	if pool then return pool end
+	pool = {}
+	for _, s in ipairs(world.shops) do
+		local stock = s.kind == "restaurant" and s.menu or Items.SHOPS[s.kind]
+		if stock and #stock > 0 then table.insert(pool, { id = s.id, kind = s.kind, pos = s.pos, name = s.name, thai = s.thai, stock = stock }) end
+	end
+	for id, p in pairs(world.pois) do
+		local stock = FOOD_POI[p.kind] and Items.SHOPS[p.kind]
+		if stock and p.door then table.insert(pool, { id = id, kind = p.kind, pos = p.door, name = p.name, thai = p.thai, stock = stock }) end
+	end
+	return pool
+end
+local function openKitchens(world, clock: number)
+	local out = {}
+	for _, k in ipairs(kitchens(world)) do
+		if isOpen(k.kind, clock) then table.insert(out, k) end
+	end
+	if #out == 0 then return kitchens(world) end
+	return out
+end
+Delivery.isOpen = isOpen
+local offered = {} -- [UserId] = { last pick-up offered, the one before }
+
 -- ctx: { world, rng, weather, vehicles, npc }
+-- (owner, 2026-11-16: "jobs should start from the nearest area".) The order comes from the kitchen
+-- closest to the rider; the last two offered (and not taken) step aside for the next closest, so
+-- declining walks outwards from where the rider is.
 function Delivery.targets(player: Player, root: Vector3, def, ctx)
 	local world = ctx.world
-	if #world.restaurants == 0 then return nil end
-	-- one of the restaurants closest to the rider (the very closest few on a bicycle)
-	local sorted = table.clone(world.restaurants)
+	local list = openKitchens(world, ctx.time.clock())
+	if def.civic then return Civic.targets(player, root, def, ctx, list) end
+	if #list == 0 then return nil end
+	local sorted = table.clone(list)
 	table.sort(sorted, function(a, b) return (a.pos - root).Magnitude < (b.pos - root).Magnitude end)
-	local v = ctx.vehicles.get(player)
-	local slow = (not v) or v.def.topSpeed < 40
-	local best = sorted[ctx.rng:NextInteger(1, math.min(#sorted, slow and 3 or 8))]
+	local last = offered[player.UserId] or {}
+	local best = sorted[1]
+	for _, k in ipairs(sorted) do
+		if not table.find(last, k.id) then best = k break end
+	end
+	offered[player.UserId] = { best.id, last[1] }
 	local drop
 	for _ = 1, 60 do
 		local a = world.addresses[ctx.rng:NextInteger(1, #world.addresses)]
@@ -30,7 +80,7 @@ function Delivery.targets(player: Player, root: Vector3, def, ctx)
 		if dd >= def.minDist * 0.75 and dd <= def.maxDist * 0.8 then drop = a break end
 	end
 	if not drop then return nil end
-	local dish = Items.ById[best.menu[ctx.rng:NextInteger(1, #best.menu)]]
+	local dish = Items.ById[best.stock[ctx.rng:NextInteger(1, #best.stock)]]
 	return {
 		pickup = { pos = best.pos, name = best.name, thai = best.thai },
 		dropoff = { pos = drop.pos, name = drop.name or (drop.kind == "house" and "Home" or drop.kind == "dorm" and "Dormitory" or "Shop house") },

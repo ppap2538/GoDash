@@ -5,6 +5,8 @@ local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 local Lang = require(script.Parent.Lang)
+local Sounds = require(ReplicatedStorage:WaitForChild("Shared").Config.Sounds)
+local Feedback = require(script.Parent.Feedback)
 
 local Dogs = {}
 local SHOW, HIDE = 420, 520
@@ -97,7 +99,7 @@ function Dogs.start()
 						if not shown[cfg] and dist < SHOW then
 							local model, h = build(template, cfg:GetAttribute("Look") or 1)
 							model.Parent = holder
-							shown[cfg] = { model = model, height = h, pos = pos, look = Vector3.new(0, 0, -1), phase = 0 }
+							shown[cfg] = { model = model, height = h, pos = pos, look = Vector3.new(0, 0, -1), phase = 0, voice = 0.8 + math.random() * 0.5 }
 						elseif shown[cfg] and dist > HIDE then
 							shown[cfg].model:Destroy()
 							shown[cfg] = nil
@@ -125,6 +127,29 @@ function Dogs.start()
 					d.model:PivotTo(CFrame.lookAt(p, p + d.look.Unit) * FACE * CFrame.Angles(pitch, 0, 0))
 					local bark = d.model:FindFirstChild("Bark")
 					if bark then bark.Enabled = state == "chase" and (os.clock() * 3) % 1 < 0.7 end
+					-- out loud too, when the bark sound is set (Config/Sounds.dogBark): a dog that is chasing
+					-- barks again and again, a resting dog gives the odd bark when someone comes near
+					if Sounds.dogBark ~= "" then
+						local now = os.clock()
+						local dist = (d.pos - camPos).Magnitude
+						local due = state == "chase" and 0.9 or ((dist < 90) and 7 or math.huge)
+						if now - (d.barkedAt or (now - math.random() * 6)) > due then
+							d.barkedAt = now + math.random() * (state == "chase" and 0.4 or 5)
+							local root = d.model.PrimaryPart or d.model:FindFirstChildWhichIsA("BasePart", true)
+							if root then
+								local s = Instance.new("Sound")
+								s.SoundId = (Sounds.dogBark2 ~= "" and math.random() < 0.5) and Sounds.dogBark2 or Sounds.dogBark
+								s.Volume = state == "chase" and 0.7 or 0.4
+								s.PlaybackSpeed = (d.voice or 1) * (0.94 + math.random() * 0.12)
+								s.RollOffMinDistance = 12
+								s.RollOffMaxDistance = 220
+								s.SoundGroup = Feedback.sfxGroup
+								s.Parent = root
+								s:Play()
+								s.Ended:Once(function() s:Destroy() end)
+							end
+						end
+					end
 				end
 			end
 		end)

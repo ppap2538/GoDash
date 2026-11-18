@@ -9,6 +9,7 @@ local Data = require(script.Parent.PlayerDataService)
 local Lifestyle = {}
 local resting = {} -- [player] = { pos, rate, happy, label }
 local cooldown = {} -- [player] = { [key] = os.clock() }
+local warned = {} -- [player] = { hungry = true?, tired = true? } (one toast per dip, not a repeat)
 
 local function clamp100(v: number): number
 	return math.clamp(v, 0, 100)
@@ -77,8 +78,39 @@ function Lifestyle.energy(player: Player): number
 	return d and d.energy or 0
 end
 
+-- "hungry" / "tired" while the player should eat or rest before taking new orders, else nil.
+function Lifestyle.need(player: Player): string?
+	local d = Data.get(player)
+	if not d then return nil end
+	if d.hunger < Game.HUNGRY_AT then return "hungry" end
+	if d.energy < Game.TIRED_AT then return "tired" end
+	return nil
+end
+
+-- One toast when a need first drops below its line; quiet until the player has recovered a bit.
+local function warnNeeds(player: Player, d)
+	local w = warned[player]
+	if not w then w = {}; warned[player] = w end
+	if d.hunger < Game.HUNGRY_AT then
+		if not w.hungry then
+			w.hungry = true
+			Net.fire(player, "Notify", "toast", { text = "🍜 You're hungry: new orders are paused until you eat. Follow the card at the top.", bad = true })
+		end
+	elseif d.hunger >= Game.HUNGRY_AT + Game.NEED_REARM then
+		w.hungry = nil
+	end
+	if d.energy < Game.TIRED_AT then
+		if not w.tired and not w.hungry then
+			w.tired = true
+			Net.fire(player, "Notify", "toast", { text = "😪 You're exhausted: new orders are paused. Rest or grab a coffee.", bad = true })
+		end
+	elseif d.energy >= Game.TIRED_AT + Game.NEED_REARM then
+		w.tired = nil
+	end
+end
+
 function Lifestyle.start()
-	Players.PlayerRemoving:Connect(function(p) resting[p] = nil; cooldown[p] = nil end)
+	Players.PlayerRemoving:Connect(function(p) resting[p] = nil; cooldown[p] = nil; warned[p] = nil end)
 	local tick = 0
 	task.spawn(function()
 		while true do
@@ -114,15 +146,13 @@ function Lifestyle.start()
 					d.energy = clamp100(d.energy - drain)
 					d.stats.playSeconds += 1
 					local weak = d.energy <= 5 or d.hunger <= 5
-					hum.WalkSpeed = weak and 10 or 16
+					-- the client (client/OnFoot) turns this into the real pace: ramp-up, sprint
+					hum:SetAttribute("BaseWalk", weak and 10 or 16)
 					for id, untilT in pairs(d.buffs) do
 						if untilT <= os.time() then d.buffs[id] = nil; Data.touch(player, "buffs") end
 					end
 					if tick % 2 == 0 or r then Data.touch(player, "hunger", "energy", "happiness") end
-					if tick % 30 == 0 then
-						if d.hunger <= 12 then Net.fire(player, "Notify", "toast", { text = "🍜 You're hungry. Find something to eat!" })
-						elseif d.energy <= 12 then Net.fire(player, "Notify", "toast", { text = "😪 You're exhausted. Rest at a bench or your bed." }) end
-					end
+					warnNeeds(player, d)
 				end
 			end
 		end

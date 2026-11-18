@@ -9,7 +9,7 @@ local CYCLE = 2 * (Traffic.GREEN + Traffic.YELLOW)
 
 local cache = setmetatable({}, { __mode = "k" })
 
--- Junctions with lights: three or more non-soi roads meeting on a wide road.
+-- Junctions with lights: three or more bigger roads (not sois or lanes) meeting on a wide road.
 -- Returns { { node, groups = { [edge] = 0 | 1 } } } and a lookup by node id.
 function Traffic.signals(graph)
 	if cache[graph] then return cache[graph].list, cache[graph].byId end
@@ -18,7 +18,7 @@ function Traffic.signals(graph)
 		if #n.links >= 3 and n.r >= 20 then
 			local big = {}
 			for _, l in ipairs(n.links) do
-				if l.edge.type ~= "soi" then table.insert(big, l) end
+				if not l.edge.minor then table.insert(big, l) end
 			end
 			if #big >= 3 then
 				local first = big[1]
@@ -48,6 +48,21 @@ function Traffic.colour(nodeId: number, group: number, t: number): string
 	else active, yellow = 1, true end
 	if group ~= active then return "red" end
 	return yellow and "yellow" or "green"
+end
+
+-- The colour plus how long it has been showing and how long it has left (seconds). The red-light check
+-- uses `since` for its grace moment, auto drive uses `left` to decide whether a yellow can still be made.
+function Traffic.timing(nodeId: number, group: number, t: number): (string, number, number)
+	local G, Y = Traffic.GREEN, Traffic.YELLOW
+	local phase = (t + (nodeId * 7) % CYCLE) % CYCLE
+	if group == 0 then
+		if phase < G then return "green", phase, G - phase end
+		if phase < G + Y then return "yellow", phase - G, G + Y - phase end
+		return "red", phase - G - Y, CYCLE - phase
+	end
+	if phase < G + Y then return "red", phase, G + Y - phase end
+	if phase < 2 * G + Y then return "green", phase - G - Y, 2 * G + Y - phase end
+	return "yellow", phase - 2 * G - Y, CYCLE - phase
 end
 
 return Traffic

@@ -3,6 +3,7 @@
 -- road patches. Frames: `cf` stands on the pavement with -Z pointing at the road unless noted.
 local Kit = require(script.Parent.Kit)
 local Assets = require(script.Parent.Assets)
+local RiderPose = require(game:GetService("ReplicatedStorage").Shared.RiderPose)
 local M = Kit.M
 local C = Kit.COLORS
 local V3 = Vector3.new
@@ -88,13 +89,44 @@ function Life.tableSet(parent: Instance, cf: CFrame, rng: Random)
 			Kit.part(parent, V3(0.2, 2.5, 0.2), cf * CF(sx * 1.4, 1.25, sz * 1.4), Color3.fromRGB(120, 124, 130), M.Metal, D)
 		end
 	end
+	local seats = {}
 	for i = 0, 3 do
 		local seat = cf * CFrame.Angles(0, rad(i * 90 + rng:NextNumber(-15, 15)), 0) * CF(0, 0, -3)
+		seats[i + 1] = seat * CFrame.Angles(0, rad(180), 0) -- on the chair, facing the table
 		-- monobloc chairs face the table; fall back to stools without the mesh
 		if not Assets.place(parent, "chair", seat * CFrame.Angles(0, rad(180), 0), 1) then Life.stool(parent, seat, col) end
 	end
 	-- condiment caddy
 	Kit.part(parent, V3(1, 0.7, 0.6), cf * CF(0.3, 3.05, 0.2), Color3.fromRGB(200, 60, 40), M.SmoothPlastic, D)
+	return seats
+end
+
+-- People sitting at a table: n of the seats that Life.tableSet returned get a seated figure (one of
+-- the avatar models; nothing is added in a place that has none) and a plate in front of them.
+local pedTemplates: { Model }? = nil
+function Life.diners(parent: Instance, seats: { CFrame }, rng: Random, n: number)
+	if not pedTemplates then
+		pedTemplates = {}
+		local store = game:GetService("ReplicatedStorage"):FindFirstChild("GoDashModels")
+		if store then
+			for _, p in ipairs(store:GetChildren()) do
+				if p:IsA("Model") and p.Name:sub(1, 3) == "Ped" then table.insert(pedTemplates :: { Model }, p) end
+			end
+			table.sort(pedTemplates :: { Model }, function(a, b) return a.Name < b.Name end)
+		end
+	end
+	local peds = pedTemplates :: { Model }
+	if #peds == 0 then return end
+	local first = rng:NextInteger(1, #seats)
+	for k = 0, math.min(n, #seats) - 1 do
+		local seat = seats[(first + k * 2 - 1) % #seats + 1] -- opposite each other first
+		local ok, fig = pcall(RiderPose.build, peds[rng:NextInteger(1, #peds)], seat * CF(0, 1.62, 0.1), nil, "sit")
+		if ok and fig then
+			fig.Name = "Diner"
+			fig.Parent = parent
+			Kit.cyl(parent, 1.1, 0.14, seat * CF(0, 2.78, -2.1), Color3.fromRGB(244, 244, 240), M.SmoothPlastic, D)
+		end
+	end
 end
 
 function Life.foodCart(parent: Instance, cf: CFrame, rng: Random, label: string?)

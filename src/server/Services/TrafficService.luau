@@ -10,12 +10,12 @@ local Shared = ReplicatedStorage.Shared
 local Traffic = require(Shared.Traffic)
 local Vehicles = require(Shared.Config.Vehicles)
 local Net = require(Shared.Net)
-local Data = require(script.Parent.PlayerDataService)
-local Economy = require(script.Parent.EconomyService)
+local Fines = require(script.Parent.FineService)
 local Factory = require(script.Parent.Parent.World.VehicleFactory)
 
 local Service = {}
-local CARS = 14
+local RED_GRACE = 1.5 -- seconds after a light turns red in which entering still counts as the yellow
+local CARS = 70 -- (30 until the map became the whole tambon, 2026-11-18) route cars; each client adds its own local traffic around the player (client/Street) -- AI vehicles on the road (2026-11-16: was 14, the streets looked empty; half of them two-wheelers, as in any Thai town)
 local CELL = 512
 
 function Service.start(world, deps)
@@ -48,7 +48,26 @@ function Service.start(world, deps)
 	end
 
 	-- red-light enforcement ----------------------------------------------------------------------
-	local watch = {} -- [player] = { outside = Vector3, inside = nodeId?, fined = { [nodeId] = clock } }
+	-- (2026-11-16, the owner: "left turn always passes, why was I fined?") Thai rule "ซ้ายผ่านตลอด":
+	-- turning left on red is allowed. Entering on red only marks the crossing; the fine comes when the
+	-- driver leaves the junction any way but left (straight on, right, or a U-turn).
+	local function fine(player: Player, st, nodeId: number)
+		st.fined[nodeId] = os.clock()
+		local tele = vehicles.telemetry(player)
+		if tele then tele.red = (tele.red or 0) + 1 end
+		-- (2026-11-19) the daily limit: past it the police only warn (server/FineService)
+		local ok, amount, why, n, limit = Fines.charge(player, "ticket", Traffic.FINE, "redlight")
+		if not ok then
+			Fines.warn(player, "ticket", why, "🚦 Ran a red light", "🚦 ฝ่าไฟแดง")
+			return
+		end
+		local en, th = Fines.countText(n, limit)
+		Net.fire(player, "Notify", "toast", { text = ("🚦 Ran a red light! Fine %s"):format(amount > 0 and ("฿" .. amount) or "(no cash)") .. en,
+			th = ("🚦 ฝ่าไฟแดง! ปรับ %s"):format(amount > 0 and ("฿" .. amount) or "(ไม่มีเงินสด)") .. th, bad = true })
+		Net.fire(player, "Notify", "scene", { kind = "fine", reason = "redlight", amount = amount, n = n, limit = limit }) -- client/Cutscene: pulled over, a ticket
+		Net.fire(player, "Notify", "feed", { key = "fine_redlight", vars = { amount = amount } })
+	end
+	local watch = {} -- [player] = { outside = Vector3, inside = nodeId?, fined = { [nodeId] = clock }, pending = { node, heading }? }
 	Players.PlayerRemoving:Connect(function(p) watch[p] = nil end)
 	task.spawn(function()
 		while true do
@@ -63,6 +82,7 @@ function Service.start(world, deps)
 					if s and dist < s.node.r + 3 then
 						if st.inside ~= s.node.id then
 							st.inside = s.node.id
+							st.pending = nil
 							local from = st.outside or pos
 							local dir = Vector3.new(from.X - s.node.x, 0, from.Z - s.node.z)
 							local speed = vehicles.speed(player)
@@ -74,31 +94,68 @@ function Service.start(world, deps)
 									local dot = ((l.to.x - s.node.x) * dir.X + (l.to.z - s.node.z) * dir.Z) / l.len
 									if dot > bestDot then bestLink, bestDot = l, dot end
 								end
-								local now = os.clock()
-								if bestLink and bestLink.edge.type ~= "soi"
-									and Traffic.colour(s.node.id, s.groups[bestLink.edge], Workspace:GetServerTimeNow()) == "red"
-									and now - (st.fined[s.node.id] or 0) > 8 then
-									st.fined[s.node.id] = now
-									local d = Data.get(player)
-									local fine = d and math.min(d.money, Traffic.FINE) or 0
-									if fine > 0 then Economy.spend(player, fine, "redlight") end
-									local tele = vehicles.telemetry(player)
-									if tele then tele.red = (tele.red or 0) + 1 end
-									Net.fire(player, "Notify", "toast", { text = ("🚦 Ran a red light! Fine %s"):format(fine > 0 and ("฿" .. fine) or "(no cash)"), bad = true })
+								-- (2026-11-19) a moment's grace when the light has only just gone red: that is a
+								-- yellow you were already committed to, not running a red
+								local col, since
+								if bestLink and not bestLink.edge.minor then
+									col, since = Traffic.timing(s.node.id, s.groups[bestLink.edge], Workspace:GetServerTimeNow())
+								end
+								if col == "red" and since > RED_GRACE
+									and os.clock() - (st.fined[s.node.id] or 0) > 8 then
+									st.pending = { node = s.node, heading = -dir } -- decided on the way out
 								end
 							end
 						end
 					else
+						local p = st.pending
+						if p and ((pos.X - p.node.x) ^ 2 + (pos.Z - p.node.z) ^ 2) > (p.node.r + 3) ^ 2 then
+							st.pending = nil
+							local out = Vector3.new(pos.X - p.node.x, 0, pos.Z - p.node.z)
+							local right = p.heading:Cross(Vector3.yAxis)
+							if out.Magnitude > 1 and out.Unit:Dot(right) < -0.45 then
+								Net.fire(player, "Notify", "toast", { text = "⬅️ Left turn on red is allowed", th = "⬅️ ซ้ายผ่านตลอด ไม่โดนปรับ", good = true })
+							else
+								fine(player, st, p.node.id)
+							end
+						end
 						if s == nil or dist > s.node.r + 12 then st.inside = nil end
 						st.outside = pos
 					end
 				else
 					st.inside = nil
 					st.outside = nil
+					st.pending = nil
 				end
 			end
 		end
 	end)
+
+	-- zebra crossings (2026-11-18): the people crossing live on each client (client/Peds), so the client
+	-- says when its player drove over a crossing with someone on it; the server checks the player really
+	-- is driving, at speed, right at that crossing, and not fined there in the last minute.
+	local zebraFined = {} -- [player] = clock
+	Players.PlayerRemoving:Connect(function(p) zebraFined[p] = nil end)
+	Net.on("ZebraRun", { "number" }, function(player, index)
+		local z = world.zebras and world.zebras[index]
+		local v = vehicles.driving(player)
+		if not z or not v then return end
+		if os.clock() - (zebraFined[player] or 0) < 60 then return end
+		local pos = v.chassis.Position
+		if (pos.X - z.x) ^ 2 + (pos.Z - z.z) ^ 2 > 40 * 40 or vehicles.speed(player) < 7 then return end
+		zebraFined[player] = os.clock()
+		local tele = vehicles.telemetry(player)
+		if tele then tele.red = (tele.red or 0) + 1 end -- counts like a red light on the trip's safety
+		local ok, amount, why, n, limit = Fines.charge(player, "ticket", Traffic.FINE, "zebra")
+		if not ok then
+			Fines.warn(player, "ticket", why, "🚸 Didn't stop at the zebra crossing", "🚸 ไม่หยุดให้คนข้ามทางม้าลาย")
+			return
+		end
+		local en, th = Fines.countText(n, limit)
+		Net.fire(player, "Notify", "toast", { text = ("🚸 Didn't stop for people on the zebra crossing! Fine %s"):format(amount > 0 and ("฿" .. amount) or "(no cash)") .. en,
+			th = ("🚸 ไม่หยุดให้คนข้ามทางม้าลาย! ปรับ %s"):format(amount > 0 and ("฿" .. amount) or "(ไม่มีเงินสด)") .. th, bad = true })
+		Net.fire(player, "Notify", "scene", { kind = "fine", reason = "zebra", amount = amount, n = n, limit = limit })
+		Net.fire(player, "Notify", "feed", { key = "fine_zebra", vars = { amount = amount } })
+	end, 2)
 
 	-- AI traffic -----------------------------------------------------------------------------------
 	local folder = Workspace:FindFirstChild("Traffic") or Instance.new("Folder")
@@ -114,12 +171,12 @@ function Service.start(world, deps)
 	for _, n in ipairs(graph.nodes) do
 		if usable(n) then
 			for _, l in ipairs(n.links) do
-				if l.edge.type ~= "soi" then table.insert(starts, n) break end
+				if not l.edge.minor then table.insert(starts, n) break end
 			end
 		end
 	end
 	local pool = {}
-	for _, id in ipairs({ "eco_city", "sedan_vios", "pickup_dmax", "suv_fortune", "sabai110", "zoomer125", "sedan_vios", "eco_city", "oldmoped", "lux_e300" }) do
+	for _, id in ipairs({ "eco_city", "sabai110", "sedan_vios", "zoomer125", "pickup_dmax", "oldmoped", "suv_fortune", "sabai110", "sedan_vios", "zoomer125", "eco_city", "oldmoped", "lux_e300", "sabai110" }) do
 		if Vehicles.ById[id] then table.insert(pool, Vehicles.ById[id]) end
 	end
 	local made = 0
@@ -130,10 +187,10 @@ function Service.start(world, deps)
 			local path = { node.id }
 			local prev
 			local length = 0
-			for _ = 1, 45 do
+			for _ = 1, 90 do -- streets are cut into shorter pieces by the lanes joining them
 				local options = {}
 				for _, l in ipairs(node.links) do
-					if l.edge.type ~= "soi" and l.to ~= prev and usable(l.to) then table.insert(options, l) end
+					if not l.edge.minor and l.to ~= prev and usable(l.to) then table.insert(options, l) end
 				end
 				if #options == 0 then break end
 				local l = options[rng:NextInteger(1, #options)]
@@ -146,7 +203,7 @@ function Service.start(world, deps)
 				local def = pool[(i - 1) % #pool + 1]
 				local first = graph.nodes[path[1]]
 				local y = 0.3 + def.wheelR + 0.9
-				local model = Factory.display(def, CFrame.new(first.x, y, first.z), rng:NextInteger(1, 8))
+				local model = Factory.traffic(def, CFrame.new(first.x, y, first.z), rng:NextInteger(1, 8), i * 7919)
 				model.Name = "TrafficCar"
 				model.ModelStreamingMode = Enum.ModelStreamingMode.Persistent
 				model:SetAttribute("Path", table.concat(path, ","))
@@ -159,7 +216,28 @@ function Service.start(world, deps)
 			end
 		end
 	end
-	print(("[Traffic] %d signalled junctions, %d AI vehicles on the road"):format(#signals, made))
+	-- Models for the traffic every client runs around its own player (client/Street): two of each
+	-- kind, riders included, kept in ReplicatedStorage and cloned locally.
+	local kit = Instance.new("Folder")
+	kit.Name = "GoDashTrafficKit"
+	local seen, k = {}, 0
+	for _, def in ipairs(pool) do
+		for c = 1, 2 do
+			local key = def.id .. c
+			if not seen[key] then
+				seen[key] = true
+				k += 1
+				local m = Factory.traffic(def, CFrame.new(0, -400, 0), rng:NextInteger(1, 8), k * 104729)
+				m.Name = def.id
+				m:SetAttribute("Y", 0.3 + def.wheelR + 0.9)
+				m:SetAttribute("Speed", def.class == "bike" and 34 or 40)
+				m.Parent = kit
+			end
+		end
+	end
+	kit:SetAttribute("Size", #kit:GetDescendants()) -- clients wait for all of it before cloning
+	kit.Parent = game:GetService("ReplicatedStorage")
+	print(("[Traffic] %d signalled junctions, %d route vehicles, %d kinds for local traffic"):format(#signals, made, k))
 	local _ = byId
 end
 

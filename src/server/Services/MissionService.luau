@@ -10,6 +10,9 @@ local Net = require(Shared.Net)
 local Data = require(script.Parent.PlayerDataService)
 local Economy = require(script.Parent.EconomyService)
 local Inventory = require(script.Parent.InventoryService)
+local StoreCfg = require(Shared.Config.Store)
+local SeasonCfg = require(Shared.Config.Season)
+local SeasonSvc = require(script.Parent.SeasonService)
 
 local Service = {}
 
@@ -95,6 +98,7 @@ function Service.start()
 			st.claimed = true -- flag first: a second request can never pay twice
 			Data.touch(player, "missions")
 			pay(player, def, def.name)
+			SeasonSvc.addXp(player, SeasonCfg.XP.mission)
 			return true, "Reward claimed"
 		elseif op == "daily" then
 			local day = Util.dayNumber()
@@ -103,7 +107,14 @@ function Service.start()
 			dr.streak = (dr.day == day - 1) and (dr.streak % #Game.DAILY_REWARDS) + 1 or 1
 			dr.day = day
 			Data.touch(player, "dailyReward")
-			pay(player, Game.DAILY_REWARDS[dr.streak], "Daily Reward · Day " .. dr.streak)
+			-- VIP pass +20 %, members of the GoDash group +10 % (Config/Store)
+			local rw = table.clone(Game.DAILY_REWARDS[dr.streak])
+			local mult = 1
+			if player:GetAttribute("VIP") then mult *= StoreCfg.VIP_DAILY end
+			if player:GetAttribute("InGroup") then mult *= StoreCfg.GROUP_DAILY end
+			if rw.money then rw.money = math.floor(rw.money * mult + 0.5) end
+			pay(player, rw, "Daily Reward · Day " .. dr.streak)
+			SeasonSvc.addXp(player, SeasonCfg.XP.daily)
 			return true, "Daily reward claimed"
 		end
 		return false, "Bad request"

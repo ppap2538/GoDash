@@ -108,6 +108,8 @@ local function useItem(player: Player, plot, uid: number)
 	local pos = model:GetPivot().Position
 	if def.use == "bed" then
 		lifestyle.startRest(player, pos, Game.BED_RATE * (def.power or 1), "Sleeping", 0.25)
+		-- the client shows them lying down on the bed (client/Cutscene "sleep")
+		Net.fire(player, "Notify", "scene", { kind = "sleep", pos = pos, dir = model:GetPivot().LookVector, long = def.size.Z })
 	elseif def.use == "fridge" then
 		Net.fire(player, "OpenUI", "fridge", {})
 	elseif def.use == "stove" then

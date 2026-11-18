@@ -19,9 +19,12 @@ local CHIP_W, CHIP_H = 112, 26
 
 local function refresh(job)
 	local on = job and job.online == true
-	refs.chipText.Text = on and Lang.pick("Taking orders", "รับงานอยู่") or (Lang.pick("Go online", "เริ่มรับงาน") .. (Layout.isTouch and "" or " [J]"))
+	local paused = on and job.paused ~= nil -- hungry / exhausted: the server holds orders back
+	refs.chipText.Text = paused and (job.paused == "hungry" and Lang.pick("Paused: hungry", "พักงาน: หิว")
+		or job.paused == "hurt" and Lang.pick("Paused: hurt", "พักงาน: บาดเจ็บ") or Lang.pick("Paused: tired", "พักงาน: เหนื่อย"))
+		or on and Lang.pick("Taking orders", "รับงานอยู่") or (Lang.pick("Go online", "เริ่มรับงาน") .. (Layout.isTouch and "" or " [J]"))
 	refs.chipText.TextColor3 = on and C.white or C.textDim
-	refs.dot.BackgroundColor3 = on and C.green or Color3.fromRGB(150, 158, 170)
+	refs.dot.BackgroundColor3 = paused and C.orange or on and C.green or Color3.fromRGB(150, 158, 170)
 	refs.button.BackgroundColor3 = on and C.green or C.dark
 end
 

@@ -5,13 +5,11 @@ local Game = {}
 Game.DEBUG = false -- extra server logs
 Game.DATASTORE = "GoDash_Profiles_v1"
 Game.MAP = "KhonKaen" -- which province map to load (Config/Maps/<name>)
--- When the place has no baked Workspace.Map, the server builds the city at start-up.
--- nil = build everything (slow, ~1:1 city); a number = only scenery within that many studs of the
--- centre, for quick development boots. A baked place ignores this.
-Game.DEV_RADIUS = 2000
--- Live servers: how much of the city to build around the centre. Measured: 2000 studs = ~63k parts in ~8 s.
--- nil = the whole 1:1 city (not measured since the detailed facades went in; raise this step by step).
-Game.LIVE_RADIUS = 2600
+-- The server plans the whole city at start-up and draws buildings only around the players
+-- (World/Streamer), so there is no build radius any more (DEV_RADIUS / LIVE_RADIUS are gone).
+-- AI route traffic, soi dogs, checkpoints and roadworks live within this distance of the centre: since
+-- 2026-11-18 the whole tambon (was 2600 studs, ~730 m, round the old downtown box).
+Game.TRAFFIC_RADIUS = math.huge
 
 Game.START_MONEY = 500
 Game.START_VEHICLE = "bicycle"
@@ -43,6 +41,12 @@ Game.STARVING_ENERGY_DECAY = 100 / (15 * 60)
 Game.TIRED_PAY_MULT = 0.8 -- energy below 10
 Game.REST_BENCH_RATE = 1.2 -- energy per second on a public bench
 Game.BED_RATE = 6 -- energy per second in your own bed
+-- Below these, new orders pause and the Guide card leads the player to food / a coffee (2026-11-16:
+-- orders kept popping up while the hunger toast repeated every 30 s and nothing showed where to eat).
+-- The warning toast fires once on the way down and re-arms after NEED_REARM points of recovery.
+Game.HUNGRY_AT = 15
+Game.TIRED_AT = 12
+Game.NEED_REARM = 10
 
 -- World clock: one in-game day
 Game.DAY_LENGTH = 16 * 60 -- real seconds per in-game day

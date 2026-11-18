@@ -1,0 +1,146 @@
+{
+ "tree_rain_a": {
+  "triangles": 4171,
+  "size": [
+   65.8,
+   54.9,
+   37.7
+  ],
+  "bytes": 1014688
+ },
+ "tree_rain_b": {
+  "triangles": 3353,
+  "size": [
+   65.6,
+   53.6,
+   37.0
+  ],
+  "bytes": 975476
+ },
+ "tree_mango_a": {
+  "triangles": 5317,
+  "size": [
+   45.0,
+   44.0,
+   32.1
+  ],
+  "bytes": 846728
+ },
+ "tree_mango_b": {
+  "triangles": 5317,
+  "size": [
+   33.2,
+   37.6,
+   29.1
+  ],
+  "bytes": 846724
+ },
+ "tree_shade_a": {
+  "triangles": 4322,
+  "size": [
+   40.6,
+   32.5,
+   24.0
+  ],
+  "bytes": 797552
+ },
+ "tree_shade_b": {
+  "triangles": 4322,
+  "size": [
+   33.4,
+   33.1,
+   23.6
+  ],
+  "bytes": 797552
+ },
+ "tree_koon_a": {
+  "triangles": 4288,
+  "size": [
+   44.4,
+   42.9,
+   33.2
+  ],
+  "bytes": 1084432
+ },
+ "tree_koon_b": {
+  "triangles": 4288,
+  "size": [
+   43.7,
+   39.5,
+   35.2
+  ],
+  "bytes": 1084432
+ },
+ "tree_frangipani_a": {
+  "triangles": 373,
+  "size": [
+   18.4,
+   21.6,
+   13.8
+  ],
+  "bytes": 333728
+ },
+ "palm_coconut_a": {
+  "triangles": 968,
+  "size": [
+   31.7,
+   32.2,
+   38.0
+  ],
+  "bytes": 927936
+ },
+ "palm_coconut_b": {
+  "triangles": 840,
+  "size": [
+   28.9,
+   27.0,
+   29.6
+  ],
+  "bytes": 920704
+ },
+ "palm_royal_a": {
+  "triangles": 752,
+  "size": [
+   27.5,
+   24.6,
+   39.3
+  ],
+  "bytes": 916436
+ },
+ "banana_a": {
+  "triangles": 777,
+  "size": [
+   18.0,
+   18.3,
+   11.5
+  ],
+  "bytes": 922556
+ },
+ "shrub_hedge_a": {
+  "triangles": 79,
+  "size": [
+   11.1,
+   9.3,
+   7.3
+  ],
+  "bytes": 758804
+ },
+ "shrub_bougain_a": {
+  "triangles": 87,
+  "size": [
+   14.8,
+   10.7,
+   9.0
+  ],
+  "bytes": 759372
+ },
+ "grass_tuft_a": {
+  "triangles": 28,
+  "size": [
+   5.3,
+   5.9,
+   4.5
+  ],
+  "bytes": 674456
+ }
+}

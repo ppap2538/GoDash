@@ -55,10 +55,49 @@ local APPS = {
 ---------------------------------------------------------------------------------------------------
 -- helpers
 ---------------------------------------------------------------------------------------------------
+-- Where the server sends you when you are in the wrong place: the answer sets the route there
+-- (owner, 2026-11-16: "KK Motors must show the way").
+local GO_HINTS = {
+	["Visit KK Motors to buy vehicles"] = { "dealer" }, ["Upgrades are fitted at KK Motors"] = { "dealer" },
+	["Paint jobs are done at KK Motors"] = { "dealer" }, ["Repairs are done at KK Motors or a fuel station"] = { "gas", "dealer" },
+	["Go to the hospital"] = { "hospital" }, ["Go to the stupa"] = { "stupa" }, ["Go to the police station"] = { "police" },
+	["Go to your allotment at the Community Farm"] = "farm", ["Go to your plot to build"] = "plot",
+}
+
+-- Route to the nearest place of one of `kinds`; true when a route was set.
+local function navTo(kinds: { string }): boolean
+	local char = player.Character
+	local r = char and char:FindFirstChild("HumanoidRootPart") :: BasePart?
+	local here = r and r.Position or Vector3.zero
+	local best, bd
+	for _, p in ipairs(GPS.places()) do
+		if table.find(kinds, p.kind) then
+			local d = (p.pos - here).Magnitude
+			if not bd or d < bd then best, bd = p, d end
+		end
+	end
+	if not best then return false end
+	GPS.setTarget(best.pos, Lang.name(best))
+	Feedback.toast(Lang.pick("📍 Route set: follow the arrows to ", "📍 นำทางให้แล้ว ขี่ตามลูกศรไป ") .. Lang.name(best) .. " · " .. Lang.t(Util.dist(bd)), "good")
+	return true
+end
+
 local function call(remote: string, ...): boolean
 	local ok, msg = Net.call(remote, ...)
 	if msg and msg ~= "" then Feedback.toast(msg, ok and "good" or "bad") end
 	if ok then Feedback.good() end
+	local hint = (not ok) and msg and GO_HINTS[msg]
+	if hint then
+		local routed = false
+		if hint == "farm" and State.farm then
+			GPS.setTarget(State.farm.pos, "My Allotment"); routed = true
+		elseif hint == "plot" and State.plot then
+			GPS.setTarget(State.plot.base.Position, "My Home"); routed = true
+		elseif type(hint) == "table" then
+			routed = navTo(hint)
+		end
+		if routed then task.delay(0.9, function() Phone.setOpen(false) end) end -- show the road, not the phone
+	end
 	return ok == true
 end
 
@@ -77,6 +116,7 @@ local function row(icon: string, title: string, sub: string?, btnText: string?, 
 		x = 48
 	end
 	local rightW = btnText and (o.btnWidth or 84) + 10 or 8
+	if btnText and o.btn2 then rightW += (o.btn2.width or 60) + 6 end
 	UI.label(card, title, 14, o.titleColor or C.text, F.bold, { Position = UDim2.fromOffset(x, sub and 9 or 0), Size = UDim2.new(1, -x - rightW, sub and 0 or 1, sub and 18 or 0) })
 	if sub then
 		UI.label(card, sub, 12, C.sub, F.med, { Position = UDim2.fromOffset(x, 28), Size = UDim2.new(1, -x - rightW, 0, 22), TextWrapped = true, TextYAlignment = Enum.TextYAlignment.Top, TextTruncate = Enum.TextTruncate.AtEnd })
@@ -85,6 +125,12 @@ local function row(icon: string, title: string, sub: string?, btnText: string?, 
 		local b = UI.button(card, btnText, { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -8, 0.5, 0), Size = UDim2.fromOffset(o.btnWidth or 84, 32), TextSize = 13,
 			BackgroundColor3 = o.btnColor or C.green, TextColor3 = o.btnTextColor or C.white }, onClick)
 		if o.disabled then b.BackgroundColor3 = C.line; b.TextColor3 = C.sub; b.Active = false end
+		-- optional second, quieter button to the left of the main one: { text, fn, width? }
+		if o.btn2 then
+			local b2 = UI.button(card, o.btn2.text, { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -8 - (o.btnWidth or 84) - 6, 0.5, 0),
+				Size = UDim2.fromOffset(o.btn2.width or 60, 32), TextSize = 12, BackgroundColor3 = C.chip, TextColor3 = C.white }, o.btn2.fn)
+			if o.disabled then b2.BackgroundColor3 = C.line; b2.TextColor3 = C.sub; b2.Active = false end
+		end
 	end
 	return card
 end
@@ -151,6 +197,8 @@ function Phone.setOpen(v: boolean)
 	open = v
 	-- UIState docks the phone: the HUD re-flows beside it (or declutters on small screens)
 	UIState.set("phone", v)
+	-- Roblox's player list sits on top of the phone's header: put it away while the phone is open
+	pcall(function() game:GetService("StarterGui"):SetCoreGuiEnabled(Enum.CoreGuiType.PlayerList, not v) end)
 	if v then
 		shell.Visible = true
 		shell.Position = SHELL_CLOSED
@@ -165,6 +213,26 @@ end
 
 function Phone.isOpen(): boolean return open end
 
+-- Other modules add their own apps and screens (client/Feed, client/Finance, ...).
+-- app = { id, name, icon, color, badge? }; fn(arg) draws the screen with Phone.ui helpers.
+function Phone.addApp(app, fn)
+	for _, a in ipairs(APPS) do
+		if a.id == app.id then return end
+	end
+	table.insert(APPS, app)
+	screens[app.id] = fn
+end
+function Phone.addScreen(name: string, fn) screens[name] = fn end
+function Phone.current(): string return current.name end
+function Phone.refresh() if open then render() end end
+Phone.ui = {
+	row = function(...) return row(...) end,
+	section = function(...) return section(...) end,
+	bigCard = function(...) return bigCard(...) end,
+	call = function(...) return call(...) end,
+	content = function() return content end,
+}
+
 ---------------------------------------------------------------------------------------------------
 -- home
 ---------------------------------------------------------------------------------------------------
@@ -174,7 +242,7 @@ screens.home = function()
 	UI.label(hero, "Sawasdee, " .. player.DisplayName, 16, C.white, F.black, { Position = UDim2.fromOffset(14, 12), Size = UDim2.new(1, -28, 0, 22) })
 	UI.label(hero, d and ("Lv %d · %s · ★ %.2f"):format(d.level, Util.money(d.money), d.rating) or "Loading…", 13, Color3.fromRGB(190, 198, 208), F.med,
 		{ Position = UDim2.fromOffset(14, 38), Size = UDim2.new(1, -28, 0, 20) })
-	local grid = UI.new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 430), Parent = content })
+	local grid = UI.new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, math.ceil(#APPS / 4) * 96 + 10), Parent = content })
 	local g = Instance.new("UIGridLayout")
 	g.CellSize = UDim2.new(0.25, -8, 0, 84)
 	g.CellPadding = UDim2.fromOffset(10, 12)
@@ -185,6 +253,11 @@ screens.home = function()
 		local b = UI.button(cell, app.icon, { Size = UDim2.new(1, 0, 0, 62), BackgroundColor3 = app.color, TextSize = 30 }, function() go(app.id) end)
 		UI.corner(b, 18)
 		UI.label(cell, app.name, 11, C.text, F.bold, { Position = UDim2.fromOffset(0, 66), Size = UDim2.new(1, 0, 0, 16), TextXAlignment = Enum.TextXAlignment.Center })
+		-- red dot: something new (apps added by other modules pass badge = function() -> boolean)
+		if app.badge and app.badge() then
+			local dot = UI.new("Frame", { BackgroundColor3 = C.red, AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, 2, 0, -2), Size = UDim2.fromOffset(14, 14), ZIndex = 3, Parent = cell })
+			UI.corner(dot, 7); UI.stroke(dot, C.white, 2)
+		end
 		-- red dot: something to claim
 		if app.id == "missions" and d then
 			local claimable = d.dailyReward.day ~= Util.dayNumber()
@@ -250,7 +323,17 @@ screens.godash = function()
 		for _, def in ipairs(arr) do
 			local lock = d.level < def.level
 			local need = def.cargo and def.cargo > 2 and (" · cargo " .. def.cargo .. "+") or (def.seats and def.seats > 1 and (" · " .. def.seats .. " seats") or "")
-			row(def.icon, def.name, lock and ("Unlocks at level " .. def.level) or ("฿" .. def.base .. " + distance · +" .. def.exp .. " EXP" .. need .. (def.rainOnly and " · rain only" or "")),
+			-- landmark jobs only come at their hours (server/CivicJobs): show them
+			local hrs = ""
+			if def.hours then
+				local parts = {}
+				for _, w in ipairs(def.hours) do
+					local function hm(x) return ("%d:%02d"):format(math.floor(x) % 24, math.floor((x % 1) * 60 + 0.5)) end
+					table.insert(parts, hm(w[1]) .. "–" .. hm(w[2]))
+				end
+				hrs = " · 🕘 " .. table.concat(parts, ", ")
+			end
+			row(def.icon, def.name, lock and ("Unlocks at level " .. def.level) or ("฿" .. def.base .. " + distance · +" .. def.exp .. " EXP" .. need .. (def.rainOnly and " · rain only" or "") .. hrs),
 				nil, nil, { titleColor = lock and C.sub or C.text })
 		end
 	end
@@ -261,6 +344,16 @@ end
 ---------------------------------------------------------------------------------------------------
 -- Maps
 ---------------------------------------------------------------------------------------------------
+-- The places list: everything you can go to, nearest first, with a category filter.
+local PLACE_FILTERS = {
+	{ id = "all", label = "All" }, { id = "food", label = "🍜 Food" }, { id = "shop", label = "🛍 Shops" }, { id = "service", label = "🏥 Services" },
+}
+local PLACE_GROUP = {
+	restaurant = "food", cafe = "food", market = "food", nightmarket = "food", reststop = "food",
+	convenience = "shop", mall = "shop", homestore = "shop", seedshop = "shop", agri = "shop", dealer = "shop", gas = "shop",
+}
+local placeFilter = "all"
+
 screens.gps = function()
 	local w = State.world
 	local mapCard = bigCard(300, Color3.fromRGB(36, 42, 50))
@@ -271,10 +364,14 @@ screens.gps = function()
 		local char = player.Character
 		local r = char and char:FindFirstChild("HumanoidRootPart")
 		if w then
-			for _, p in ipairs(w.pois) do
-				local b = UI.new("TextButton", { Text = GPS.POI_ICON[p.kind] or "📍", TextSize = 14, BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), Size = UDim2.fromOffset(22, 22),
-					Position = toPoint(p.pos), ZIndex = 9, Parent = canvas })
+			local shown = GPS.places()
+			for _, cp in ipairs(GPS.checkpoints()) do table.insert(shown, cp) end
+			for _, p in ipairs(shown) do
+				local b = UI.new("TextButton", { Text = GPS.POI_ICON[p.kind] or "📍", TextSize = p.small and 11 or 14, BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5),
+					Size = UDim2.fromOffset(p.small and 16 or 22, p.small and 16 or 22), Position = toPoint(p.pos), ZIndex = p.small and 8 or 9, Parent = canvas })
+				b:SetAttribute("NoTranslate", true)
 				b.MouseButton1Click:Connect(function()
+					if p.kind == "checkpoint" then Feedback.toast(Lang.pick("🚨 Police checkpoint: drive round it, or pay a fine", "🚨 ด่านตรวจ: ขับหลบไป ไม่งั้นโดนปรับ"), "bad") return end
 					GPS.setTarget(p.pos, Lang.name(p))
 					Feedback.toast("📍 Route set to " .. Lang.name(p), "good")
 				end)
@@ -316,10 +413,19 @@ screens.gps = function()
 	end
 	section("PLACES")
 	if not w then UI.label(content, "Loading places…", 13, C.sub) return end
+	local chips = UI.new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 34), Parent = content })
+	UI.list(chips, 6, true)
+	for _, c in ipairs(PLACE_FILTERS) do
+		local sel = placeFilter == c.id
+		UI.button(chips, c.label, { Size = UDim2.new(0.25, -5, 1, 0), TextSize = 12, BackgroundColor3 = sel and C.green or C.card, TextColor3 = sel and C.white or C.text }, function()
+			placeFilter = c.id
+			render()
+		end)
+	end
 	local list = {}
-	for _, p in ipairs(w.pois) do table.insert(list, p) end
-	if State.plot then table.insert(list, { kind = "home", name = "My Home", pos = State.plot.base.Position }) end
-	if State.farm then table.insert(list, { kind = "farm", name = "My Allotment (" .. State.farm.id .. ")", pos = State.farm.pos }) end
+	for _, p in ipairs(GPS.places()) do
+		if placeFilter == "all" or PLACE_GROUP[p.kind] == placeFilter or (placeFilter == "service" and not PLACE_GROUP[p.kind]) then table.insert(list, p) end
+	end
 	local char = player.Character
 	local r = char and char:FindFirstChild("HumanoidRootPart")
 	local here = r and r.Position or Vector3.zero
@@ -381,6 +487,11 @@ screens.garage = function(arg)
 		end
 	end
 	section(dealer and "FOR SALE" or "SHOWROOM (buy at KK Motors)")
+	if not dealer then
+		row("🧭", "KK Motors", Lang.pick("Buy, upgrade and paint there", "ซื้อ อัปเกรด และทำสีรถที่นี่"), Lang.pick("Go", "ไป"), function()
+			if navTo({ "dealer" }) then Phone.setOpen(false) end
+		end, { btnWidth = 60, btnColor = C.blue })
+	end
 	for _, def in ipairs(Vehicles.List) do
 		if not d.vehicles[def.id] then
 			local lock = d.level < def.level
@@ -413,7 +524,11 @@ screens.vehicle = function(arg)
 			TextColor3 = (lock or d.money < def.price) and C.sub or C.white }, function()
 			if call("Garage", "buy", def.id) then render() end
 		end)
-		if not arg.dealer then UI.label(content, "Visit KK Motors (see Maps) to buy.", 12, C.sub, F.med, { TextXAlignment = Enum.TextXAlignment.Center }) end
+		if not arg.dealer then
+			UI.button(content, Lang.pick("🧭 Take me to KK Motors", "🧭 นำทางไป KK Motors"), { BackgroundColor3 = C.blue }, function()
+				if navTo({ "dealer" }) then Phone.setOpen(false) end
+			end)
+		end
 		return
 	end
 	UI.button(content, "🔑 Bring it to me", {}, function() call("Garage", "spawn", def.id) end)
@@ -719,7 +834,14 @@ screens.shop = function(arg)
 	if #arg.stock > 0 then section("BUY") end
 	for _, id in ipairs(arg.stock) do
 		local it = Items.ById[id]
-		if it then
+		if it and it.kind == "food" then
+			-- food: eat it here in one tap; "+ Bag" keeps one for later
+			row(it.icon, it.name .. " · " .. Util.money(it.price), (it.thai and (it.thai .. "  ") or "") .. itemSub(it), "Eat now", function()
+				if call("Shop", "eatnow", arg.id, id) then render() end
+			end, { btnWidth = 70, disabled = d.money < it.price, btn2 = { text = "+ Bag", width = 64, fn = function()
+				if call("Shop", "buy", arg.id, id, 1) then render() end
+			end } })
+		elseif it then
 			row(it.icon, it.name .. " · " .. Util.money(it.price), (it.thai and (it.thai .. "  ") or "") .. itemSub(it), "Buy", function()
 				if call("Shop", "buy", arg.id, id, 1) then render() end
 			end, { btnWidth = 60, disabled = d.money < it.price })
@@ -857,6 +979,7 @@ screens.radio = function()
 		local playing = Radio.station == s.id
 		row(s.icon, s.name .. (playing and "  ♪" or ""), s.thai .. " · " .. #s.tracks .. " tracks", playing and "Stop" or "Play", function()
 			Radio.play(not playing and s.id or nil)
+			Radio.remember(not playing)
 			render()
 		end, { btnWidth = 62, btnColor = playing and C.red or C.green })
 	end
@@ -891,8 +1014,45 @@ screens.settings = function()
 		row(icon, title, sub, s[key] and "ON" or "OFF", function() set(key, not s[key]) end, { btnWidth = 60, btnColor = s[key] and C.green or Color3.fromRGB(150, 158, 170) })
 	end
 	toggle("🛟", "Driving assist", "Extra grip so the vehicle is easier to control", "assist")
+	-- who may hop on as your passenger (server/VehicleService "Ride along")
+	local L = Lang.pick
+	local rideCard = bigCard(76)
+	local rl = UI.label(rideCard, L("👫 Who can ride with you", "👫 ใครขึ้นรถเราได้บ้าง"), 14, C.text, F.bold, { Position = UDim2.fromOffset(12, 6), Size = UDim2.new(1, -24, 0, 20) })
+	rl:SetAttribute("NoTranslate", true)
+	local rideRow = UI.new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(10, 32), Size = UDim2.new(1, -20, 0, 36), Parent = rideCard })
+	UI.list(rideRow, 6, true)
+	for _, o in ipairs({ { "friends", L("Friends", "เพื่อน") }, { "all", L("Anyone", "ทุกคน") }, { "off", L("Nobody", "ไม่รับ") } }) do
+		local sel = (s.rideAlong or "friends") == o[1]
+		local b = UI.button(rideRow, o[2], { Size = UDim2.new(1 / 3, -4, 1, 0), TextSize = 13, BackgroundColor3 = sel and C.green or C.bg, TextColor3 = sel and C.white or C.text }, function() set("rideAlong", o[1]) end)
+		b:SetAttribute("NoTranslate", true)
+	end
+	-- graphics detail (client/Perf): auto follows the frame rate; phones start at medium
+	section("GRAPHICS")
+	local Perf = require(script.Parent.Perf)
+	local qCard = bigCard(96)
+	local ql = UI.label(qCard, L("🖼 Graphics detail", "🖼 ระดับกราฟิก"), 14, C.text, F.bold, { Position = UDim2.fromOffset(12, 6), Size = UDim2.new(1, -24, 0, 20) })
+	ql:SetAttribute("NoTranslate", true)
+	local nowTier = ({ L("low", "ต่ำ"), L("medium", "กลาง"), L("high", "สูง") })[Perf.tier]
+	local qs = UI.label(qCard, L("Lower it if the game stutters · now: ", "ถ้าเกมกระตุกให้ลดลง · ตอนนี้: ") .. nowTier, 11, C.sub, F.med, { Position = UDim2.fromOffset(12, 26), Size = UDim2.new(1, -24, 0, 16) })
+	qs:SetAttribute("NoTranslate", true)
+	local qRow = UI.new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(10, 50), Size = UDim2.new(1, -20, 0, 36), Parent = qCard })
+	UI.list(qRow, 5, true)
+	for _, o in ipairs({ { "auto", L("Auto", "อัตโนมัติ") }, { "low", L("Low", "ต่ำ") }, { "medium", L("Medium", "กลาง") }, { "high", L("High", "สูง") } }) do
+		local sel = (s.quality or "auto") == o[1]
+		local b = UI.button(qRow, o[2], { Size = UDim2.new(0.25, -4, 1, 0), TextSize = 12, BackgroundColor3 = sel and C.green or C.bg, TextColor3 = sel and C.white or C.text }, function()
+			Perf.setQuality(o[1])
+			set("quality", o[1])
+		end)
+		b:SetAttribute("NoTranslate", true)
+	end
 	section("SOUND")
 	toggle("🔊", "Sound effects", "Engines, rain, UI", "sfx")
+	row("🎶", "Background music", "Upbeat songs while you ride (Radio app: station, volume)", s.bgm ~= false and "ON" or "OFF", function()
+		local on = s.bgm == false
+		Radio.play(on and (Radio.station or Radio.DEFAULT) or nil)
+		Radio.remember(on)
+		render()
+	end, { btnWidth = 60, btnColor = s.bgm ~= false and C.green or Color3.fromRGB(150, 158, 170) })
 	toggle("🎵", "City ambience", "Birds, traffic and night sounds", "music")
 	section("LANGUAGE")
 	local langRow = UI.new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 42), Parent = content })
@@ -907,8 +1067,9 @@ screens.settings = function()
 		b:SetAttribute("NoTranslate", true)
 	end
 	section("CONTROLS")
-	for _, t in ipairs({ { "W / S", "Accelerate · brake / reverse" }, { "A / D", "Steer" }, { "Space", "Handbrake" }, { "Shift", "Boost" }, { "F", "Headlights (get in: F)" },
-		{ "Z / C / X", "Indicators / hazards" }, { "E", "Interact · leave vehicle" }, { "G", "Pick up / deliver while driving" }, { "Y", "Accept a job offer" }, { "M", "Phone" } }) do
+	for _, t in ipairs({ { "W / S", "Accelerate · brake / reverse" }, { "A / D", "Steer" }, { "Space", "Handbrake" }, { "Shift", "Boost" }, { "Q", "Auto drive (follows the GPS route)" }, { "F", "Headlights (get in: F)" },
+		{ "Z / C / X", "Indicators / hazards" }, { "E", "Interact · leave vehicle" }, { "G", "Pick up / deliver while driving" }, { "Y", "Accept a job offer" }, { "M", "Phone" },
+		{ "P", "Photo mode" } }) do
 		local card2 = row("", t[2], nil, nil, nil, { height = 34 })
 		UI.label(card2, t[1], 12, C.greenDark, F.black, { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -12, 0, 0), Size = UDim2.new(0, 90, 1, 0), TextXAlignment = Enum.TextXAlignment.Right })
 	end
@@ -955,7 +1116,7 @@ function Phone.start()
 	local function schedule(keys)
 		if not open or pending then return end
 		if keys and current.name ~= "home" and not (keys.money or keys.inventory or keys.vehicles or keys.plot or keys.farm or keys.missions or keys.dailyReward or keys.settings or keys.level
-			or keys.bank or keys.stats or keys.daily or keys.rating or keys.activeVehicle) then return end
+			or keys.bank or keys.stats or keys.daily or keys.rating or keys.activeVehicle or keys.season or keys.company or keys.unlocks or keys.title) then return end
 		pending = true
 		task.delay(0.25, function()
 			pending = false

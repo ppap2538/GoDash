@@ -12,14 +12,16 @@ local rad = math.rad
 
 local Shop = {}
 
+-- Real Isan shophouse fronts (2026-11-16 realism pass): mostly cream, beige and bare grey concrete,
+-- some faded ochre / salmon / mint paint; none of the cold blue-whites the old list had.
 local WALLS = {
-	Color3.fromRGB(240, 232, 214), Color3.fromRGB(232, 222, 200), Color3.fromRGB(226, 232, 226), Color3.fromRGB(236, 220, 208),
-	Color3.fromRGB(214, 224, 232), Color3.fromRGB(244, 240, 232), Color3.fromRGB(230, 214, 190), Color3.fromRGB(222, 222, 216),
-	Color3.fromRGB(240, 226, 196), Color3.fromRGB(210, 220, 210), Color3.fromRGB(236, 206, 196), Color3.fromRGB(200, 208, 216),
+	Color3.fromRGB(230, 220, 198), Color3.fromRGB(218, 204, 178), Color3.fromRGB(206, 202, 192), Color3.fromRGB(226, 208, 188),
+	Color3.fromRGB(196, 192, 184), Color3.fromRGB(234, 226, 210), Color3.fromRGB(222, 200, 166), Color3.fromRGB(212, 208, 198),
+	Color3.fromRGB(232, 216, 178), Color3.fromRGB(196, 208, 194), Color3.fromRGB(224, 194, 176), Color3.fromRGB(186, 184, 178),
 }
 local SHUTTERS = {
-	Color3.fromRGB(196, 200, 204), Color3.fromRGB(150, 170, 190), Color3.fromRGB(130, 160, 140), Color3.fromRGB(206, 196, 170),
-	Color3.fromRGB(170, 174, 180), Color3.fromRGB(110, 130, 160),
+	Color3.fromRGB(176, 176, 172), Color3.fromRGB(150, 152, 150), Color3.fromRGB(126, 142, 156), Color3.fromRGB(128, 150, 132),
+	Color3.fromRGB(188, 178, 152), Color3.fromRGB(140, 140, 138),
 }
 local SIGN_BG = {
 	Color3.fromRGB(196, 40, 40), Color3.fromRGB(28, 90, 170), Color3.fromRGB(240, 196, 40), Color3.fromRGB(30, 130, 80),
@@ -43,7 +45,7 @@ Shop.NAMES = NAMES
 
 local WHITE = Color3.fromRGB(236, 238, 240)
 local ALU = Color3.fromRGB(170, 176, 182)
-local DARKGLASS = Color3.fromRGB(44, 50, 58)
+local DARKGLASS = Color3.fromRGB(40, 44, 42) -- tinted grey-green, as Thai shophouse glass is
 local PANE = Enum.Material.SmoothPlastic -- dark, slightly glossy: real windows look dark by day
 
 local acCount = 0
@@ -153,8 +155,7 @@ function Shop.row(parent: Instance, base: CFrame, w: number, d: number, rng: Ran
 		for f = 2, floors do
 			local y0 = gh + (f - 2) * fh
 			if lite then
-				local g = Kit.part(m, V3(uw - 5, 5, 0.25), base * CF(x, y0 + 6, fz - 0.08), DARKGLASS, PANE, { decor = true, reflectance = 0.1 })
-				if rng:NextNumber() < 0.5 then Kit.nightGlow(g) end
+				Kit.facade(m, base * CF(x, y0 + fh / 2 + 0.2, fz - 0.1), uw - 1.1, fh - 0.5, Kit.FACADE.town, 1, 1, wall, rng:NextNumber() < 0.5)
 			elseif balcony then
 				local door = Kit.part(m, V3(uw - 4.5, 7.4, 0.2), base * CF(x, y0 + 4.2, fz - 0.06), DARKGLASS, PANE, { decor = true, reflectance = 0.1 })
 				if rng:NextNumber() < 0.5 then Kit.nightGlow(door) end

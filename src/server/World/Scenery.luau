@@ -2,6 +2,7 @@
 -- base = lot centre at ground level, front = local -Z, x across the front, y up.
 local Kit = require(script.Parent.Kit)
 local Assets = require(script.Parent.Assets)
+local Solid = require(script.Parent.Solid)
 local M = Kit.M
 local C = Kit.COLORS
 local V3 = Vector3.new
@@ -85,9 +86,9 @@ function S.row(parent: Instance, base: CFrame, w: number, d: number, rng: Random
 			if shop then Kit.nightGlow(sign) end
 		end
 	end
+	local units = math.max(1, math.floor(w / 15.5 + 0.5))
 	for f = 2, floors do
-		local win = Kit.part(m, V3(w - 5, 4.2, 0.3), base * CF(0, (f - 1) * fh + 5.4, fz - 0.05), C.glass, M.Glass, { decor = true, reflectance = 0.1 })
-		if rng:NextNumber() < 0.6 then Kit.nightGlow(win) end
+		Kit.facade(m, base * CF(0, (f - 1) * fh + fh / 2, fz - 0.1), w - 0.6, fh, Kit.FACADE.town, units, 1, col, rng:NextNumber() < 0.6)
 	end
 	if rng:NextNumber() < 0.4 then
 		Kit.cyl(m, 3, 3.4, base * CF(rng:NextNumber(-w / 3, w / 3), h + 2.6, 4), Color3.fromRGB(70, 110, 170), M.SmoothPlastic, { decor = true })
@@ -204,23 +205,94 @@ end
 ---------------------------------------------------------------------------------------------------
 -- street furniture and plants
 ---------------------------------------------------------------------------------------------------
+-- What S.tree(kind) plants: species (Config/Plants kinds) with weights, size range, trunk collider width.
+S.PLANTS = {
+	rain = { { "rain", 1 }, scale = { 0.6, 0.82 }, trunk = 3.6 },
+	small = { { "shade", 3 }, { "mango", 2 }, { "koon", 3 }, { "frangipani", 1 }, scale = { 0.6, 0.85 }, trunk = 2.4 },
+	street = { { "koon", 4 }, { "shade", 3 }, { "mango", 2 }, { "rain", 1 }, scale = { 0.62, 0.8 }, trunk = 2.6 },
+	koon = { { "koon", 1 }, scale = { 0.65, 0.9 }, trunk = 2.2 },
+	mango = { { "mango", 1 }, scale = { 0.6, 0.85 }, trunk = 2.6 },
+	frangipani = { { "frangipani", 1 }, scale = { 0.8, 1.1 }, trunk = 1.6 },
+	palm = { { "coconut", 7 }, { "royal", 3 }, scale = { 0.8, 1.05 }, trunk = 1.6 },
+	royal = { { "royal", 1 }, scale = { 0.85, 1.05 }, trunk = 1.8 },
+	banana = { { "banana", 1 }, scale = { 0.8, 1.2 }, trunk = 0.9 },
+	bush = { { "hedge", 3 }, { "bougainvillea", 2 }, scale = { 0.55, 0.9 } },
+	flower = { { "bougainvillea", 1 }, scale = { 0.6, 0.95 } },
+	grass = { { "grass", 1 }, scale = { 0.8, 1.5 } },
+}
+for _, plan in pairs(S.PLANTS) do
+	local total = 0
+	for _, it in ipairs(plan) do total += it[2] end
+	plan.total = total
+end
+-- Sugar palm (ต้นตาล), the tree of the Isan rice fields (2026-11-18): a tall straight dark trunk and a
+-- round crown of stiff fan leaves, a few dead brown fans hanging below. Part-built (no mesh yet).
+function S.sugarPalm(parent: Instance, base: CFrame, rng: Random)
+	local m = Kit.model(parent, "SugarPalm")
+	local h = rng:NextNumber(40, 54)
+	local bark = Color3.fromRGB(84, 74, 66)
+	local flat = CFrame.new(base.Position) * CFrame.Angles(0, rad(rng:NextNumber(0, 360)), 0)
+	local lean = CFrame.Angles(rad(rng:NextNumber(-2.5, 2.5)), 0, rad(rng:NextNumber(-2.5, 2.5)))
+	local trunk = flat * lean
+	Kit.cyl(m, 1.9, h * 0.5, trunk * CF(0, h * 0.25, 0), bark, M.Wood, { name = "Trunk" })
+	Kit.cyl(m, 1.6, h * 0.52, trunk * CF(0, h * 0.74, 0), Color3.fromRGB(92, 82, 72), M.Wood, { decor = true })
+	local top = trunk * CF(0, h, 0)
+	Kit.ball(m, 3.8, top * CF(0, 0.8, 0), Color3.fromRGB(58, 92, 48), M.LeafyGrass, { decor = true })
+	local greens = { Color3.fromRGB(78, 122, 62), Color3.fromRGB(92, 134, 66), Color3.fromRGB(68, 110, 56), Color3.fromRGB(104, 140, 72) }
+	-- the fans stand edge-on to the trunk (each one's flat face turned sideways), so the crown is a
+	-- spiky ball from every side instead of a stack of plates
+	local fans = rng:NextInteger(20, 24)
+	for i = 0, fans - 1 do
+		local az = i / fans * 360 * 2.618 + rng:NextNumber(-12, 12) -- golden-angle spread round the crown
+		local el = -15 + (i / fans) * 95 + rng:NextNumber(-8, 8) -- from a little below level to almost straight up
+		local dir = CFrame.Angles(0, rad(az), 0) * CFrame.Angles(rad(el), 0, 0)
+		local d = rng:NextNumber(4.4, 5.6)
+		local fan = top * CF(0, 0.8, 0) * dir * CF(0, 0, -(1.6 + d * 0.5)) * CFrame.Angles(0, 0, rad(90 + rng:NextNumber(-30, 30)))
+		Kit.cyl(m, d, 0.14, fan, greens[rng:NextInteger(1, #greens)], M.LeafyGrass, { decor = true })
+	end
+	-- a skirt of dead brown fans hanging under the crown
+	for i = 1, rng:NextInteger(3, 5) do
+		local dir = CFrame.Angles(0, rad(i * 97 + rng:NextNumber(-20, 20)), 0) * CFrame.Angles(rad(-rng:NextNumber(62, 80)), 0, 0)
+		local d = rng:NextNumber(3.8, 4.8)
+		Kit.cyl(m, d, 0.12, top * CF(0, -0.2, 0) * dir * CF(0, 0, -(1.2 + d * 0.5)) * CFrame.Angles(0, 0, rad(90)), Color3.fromRGB(146, 118, 76), M.Wood, { decor = true })
+	end
+	return m
+end
+
 function S.tree(parent: Instance, base: CFrame, rng: Random, kind: string?)
 	local k = kind or "small"
+	if k == "sugarpalm" then
+		S.sugarPalm(parent, base, rng)
+		return
+	end
 	local d = { decor = true, shadow = true }
 	local bark = ({ Color3.fromRGB(104, 84, 64), Color3.fromRGB(92, 76, 60), Color3.fromRGB(116, 96, 76) })[rng:NextInteger(1, 3)]
 	local greens = { Color3.fromRGB(58, 104, 50), Color3.fromRGB(72, 120, 54), Color3.fromRGB(50, 92, 48), Color3.fromRGB(86, 130, 60) }
 	local function leaf(): Color3 return greens[rng:NextInteger(1, #greens)] end
 	base = base * CFrame.Angles(0, rad(rng:NextNumber(0, 360)), 0)
-	-- real tree meshes: a palm, and one broadleaf tree at different sizes; an invisible trunk keeps them solid
-	local meshName = (k == "palm") and "tree_palm" or ((k == "rain" or k == "small") and "tree_rain" or nil)
-	if meshName and Assets.has(meshName) then
-		local scale = k == "palm" and rng:NextNumber(1.25, 1.7) or (k == "rain" and rng:NextNumber(0.85, 1.15) or rng:NextNumber(0.5, 0.7))
+	-- the vegetation library (Config/Plants): several species, each with its own models; an invisible
+	-- trunk keeps the big ones solid. Falls back to the part-built trees below when it is not in the place.
+	local plan = S.PLANTS[k] or S.PLANTS.small
+	local roll = rng:NextNumber() * plan.total
+	local pickKind = plan[1][1]
+	for _, it in ipairs(plan) do
+		roll -= it[2]
+		if roll <= 0 then pickKind = it[1] break end
+	end
+	local names = Assets.plants(pickKind)
+	if #names > 0 then
+		local name = names[rng:NextInteger(1, #names)]
+		local scale = rng:NextNumber(plan.scale[1], plan.scale[2])
 		local flat = CFrame.new(base.Position) * CFrame.Angles(0, rad(rng:NextNumber(0, 360)), 0)
-		local tree = Assets.place(parent, meshName, flat * CF(0, -0.3, 0), scale)
+		local tree = Assets.place(parent, name, flat * CF(0, -0.2, 0), scale)
 		if tree then
-			local h = (tree:GetAttribute("Height") or 20) * scale
-			local trunk = Kit.cyl(parent, k == "palm" and 1.4 or 2.2 * scale + 0.6, h * 0.5, flat * CF(0, h * 0.25, 0), bark, M.Wood, { name = "Trunk", transparency = 1 })
-			trunk.CastShadow = false
+			if plan.trunk then
+				local h = (tree:GetAttribute("Height") or 20) * scale
+				local trunk = Kit.cyl(parent, plan.trunk * scale + 0.5, h * 0.45, flat * CF(0, h * 0.225, 0), bark, M.Wood, { name = "Trunk", transparency = 1 })
+				trunk.CastShadow = false
+			elseif k == "bush" or k == "flower" then
+				Solid.body(tree, 0.7, 4) -- hedges: a walker goes round them (World/Solid)
+			end
 			return
 		end
 	end
@@ -285,7 +357,7 @@ function S.lamp(parent: Instance, base: CFrame)
 	Kit.cyl(parent, 0.7, 20, base * CF(0, 10, 0), C.metalDark, M.Metal, { decor = true })
 	Kit.part(parent, V3(0.5, 0.5, 7), base * CF(0, 19.8, -3.2), C.metalDark, M.Metal, { decor = true })
 	local head = Kit.part(parent, V3(1.6, 0.5, 3), base * CF(0, 19.5, -6), Color3.fromRGB(250, 240, 210), M.SmoothPlastic, { decor = true })
-	Kit.nightLight(head, 46, Color3.fromRGB(255, 214, 160), 1.6)
+	Kit.nightLight(head, 56, Color3.fromRGB(255, 214, 160), 1.15)
 	Kit.nightGlow(head)
 end
 
@@ -321,17 +393,55 @@ function S.bench(parent: Instance, base: CFrame)
 	Kit.part(parent, V3(6, 0.5, 1.8), base * CF(0, 1.7, 0), C.wood, M.WoodPlanks)
 	Kit.part(parent, V3(6, 1.8, 0.4), base * CF(0, 2.9, 0.9), C.wood, M.WoodPlanks, { decor = true })
 	for _, sx in ipairs({ -2.5, 2.5 }) do Kit.part(parent, V3(0.5, 1.6, 1.6), base * CF(sx, 0.8, 0), C.metalDark, M.Metal, { decor = true }) end
+	-- a real seat (the back rest is at +Z, so the sitter faces -Z). Nobody is sat by bumping into it:
+	-- the server seats a player who chooses to rest here.
+	local seat = Instance.new("Seat")
+	seat.Name = "RestSeat"
+	seat.Anchored = true
+	seat.Size = V3(5.4, 0.3, 1.5)
+	seat.CFrame = base * CF(0, 2.05, -0.05)
+	seat.Transparency = 1
+	seat.CanCollide = false
+	seat.CanTouch = false
+	seat.CanQuery = false
+	seat:AddTag("RestSeat")
+	seat.Parent = parent
 end
 
 function S.trafficLight(parent: Instance, base: CFrame)
 	Kit.cyl(parent, 0.8, 16, base * CF(0, 8, 0), C.metalDark, M.Metal, { decor = true })
 	Kit.part(parent, V3(0.5, 0.5, 9), base * CF(0, 15.6, -4.4), C.metalDark, M.Metal, { decor = true })
-	Kit.part(parent, V3(1.5, 4.2, 1.2), base * CF(0, 14.6, -8.6), Color3.fromRGB(240, 190, 40), M.SmoothPlastic, { decor = true })
+	-- (2026-11-19, owner: the lights were hard to read) a bigger head on a black backboard with a yellow
+	-- rim, and a hood over each lamp, as on real Thai signals. The lamps face local -X (the drivers).
+	Kit.part(parent, V3(0.2, 7.6, 3.2), base * CF(0.55, 14.4, -8.6), Color3.fromRGB(240, 190, 40), M.SmoothPlastic, { decor = true })
+	Kit.part(parent, V3(0.3, 7.0, 2.6), base * CF(0.45, 14.4, -8.6), Color3.fromRGB(16, 16, 18), M.SmoothPlastic, { decor = true })
+	Kit.part(parent, V3(1.2, 6.2, 2.0), base * CF(-0.3, 14.4, -8.6), Color3.fromRGB(28, 28, 30), M.SmoothPlastic, { decor = true })
 	local cols = { Color3.fromRGB(220, 50, 40), Color3.fromRGB(240, 190, 40), Color3.fromRGB(60, 200, 90) }
 	for i, c in ipairs(cols) do
-		local l = Kit.ball(parent, 0.9, base * CF(0, 16 - i * 1.2 + 1, -8.6) * CF(-0.75, 0, 0), c, i == 3 and M.Neon or M.SmoothPlastic, { decor = true })
+		local y = 14.4 + (2 - i) * 1.95
+		local l = Kit.ball(parent, 1.55, base * CF(-0.9, y, -8.6), c, i == 3 and M.Neon or M.SmoothPlastic, { decor = true })
 		l.Name = "Lamp" .. i
+		Kit.part(parent, V3(1.0, 0.12, 1.75), base * CF(-1.3, y + 0.86, -8.6), Color3.fromRGB(28, 28, 30), M.SmoothPlastic, { decor = true })
 	end
+end
+
+-- Sign gantry over a big road where one district ends and the next begins. cf looks along the
+-- road; `front` is the district drivers enter when they see the front face, `back` the other way.
+function S.gateway(parent: Instance, cf: CFrame, span: number, front: any, back: any)
+	local m = Kit.model(parent, "Gateway")
+	local green = Color3.fromRGB(22, 104, 64)
+	for _, sx in ipairs({ -1, 1 }) do
+		Kit.cyl(m, 1.6, 31, cf * CF(sx * span / 2, 15.5, 0), C.metalDark, M.Metal, { decor = true })
+	end
+	for _, y in ipairs({ 22.6, 30.4 }) do
+		Kit.part(m, V3(span + 1.6, 1, 1), cf * CF(0, y, 0), C.metalDark, M.Metal, { decor = true })
+	end
+	local bw = math.min(span - 6, 36)
+	local board = Kit.part(m, V3(bw, 6.6, 0.6), cf * CF(0, 26.5, 0), green, M.SmoothPlastic, { decor = true, shadow = true })
+	Kit.part(m, V3(bw + 0.6, 7.2, 0.3), cf * CF(0, 26.5, 0), C.white, M.SmoothPlastic, { decor = true })
+	Kit.sign(board, front.thai, { sub = front.name, face = Enum.NormalId.Front, bg = green, maxDistance = 700, pps = 14 })
+	Kit.sign(board, back.thai, { sub = back.name, face = Enum.NormalId.Back, bg = green, maxDistance = 700, pps = 14 })
+	return m
 end
 
 function S.billboard(parent: Instance, base: CFrame, text: string, sub: string, color: Color3)

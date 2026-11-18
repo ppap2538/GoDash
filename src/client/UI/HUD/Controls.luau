@@ -28,6 +28,7 @@ local function keysNow(): { { string } }
 		table.insert(list, { "A / D", L("Steer", "เลี้ยวซ้าย / ขวา") })
 		table.insert(list, { "Space", L("Handbrake", "เบรกมือ") })
 		if job then table.insert(list, { "G", L("Pick up / deliver", "รับ / ส่งอาหาร") }) end
+		table.insert(list, { "Q", Drive.info.auto and L("Auto drive off", "ปิดขับอัตโนมัติ") or L("Auto drive (follows the route)", "ขับอัตโนมัติตามเส้นทาง") })
 		table.insert(list, { "V", L("First-person view", "มุมมองคนขี่") })
 		table.insert(list, { "F", L("Headlights", "ไฟหน้า") })
 		table.insert(list, { "E", L("Get off", "ลงจากรถ") })

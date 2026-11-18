@@ -31,6 +31,22 @@ local function restyle(inst: Instance)
 	if inst:IsA("ProximityPrompt") and inst.Style ~= Enum.ProximityPromptStyle.Custom then
 		inst.Style = Enum.ProximityPromptStyle.Custom
 	end
+	-- prompts meant for one player ("Drive" on your own vehicle) or for everyone else ("Ride along")
+	-- (server/VehicleService); Enabled set here is local to this client
+	if inst:IsA("ProximityPrompt") then
+		local me = game:GetService("Players").LocalPlayer.UserId
+		local only, notFor = inst:GetAttribute("ForUser"), inst:GetAttribute("NotForUser")
+		if (only ~= nil and only ~= me) or (notFor ~= nil and notFor == me) then
+			inst.Enabled = false
+			if not inst:GetAttribute("HiddenHook") then
+				inst:SetAttribute("HiddenHook", true)
+				-- the server toggles Enabled (seat taken / free) and that replicates: keep it hidden here
+				inst:GetPropertyChangedSignal("Enabled"):Connect(function()
+					if inst.Enabled then inst.Enabled = false end
+				end)
+			end
+		end
+	end
 end
 
 local function keyText(e: Entry): string

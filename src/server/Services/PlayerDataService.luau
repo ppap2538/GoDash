@@ -22,7 +22,9 @@ local function template()
 		version = 1,
 		money = Game.START_MONEY, bank = 0, level = 1, exp = 0,
 		energy = 100, hunger = 100, happiness = 80,
+		injury = 0, -- 0-100 from falls and crashes; the hospital treats it (server/HealthService)
 		rating = 5, ratingCount = 0,
+		reviews = {}, -- the last 30 customer reviews, newest first: { t, s (stars), m (mode), who, tip, tags, seed } (client/Reviews)
 		stats = { deliveries = 0, rides = 0, distance = 0, earned = 0, harvests = 0, planted = 0, fiveStars = 0, playSeconds = 0 },
 		daily = { day = 0, income = 0, jobs = 0, safeBonus = 0, merit = 0, interest = 0 },
 		vehicles = { [Game.START_VEHICLE] = Vehicles.newOwned(start) },
@@ -33,7 +35,23 @@ local function template()
 		buffs = {},
 		missions = { day = 0, daily = {}, career = {} },
 		dailyReward = { day = 0, streak = 0 },
-		settings = { steer = 1, assist = true, music = true, sfx = true, lang = "th" },
+		settings = { steer = 1, assist = true, music = true, sfx = true, bgm = true, lang = "th", rideAlong = "friends" }, -- music = city ambience, bgm = background songs; rideAlong = who may ride with you
+		win = false, -- member of the motorbike-taxi stands (server/StreetService)
+		licence = { bike = false, car = false }, -- driving licences (server/LicenseService)
+		loans = {}, -- [vehicleId] = { left, each, due, missed } (server/FinanceService)
+		credit = 650, -- credit score 300-850 (Config/Credit)
+		bankLoan = false, -- or { principal, total, each, terms, left, timer, missed, fee, paidPart } (KK Bank personal loan)
+		week = { id = 0, earned = 0, jobs = 0, five = 0 }, -- this week's totals for the Top Riders boards (server/LeaderboardService)
+		-- Tier-A plan (2026-11-17): server/Services/StoreService, SeasonService, CompanyService
+		receipts = {}, -- Robux purchase ids already granted (newest last, the last 100)
+		passes = { vip = false, neon = false }, -- last known game-pass ownership (Roblox is asked on every join)
+		codes = {}, -- [CODE] = os.time() when redeemed
+		unlocks = {}, -- [key] = true: season cosmetics and titles (Config/Season.COSMETICS)
+		title = "", -- chosen title key ("" = the rank)
+		season = { id = 0, xp = 0, premium = false, free = {}, prem = {} },
+		company = { riders = 0, level = 1, bank = 0, last = 0 },
+		badges = {}, -- [badge key] = true once awarded
+		seenNews = "", -- the "What's new" version this rider has seen
 		firstJoin = 0, lastSeen = 0,
 	}
 end

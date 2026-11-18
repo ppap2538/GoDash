@@ -17,8 +17,9 @@ local UserInputService = game:GetService("UserInputService")
 
 local Layout = {}
 
-Layout.BASE_H = 720
-Layout.COMPACT_BASE_H = 540
+-- (2026-11-17, owner: "some UI is too big and covers the screen": was 720 / 540, so everything is ~10% / ~5% smaller)
+Layout.BASE_H = 800
+Layout.COMPACT_BASE_H = 570
 Layout.MIN_W = 760
 Layout.PHONE_W = 340
 Layout.PHONE_MAX_H = 620

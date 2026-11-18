@@ -19,6 +19,7 @@ local UIState = require(script.Parent.UI.Core.UIState)
 local State = require(script.Parent.State)
 local Drive = require(script.Parent.Drive)
 local Feedback = require(script.Parent.Feedback)
+local HUD = require(script.Parent.HUD)
 local Phone = require(script.Parent.Phone)
 local GPS = require(script.Parent.GPS)
 local Lang = require(script.Parent.Lang)
@@ -32,7 +33,14 @@ local refs = {} :: { [string]: any }
 local current = nil :: any -- the last computed objective
 local myVehicle: Model? = nil
 
-local W, H = 470, 92
+-- 2026-11-18 owner: the card in the middle of the top was big and hid the traffic lights. It now sits in
+-- the top-left column under the money/needs panel (HUD.topLeft), as wide as that column: a title row
+-- with the arrow, the detail under it, the button under that. Riding: the title row only.
+local ROW_H = 46 -- icon + title + arrow
+local DETAIL_H = 32
+local BUTTON_H = touch and 40 or 34
+local SLIM_H = 40
+local slim = false
 
 ---------------------------------------------------------------------------------------------------
 -- helpers
@@ -67,23 +75,115 @@ local function setOnline(on: boolean)
 end
 Guide.setOnline = setOnline
 
-local function nearestGas(from: Vector3)
+local function nearestPoi(from: Vector3, kind: string)
 	local w = State.world
 	if not w then return nil end
 	local best, bd
 	for _, p in ipairs(w.pois) do
-		if p.kind == "gas" then
+		if p.kind == kind then
 			local d = (p.pos - from).Magnitude
 			if not bd or d < bd then best, bd = p, d end
 		end
 	end
 	return best
 end
+local function nearestGas(from: Vector3) return nearestPoi(from, "gas") end
 
 local function placeName(t): string
 	if not t then return "" end
 	if Lang.code == "th" and t.thai and t.thai ~= "" then return t.thai end
 	return Lang.t(t.name or "")
+end
+
+---------------------------------------------------------------------------------------------------
+-- needs: hungry / exhausted. New orders are paused on the server, so the card leads to food:
+-- eat from the bag if there is something good in it, otherwise route to the nearest place that
+-- sells it and offer one "eat now" button there.
+---------------------------------------------------------------------------------------------------
+local Items = require(Shared.Config.Items)
+local EAT_RANGE = 50 -- the shop accepts 60 studs; a little margin for lag
+local routed = nil :: string? -- the place the GPS was pointed at during this dip (once, never fought)
+local routedPos = nil :: Vector3?
+
+local function bagMeal(d, want: string): any
+	local best, bv = nil, (want == "hunger") and 15 or 12
+	for id, n in pairs(d.inventory or {}) do
+		local it = Items.ById[id]
+		if it and it.kind == "food" and n > 0 and (it[want] or 0) >= bv then best, bv = it, it[want] end
+	end
+	return best
+end
+
+local function nearestFood(from: Vector3, want: string): any
+	local w = State.world
+	if not w or not w.food then return nil end
+	local best, bd
+	local minV = want == "hunger" and 20 or 15
+	for _, p in ipairs(w.food) do
+		local m = p[want]
+		if m and m.value >= minV then
+			local dd = Util.flatDist(p.pos, from)
+			if not bd or dd < bd then best, bd = p, dd end
+		end
+	end
+	return best, bd
+end
+
+local function itemName(id: string): string
+	local it = Items.ById[id]
+	if not it then return id end
+	return (Lang.code == "th" and it.thai) or it.name
+end
+
+local function needCard(want: string, d, pos: Vector3?, driving: boolean)
+	local hungry = want == "hunger"
+	local icon = hungry and "🍜" or "😪"
+	local head = hungry and L("You're hungry", "หิวแล้ว") or L("You're exhausted", "เหนื่อยมากแล้ว")
+	local paused = L("New orders are paused until you ", "หยุดรับออร์เดอร์ไว้ก่อนจนกว่าจะ") .. (hungry and L("eat.", "กินข้าว") or L("rest.", "ได้พัก"))
+	-- something good in the bag: eat it right here
+	local meal = bagMeal(d, want)
+	if meal then
+		return { icon = icon, color = C.orange, warn = true, title = head .. L(": eat from your bag", " · มีของกินในกระเป๋า"),
+			detail = paused,
+			button = { text = meal.icon .. " " .. L("Eat ", "กิน") .. itemName(meal.id), fn = function()
+				local ok, msg = Net.call("Inventory", "eat", meal.id)
+				if msg and msg ~= "" then Feedback.toast(msg, ok and "good" or "bad") end
+			end } }
+	end
+	if not pos then return nil end
+	local place, dist = nearestFood(pos, want)
+	if not place then
+		return { icon = icon, color = C.orange, warn = true, title = head,
+			detail = hungry and L("Look for a restaurant or market on the map (Phone → Maps).", "หาร้านอาหารหรือตลาดในแผนที่ (มือถือ → แผนที่)")
+				or L("Rest on a bench or sala: walk up and press E.", "พักที่ม้านั่งหรือศาลา: เดินไปแล้วกด E") }
+	end
+	local m = place[want]
+	local name = placeName(place)
+	if dist <= EAT_RANGE then
+		return { icon = icon, color = C.green, title = L("You're at ", "ถึงแล้ว: ") .. name,
+			detail = touch and L("Tap the button to buy and eat right away.", "แตะปุ่มเพื่อซื้อแล้วกินทันที")
+				or L("Click the button to buy and eat right away.", "คลิกปุ่มเพื่อซื้อแล้วกินทันที"),
+			button = { text = (Items.ById[m.id] and Items.ById[m.id].icon or "🍛") .. " " .. L("Eat ", "กิน") .. itemName(m.id) .. " " .. Util.money(m.price), fn = function()
+				local ok, msg = Net.call("Shop", "eatnow", place.id, m.id)
+				if msg and msg ~= "" then Feedback.toast(msg, ok and "good" or "bad") end
+				if ok then Feedback.good() end
+			end } }
+	end
+	-- far away: point the GPS there once per dip (the player can still pick another target). When there
+	-- is no target at all any more (a waypoint clears itself 40 studs out, e.g. riding past the shop),
+	-- point it there again: the card says "follow the green line", so there must be one (owner,
+	-- 2026-11-16: "the green line disappeared").
+	if routed ~= place.id or (GPS.target() == nil and dist > 60) then
+		routed = place.id
+		routedPos = place.pos
+		GPS.setTarget(place.pos, name)
+	end
+	local how = driving and L("Follow the green line.", "ขี่ตามเส้นสีเขียว")
+		or (dist < 150 and L("It's close: just walk over.", "อยู่ใกล้แล้ว เดินไปได้เลย"))
+		or (myVehicle and L("Get on your vehicle (F) and follow the green line.", "ขึ้นรถ (กด F) แล้วขี่ตามเส้นสีเขียว") or L("Follow the green line.", "เดินตามเส้นสีเขียว"))
+	return { icon = icon, color = C.orange, warn = true, target = place.pos,
+		title = head .. (hungry and L(": eat at ", " ไปกินที่ ") or L(": coffee at ", " ไปดื่มกาแฟที่ ")) .. name,
+		detail = paused .. " · " .. how }
 end
 
 ---------------------------------------------------------------------------------------------------
@@ -99,7 +199,6 @@ local function compute()
 	local info = Drive.info
 	local driving = info.driving == true
 	local pos = rootPos()
-	local first = ((d.stats and d.stats.deliveries) or 0) + ((d.stats and d.stats.rides) or 0) == 0
 	local vehName = myVehicle and Lang.t(myVehicle:GetAttribute("VehicleName") or myVehicle.Name) or L("vehicle", "รถ")
 
 	-- a job offer is waiting
@@ -149,15 +248,49 @@ local function compute()
 		return o
 	end
 
-	-- no job: needs come first
-	if not first and d.energy < 12 then
-		return { icon = "😪", color = C.orange, warn = true, title = L("You're exhausted", "เหนื่อยมากแล้ว"),
-			detail = L("Rest on a bench or sala (walk up, press E) or drink an energy drink.", "พักที่ม้านั่งหรือศาลา (เดินไปกด E) หรือดื่มเครื่องดื่มชูกำลัง") }
+	-- hurt from falls (server/HealthService): from 80 no new orders until a doctor has seen to it;
+	-- from 60 the card suggests the hospital whenever nothing else is going on
+	local inj = player:GetAttribute("Injury") or 0
+	local hurtCard = nil
+	if inj >= 60 and pos then
+		local hosp = nearestPoi(pos, "hospital")
+		if hosp then
+			local dist = Util.flatDist(pos, hosp.pos)
+			local must = inj >= 80
+			local o = { icon = "🏥", color = C.red, warn = must, target = dist > 30 and hosp.pos or nil,
+				title = must and L(("Badly hurt (%d): see a doctor"):format(inj), ("บาดเจ็บหนัก (%d) ต้องไปหาหมอ"):format(inj))
+					or L(("Hurt (%d): get it looked at"):format(inj), ("เจ็บพอสมควร (%d) แวะหาหมอ"):format(inj)) }
+			if dist <= 30 then
+				o.detail = L("Gold card ฿30 + medicine. The queue can be long.", "บัตรทอง ฿30 + ค่ายา คิวอาจจะยาวหน่อย")
+				o.button = { text = "🩹 " .. L("Get treated", "รักษาแผล"), fn = function()
+					local ok, msg = Net.call("Shop", "heal", "hospital")
+					if not ok and msg and msg ~= "" then Feedback.toast(msg, "bad") end
+				end }
+			else
+				if routed ~= "hospital" or (GPS.target() == nil and dist > 60) then
+					routed, routedPos = "hospital", hosp.pos
+					GPS.setTarget(hosp.pos, placeName(hosp))
+				end
+				o.detail = (must and L("New orders are paused until you're treated. ", "หยุดรับออร์เดอร์จนกว่าจะรักษา · ") or "")
+					.. L("Follow the green line to ", "ไปตามเส้นสีเขียวที่ ") .. placeName(hosp)
+			end
+			if must then return o end
+			hurtCard = o
+		end
 	end
-	if not first and d.hunger < 15 then
-		return { icon = "🍜", color = C.orange, warn = true, title = L("You're hungry", "หิวแล้ว"),
-			detail = L("Walk into any restaurant and press E to buy food, then eat it from your Bag.", "เดินเข้าร้านอาหารแล้วกด E ซื้ออาหาร แล้วกินจากแอปกระเป๋า") }
+
+	-- no job: needs come first (the server holds new orders back until they are met)
+	local want = (d.hunger < Game.HUNGRY_AT and "hunger") or (d.energy < Game.TIRED_AT and "energy") or nil
+	if want then
+		local o = needCard(want, d, pos, driving)
+		if o then return o end
+	elseif routed and not (routed == "hospital" and inj >= 60) then
+		-- fed / rested: drop the route to the restaurant if it is still the GPS target
+		local t = State.target
+		if t and routedPos and (t.pos - routedPos).Magnitude < 1 then GPS.setTarget(nil) end
+		routed, routedPos = nil, nil
 	end
+	if hurtCard then return hurtCard end
 
 	if not driving then
 		if myVehicle then
@@ -221,13 +354,12 @@ local function render(o)
 		refs.tag.Text = L("WHAT TO DO NOW", "ตอนนี้ต้องทำอะไร")
 	end
 	local hasBtn = o.button ~= nil
-	refs.button.Visible = hasBtn
 	if hasBtn then refs.button.Text = o.button.text end
-	refs.compass.Visible = (not hasBtn) and o.target ~= nil
-	local textRight = (hasBtn or o.target) and (hasBtn and 162 or 84) or 14
-	refs.title.Size = UDim2.new(1, -(70 + textRight), 0, 24)
-	refs.detail.Size = UDim2.new(1, -(70 + textRight), 0, 34)
-	refs.tag.Size = UDim2.new(1, -(70 + textRight), 0, 14)
+	refs.compass.Visible = o.target ~= nil
+	local textRight = o.target and 50 or 10
+	refs.title.Size = UDim2.new(1, -(50 + textRight), 0, 20)
+	refs.tag.Size = UDim2.new(1, -(50 + textRight), 0, 12)
+	if refs.resize then refs.resize() end
 end
 
 local function signature(o): string
@@ -235,45 +367,49 @@ local function signature(o): string
 end
 
 local function buildCard(parent: Instance)
-	local card = UI.panel(parent, { Name = "Guide", LayoutOrder = -10, Size = UDim2.fromOffset(W, H), BackgroundTransparency = 0.12 }, 18)
+	local card = UI.panel(parent, { Name = "Guide", LayoutOrder = 20, Size = UDim2.new(1, 0, 0, ROW_H), BackgroundTransparency = 0.15, ClipsDescendants = true }, 14)
 	refs.card = card
-	refs.accent = UI.new("Frame", { BackgroundColor3 = C.green, Size = UDim2.new(0, 6, 1, -24), Position = UDim2.fromOffset(0, 12), Parent = card })
-	UI.corner(refs.accent, 3)
-	local iconBg = UI.new("Frame", { BackgroundColor3 = C.green, AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 16, 0.5, 0), Size = UDim2.fromOffset(46, 46), Parent = card })
-	UI.corner(iconBg, 23)
+	refs.accent = UI.new("Frame", { BackgroundColor3 = C.green, Size = UDim2.new(0, 4, 1, -16), Position = UDim2.fromOffset(0, 8), Parent = card })
+	UI.corner(refs.accent, 2)
+	local iconBg = UI.new("Frame", { BackgroundColor3 = C.green, Position = UDim2.fromOffset(10, 7), Size = UDim2.fromOffset(32, 32), Parent = card })
+	UI.corner(iconBg, 16)
 	refs.iconBg = iconBg
-	refs.icon = UI.label(iconBg, "🛵", 24, C.white, F.med, { Size = UDim2.fromScale(1, 1), TextXAlignment = Enum.TextXAlignment.Center, TextTruncate = Enum.TextTruncate.None })
-	refs.tag = UI.label(card, "", 11, C.green, F.bold, { Position = UDim2.fromOffset(72, 8), Size = UDim2.new(1, -84, 0, 14) })
-	refs.title = UI.label(card, "", 18, C.white, F.black, { Position = UDim2.fromOffset(72, 22), Size = UDim2.new(1, -84, 0, 24) })
-	UI.fitText(refs.title, 18, 11)
-	refs.detail = UI.label(card, "", 13, C.textDim, F.med, { Position = UDim2.fromOffset(72, 48), Size = UDim2.new(1, -84, 0, 34), TextWrapped = true,
+	refs.icon = UI.label(iconBg, "🛵", 17, C.white, F.med, { Size = UDim2.fromScale(1, 1), TextXAlignment = Enum.TextXAlignment.Center, TextTruncate = Enum.TextTruncate.None })
+	refs.tag = UI.label(card, "", 10, C.green, F.bold, { Position = UDim2.fromOffset(50, 5), Size = UDim2.new(1, -60, 0, 12) })
+	refs.title = UI.label(card, "", 15, C.white, F.black, { Position = UDim2.fromOffset(50, 17), Size = UDim2.new(1, -60, 0, 20) })
+	UI.fitText(refs.title, 15, 10)
+	refs.detail = UI.label(card, "", 12, C.textDim, F.med, { Position = UDim2.fromOffset(12, ROW_H - 2), Size = UDim2.new(1, -22, 0, DETAIL_H), TextWrapped = true,
 		TextYAlignment = Enum.TextYAlignment.Top, TextTruncate = Enum.TextTruncate.AtEnd })
-	-- arrow + distance to the target
-	local compass = UI.new("Frame", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -10, 0.5, 0), Size = UDim2.fromOffset(70, 74), Visible = false, Parent = card })
+	-- arrow + distance to the target, at the right of the title row
+	local compass = UI.new("Frame", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -6, 0, 3), Size = UDim2.fromOffset(44, 42), Visible = false, Parent = card })
 	refs.compass = compass
-	local ring = UI.new("Frame", { BackgroundColor3 = C.white, BackgroundTransparency = 0.88, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 0), Size = UDim2.fromOffset(48, 48), Parent = compass })
-	UI.corner(ring, 24)
+	local ring = UI.new("Frame", { BackgroundColor3 = C.white, BackgroundTransparency = 0.88, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 0), Size = UDim2.fromOffset(28, 28), Parent = compass })
+	UI.corner(ring, 14)
 	UI.stroke(ring, C.green, 2, 0.2)
-	refs.arrow = UI.label(ring, "▲", 26, C.green, F.black, { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(40, 40),
+	refs.arrow = UI.label(ring, "▲", 16, C.green, F.black, { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(24, 24),
 		TextXAlignment = Enum.TextXAlignment.Center, TextTruncate = Enum.TextTruncate.None })
-	refs.dist = UI.label(compass, "", 13, C.white, F.black, { Position = UDim2.fromOffset(0, 52), Size = UDim2.new(1, 0, 0, 18), TextXAlignment = Enum.TextXAlignment.Center, TextTruncate = Enum.TextTruncate.None })
-	refs.button = UI.button(card, "", { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -12, 0.5, 0), Size = UDim2.fromOffset(148, touch and 52 or 44), TextSize = 15, Visible = false }, function()
+	refs.dist = UI.label(compass, "", 11, C.white, F.black, { Position = UDim2.fromOffset(0, 29), Size = UDim2.new(1, 0, 0, 13), TextXAlignment = Enum.TextXAlignment.Center, TextTruncate = Enum.TextTruncate.None })
+	refs.button = UI.button(card, "", { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -7), Size = UDim2.new(1, -20, 0, BUTTON_H - 6), TextSize = 14, Visible = false }, function()
 		if current and current.button then current.button.fn() end
 	end)
-	UI.fitText(refs.button, 15, 10)
+	UI.fitText(refs.button, 14, 10)
 	for _, l in ipairs({ refs.icon, refs.tag, refs.title, refs.detail, refs.dist, refs.button, refs.arrow }) do l:SetAttribute("NoTranslate", true) end
 	UIState.onChange(function()
 		card.Visible = not UIState.get("build") and not UIState.get("modal")
 	end)
+	-- the height follows what is shown: title row, detail line(s), button
 	local function size()
-		local w = Layout.breakpoint == "compact" and 420 or W
-		local strip = parent.AbsoluteSize.X / math.max(Layout.scale, 0.01)
-		if strip > 10 then w = math.min(w, strip) end
-		card.Size = UDim2.fromOffset(math.max(w, 300), H)
+		local o = current
+		local hasDetail = not slim and o ~= nil and (o.detail or "") ~= ""
+		local hasBtn = not slim and o ~= nil and o.button ~= nil
+		refs.detail.Visible = hasDetail
+		refs.button.Visible = hasBtn
+		local h = slim and SLIM_H or (ROW_H + (hasDetail and DETAIL_H or 0) + (hasBtn and BUTTON_H or 0))
+		card.Size = UDim2.new(1, 0, 0, h)
 	end
+	refs.resize = size
 	size()
 	Layout.onChange(size)
-	parent:GetPropertyChangedSignal("AbsoluteSize"):Connect(size)
 end
 
 ---------------------------------------------------------------------------------------------------
@@ -315,7 +451,7 @@ end
 
 ---------------------------------------------------------------------------------------------------
 function Guide.start()
-	buildCard(Feedback.top)
+	buildCard(HUD.topLeft or Feedback.top) -- under the money/needs panel, out of the way of the road ahead
 	buildVehicleTag()
 
 	-- J: go online / offline (keyboard)
@@ -336,6 +472,18 @@ function Guide.start()
 			myVehicle = findVehicle()
 			local ok, o = pcall(compute)
 			if ok and o then
+				-- riding: the card slims to its title (plus the compass or a smaller button; J still works)
+				local wantSlim = Drive.info.driving == true and (Drive.info.speed or 0) > 10 and not o.warn
+				if wantSlim ~= slim and refs.resize then
+					slim = wantSlim
+					refs.tag.Visible = not slim
+					refs.title.Position = UDim2.fromOffset(50, slim and 10 or 17)
+					refs.iconBg.Position = UDim2.fromOffset(10, slim and 5 or 7)
+					refs.iconBg.Size = slim and UDim2.fromOffset(30, 30) or UDim2.fromOffset(32, 32)
+					refs.compass.Position = UDim2.new(1, -6, 0, slim and 0 or 3)
+					refs.card.BackgroundTransparency = slim and 0.3 or 0.15
+					refs.resize()
+				end
 				local sig = signature(o)
 				if sig ~= last then
 					local stepChanged = current and current.step ~= o.step

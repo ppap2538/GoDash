@@ -59,6 +59,7 @@ function Inventory.start(lifestyle, missions)
 			if not Inventory.remove(player, id, 1) then return false, "You don't have any" end
 			lifestyle.consume(player, it)
 			missions.progress(player, "eat", 1)
+			Net.fire(player, "Notify", "scene", { kind = (it.hunger or 0) < 12 and "drink" or "eat", item = it.name }) -- eaten from the bag, beside the bike
 			return true, "Ate " .. it.name
 		elseif op == "drop" then
 			local n = math.clamp(qty or 1, 1, 99)

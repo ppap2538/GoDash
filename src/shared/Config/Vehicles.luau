@@ -13,53 +13,56 @@ export type Vehicle = {
 
 local Vehicles = {}
 
+-- (2026-11-17, owner: "every vehicle should go faster": top speed x1.3, acceleration x1.35, brakes x1.15, grip x1.08)
+-- (2026-11-19, owner: "ปรับมอไซให้ไวกว่าเดิม เพราะจักรยานไวแล้ว": the engine bikes were hardly quicker than the
+-- bicycle; the small ones gained most: Rusty Dream 60->74 km/h and accel 16->27, the others +9..17 % top, +15..40 % accel)
 local LIST: { Vehicle } = {
 	{ id = "bicycle", name = "Old Bicycle", thai = "จักรยานคู่ใจ", class = "bike", style = "bicycle", pedal = true,
-		price = 0, level = 1, topSpeed = 27, accel = 10, brake = 26, grip = 9, steer = 36,
+		price = 0, level = 1, topSpeed = 47, accel = 22, brake = 32, grip = 10.5, steer = 36, -- 2026-11-16 owner: "too slow, hard to start" (was 27 / 10)
 		cargo = 1, seats = 0, fuelCap = 0, fuelUse = 0, mass = 90, len = 6.4, wid = 1.8, height = 3.4, wheelR = 1.15, comfort = 0.6,
 		desc = "Where every rider starts. No fuel, just legs." },
 	{ id = "oldmoped", name = "Rusty Dream 100", thai = "มอเตอร์ไซค์มือสอง", class = "bike", style = "oldbike",
-		price = 1800, level = 2, topSpeed = 46, accel = 12, brake = 28, grip = 8.5, steer = 34,
+		price = 1800, level = 2, topSpeed = 74, accel = 27, brake = 32, grip = 9, steer = 34,
 		cargo = 2, seats = 1, fuelCap = 3.5, fuelUse = 0.3, mass = 200, len = 7.0, wid = 2.2, height = 3.4, wheelR = 1.05, comfort = 0.7,
 		desc = "Third-hand, smoky and loud, but it has an engine." },
 	{ id = "sabai110", name = "Sabai 110", thai = "มอเตอร์ไซค์แม่บ้าน", class = "bike", style = "underbone",
-		price = 7500, level = 4, topSpeed = 62, accel = 17, brake = 34, grip = 9, steer = 34,
+		price = 7500, level = 4, topSpeed = 95, accel = 32, brake = 39, grip = 9.5, steer = 34,
 		cargo = 2, seats = 1, fuelCap = 4, fuelUse = 0.22, mass = 220, len = 7.2, wid = 2.2, height = 3.4, wheelR = 1.05, comfort = 0.8,
 		desc = "Brand new family bike. Sips fuel, fits any soi." },
 	{ id = "zoomer125", name = "Zoomer 125", thai = "สกู๊ตเตอร์", class = "bike", style = "scooter",
-		price = 16000, level = 6, topSpeed = 72, accel = 20, brake = 38, grip = 10, steer = 34,
+		price = 16000, level = 6, topSpeed = 108, accel = 36, brake = 44, grip = 11, steer = 34,
 		cargo = 3, seats = 1, fuelCap = 6, fuelUse = 0.26, mass = 250, len = 7.4, wid = 2.4, height = 3.6, wheelR = 0.95, comfort = 1.0,
 		desc = "Automatic scooter with a big top box." },
 	{ id = "raptor300", name = "Raptor 300", thai = "สปอร์ตไบค์", class = "bike", style = "sport",
-		price = 34000, level = 9, topSpeed = 98, accel = 30, brake = 46, grip = 11.5, steer = 30,
+		price = 34000, level = 9, topSpeed = 142, accel = 49, brake = 53, grip = 12.5, steer = 30,
 		cargo = 2, seats = 1, fuelCap = 11, fuelUse = 0.4, mass = 320, len = 7.8, wid = 2.3, height = 3.6, wheelR = 1.1, comfort = 0.7,
 		desc = "Quick sport bike for express orders." },
 	{ id = "titan650", name = "Titan 650", thai = "บิ๊กไบค์", class = "bike", style = "bigbike",
-		price = 95000, level = 15, topSpeed = 128, accel = 40, brake = 54, grip = 12.5, steer = 28,
+		price = 95000, level = 15, topSpeed = 182, accel = 62, brake = 62, grip = 13.5, steer = 28,
 		cargo = 3, seats = 1, fuelCap = 15, fuelUse = 0.55, mass = 420, len = 8.4, wid = 2.6, height = 3.9, wheelR = 1.2, comfort = 0.9,
 		desc = "Big bike. Fastest way through traffic." },
 	{ id = "eco_city", name = "Mira Eco", thai = "อีโคคาร์", class = "car", style = "hatch",
-		price = 58000, level = 8, topSpeed = 86, accel = 15, brake = 36, grip = 10, steer = 30,
+		price = 58000, level = 8, topSpeed = 112, accel = 20, brake = 41, grip = 11, steer = 30,
 		cargo = 5, seats = 3, fuelCap = 35, fuelUse = 0.7, mass = 1000, len = 13.5, wid = 6.2, height = 5.4, wheelR = 1.25, comfort = 1.1,
 		desc = "Cheap to run. Opens ride-hailing for 3." },
 	{ id = "sedan_vios", name = "Viva Sedan", thai = "รถเก๋ง", class = "car", style = "sedan",
-		price = 120000, level = 12, topSpeed = 102, accel = 19, brake = 40, grip = 11, steer = 29,
+		price = 120000, level = 12, topSpeed = 133, accel = 26, brake = 46, grip = 12, steer = 29,
 		cargo = 6, seats = 3, fuelCap = 42, fuelUse = 0.85, mass = 1150, len = 15.5, wid = 6.4, height = 5.2, wheelR = 1.3, comfort = 1.3,
 		desc = "Comfortable sedan. Passengers tip more." },
 	{ id = "pickup_dmax", name = "Kwai Pickup", thai = "รถกระบะ", class = "car", style = "pickup",
-		price = 165000, level = 14, topSpeed = 94, accel = 17, brake = 38, grip = 10.5, steer = 28,
+		price = 165000, level = 14, topSpeed = 122, accel = 23, brake = 44, grip = 11.5, steer = 28,
 		cargo = 12, seats = 1, fuelCap = 60, fuelUse = 1.1, mass = 1500, len = 17.5, wid = 6.8, height = 6.2, wheelR = 1.55, comfort = 1.0,
 		desc = "Huge bed for large orders and farm hauls." },
 	{ id = "suv_fortune", name = "Fortuna SUV", thai = "รถเอสยูวี", class = "car", style = "suv",
-		price = 210000, level = 17, topSpeed = 98, accel = 18, brake = 40, grip = 11, steer = 28,
+		price = 210000, level = 17, topSpeed = 127, accel = 24, brake = 46, grip = 12, steer = 28,
 		cargo = 9, seats = 5, fuelCap = 65, fuelUse = 1.2, mass = 1650, len = 16.5, wid = 6.8, height = 6.6, wheelR = 1.6, comfort = 1.4,
 		desc = "Seats 5 and shrugs off rough rural roads." },
 	{ id = "lux_e300", name = "Regent E", thai = "รถหรู", class = "car", style = "luxury",
-		price = 520000, level = 22, topSpeed = 128, accel = 27, brake = 50, grip = 12.5, steer = 28,
+		price = 520000, level = 22, topSpeed = 166, accel = 36, brake = 57, grip = 13.5, steer = 28,
 		cargo = 6, seats = 3, fuelCap = 60, fuelUse = 1.3, mass = 1500, len = 16.5, wid = 6.6, height = 5.1, wheelR = 1.4, comfort = 1.9,
 		desc = "VIP rides pay the most in this." },
 	{ id = "super_gt", name = "Naga GT", thai = "ซูเปอร์คาร์", class = "car", style = "super",
-		price = 1500000, level = 30, topSpeed = 168, accel = 44, brake = 64, grip = 14.5, steer = 26,
+		price = 1500000, level = 30, topSpeed = 218, accel = 59, brake = 74, grip = 15.5, steer = 26,
 		cargo = 2, seats = 1, fuelCap = 55, fuelUse = 2.0, mass = 1300, len = 15.5, wid = 6.9, height = 4.2, wheelR = 1.4, comfort = 1.5,
 		desc = "The dream. Loud, low and very fast." },
 }
@@ -90,6 +93,58 @@ Vehicles.COLORS = {
 	{ name = "Silver", color = Color3.fromRGB(150, 156, 164) },
 }
 Vehicles.PAINT_PRICE = 250
+
+-- Styling ("แต่งซิ่ง", 2026-11-17 growth plan): looks only, no driving numbers. Bought in the phone's
+-- Styling app; going back to "none" / the standard horn is free. owned.style = { glow, plate, sticker, horn }.
+Vehicles.STYLE_PRICES = { glow = 1500, plate = 800, sticker = 500, horn = 300, exhaust = 800 }
+Vehicles.GLOWS = {
+	{ name = "Neon Green", thai = "เขียวนีออน", color = Color3.fromRGB(40, 255, 120) },
+	{ name = "Ice Blue", thai = "ฟ้าน้ำแข็ง", color = Color3.fromRGB(60, 190, 255) },
+	{ name = "Hot Pink", thai = "ชมพูช็อก", color = Color3.fromRGB(255, 60, 180) },
+	{ name = "Purple", thai = "ม่วง", color = Color3.fromRGB(160, 80, 255) },
+	{ name = "Red", thai = "แดง", color = Color3.fromRGB(255, 50, 50) },
+	{ name = "Orange", thai = "ส้ม", color = Color3.fromRGB(255, 140, 30) },
+	{ name = "White", thai = "ขาว", color = Color3.fromRGB(240, 246, 255) },
+	{ name = "Gold", thai = "ทอง", color = Color3.fromRGB(255, 200, 60) },
+	-- special ones: need = a game pass ("vip" / "neon") or a season unlock key (Config/Season.COSMETICS)
+	{ name = "VIP Gold", thai = "ทอง VIP", color = Color3.fromRGB(255, 215, 90), need = "vip" },
+	{ name = "Rainbow", thai = "สายรุ้ง", color = Color3.fromRGB(255, 255, 255), need = "neon", rainbow = true },
+	{ name = "Sunset", thai = "สีพระอาทิตย์ตก", color = Color3.fromRGB(255, 120, 80), need = "glow_sunset" },
+	{ name = "Mint", thai = "สีมิ้นต์", color = Color3.fromRGB(120, 255, 210), need = "glow_mint" },
+}
+-- stickers on the sides of the delivery bag (bikes) / above the number plate (cars). Made-up slogans only.
+Vehicles.STICKERS = {
+	{ icon = "🔥", text = "ซิ่ง", color = Color3.fromRGB(230, 50, 40) },
+	{ icon = "⚡", text = "สายส่ง", color = Color3.fromRGB(250, 190, 20) },
+	{ icon = "🌸", text = "ขอนแก่น", color = Color3.fromRGB(240, 110, 170) },
+	{ icon = "🛵", text = "ทางใครทางมัน", color = Color3.fromRGB(40, 120, 220) },
+	{ icon = "❤", text = "รักแม่", color = Color3.fromRGB(220, 40, 80) },
+	{ icon = "🎶", text = "อีสานบ้านเฮา", color = Color3.fromRGB(130, 70, 200) },
+	{ icon = "😎", text = "ไม่ซิ่งไม่หล่อ", color = Color3.fromRGB(30, 30, 36) },
+	{ icon = "🍜", text = "หิวตลอด", color = Color3.fromRGB(240, 120, 30) },
+	{ icon = "🏆", text = "ซีซัน 1", color = Color3.fromRGB(150, 70, 230), need = "sticker_s1" },
+	{ icon = "👑", text = "ตำนานไรเดอร์", color = Color3.fromRGB(200, 150, 20), need = "sticker_legend" },
+}
+-- exhaust note (EngineSound reads the "Exhaust" attribute): 1 stock, 2 racing pipe, 3 quiet
+Vehicles.EXHAUSTS = {
+	{ name = "Stock", thai = "ท่อเดิม" },
+	{ name = "Racing pipe", thai = "ท่อซิ่ง" },
+	{ name = "Quiet", thai = "ท่อเงียบ" },
+}
+Vehicles.HORNS = {
+	{ name = "Standard", thai = "มาตรฐาน", pitch = 1 },
+	{ name = "Deep", thai = "เสียงทุ้ม", pitch = 0.72 },
+	{ name = "Air horn", thai = "แตรลม", air = true, pitch = 1 },
+	{ name = "Beep beep", thai = "ปิ๊ดๆ", pitch = 1.55 },
+	{ name = "Bell", thai = "กระดิ่ง", bell = true, pitch = 1 },
+}
+Vehicles.PLATE_MAX = 8 -- characters on a custom plate (Thai letters, A-Z, digits, space, dash)
+-- The plate everyone gets until they buy their own: two Thai letters and a number from the user id.
+local PLATE_LETTERS = { "กข", "กง", "ขค", "ฆม", "งษ", "จฉ", "ชณ", "ฐฒ", "ทน", "บผ", "พภ", "มย", "รล", "วศ", "สห", "อฮ" }
+function Vehicles.defaultPlate(userId: number): string
+	local n = math.abs(userId)
+	return PLATE_LETTERS[n % #PLATE_LETTERS + 1] .. " " .. tostring(1000 + math.floor(n / 16) % 9000)
+end
 
 function Vehicles.upgradePrice(v: Vehicle, upgradeId: string, nextLevel: number): number
 	local base = math.max(v.price, 3000)

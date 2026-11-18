@@ -23,7 +23,7 @@ local function smooth(x: number, a: number, b: number): number
 	return t * t * (3 - 2 * t)
 end
 
-local atmosphere, bloom, cc, rays, clouds
+local atmosphere, bloom, cc, rays, clouds, dof
 local rainPart, rainEmitter, rainSound
 local ambient = {}
 local night = false
@@ -61,10 +61,38 @@ local function applyGlow(part: Instance)
 		part:SetAttribute("DayMaterial", day)
 	end
 	part.Material = night and Enum.Material.Neon or (Enum.Material :: any)[day] or Enum.Material.SmoothPlastic
+	-- dark window glass would glow dark: at night a lit window is warm lamp light (signs keep their colours)
+	local dc = part:GetAttribute("DayColor")
+	if dc == nil then
+		local c = part.Color
+		if math.max(c.R, c.G, c.B) < 0.4 then
+			dc = c
+			part:SetAttribute("DayColor", c)
+		else
+			part:SetAttribute("DayColor", false)
+		end
+	end
+	if typeof(dc) == "Color3" then
+		if night then
+			local k = 0.34 + ((part.Position.X * 7.3 + part.Position.Z * 3.1) % 1) * 0.18 -- not every room is equally bright
+			part.Color = Color3.fromRGB(255 * k, 196 * k, 120 * k) -- warm lamp light, not a white glare
+		else
+			part.Color = dc
+		end
+	end
 end
 local function applyLight(part: Instance)
 	for _, l in ipairs(part:GetChildren()) do
 		if l:IsA("Light") then l.Enabled = night end
+	end
+	-- A lamp that streams in arrives before its light does, so the light is not there yet when the
+	-- tag is seen (until 2026-11-16 every district that loaded after dark stayed unlit). Catch it
+	-- when it arrives.
+	if not part:GetAttribute("LightHook") then
+		part:SetAttribute("LightHook", true)
+		part.ChildAdded:Connect(function(l)
+			if l:IsA("Light") then l.Enabled = night end
+		end)
 	end
 end
 local function setNight(v: boolean)
@@ -94,13 +122,40 @@ function Env.start()
 	bloom = post("BloomEffect", "GoDashBloom")
 	cc = post("ColorCorrectionEffect", "GoDashColor")
 	rays = post("SunRaysEffect", "GoDashRays")
-	bloom.Intensity = 0.35; bloom.Size = 22; bloom.Threshold = 1.1
-	rays.Intensity = 0.06; rays.Spread = 0.6
-	atmosphere.Offset = 0.1
+	dof = post("DepthOfFieldEffect", "GoDashFocus")
+	-- 2026-11-16 realism pass: a hot, humid Isan city. Hard midday shadows, warm haze that eats the
+	-- distance, colours a little less candy than Roblox defaults, highlights (sun glints, neon signs
+	-- at night) blooming only above HDR white, and a soft far blur like a phone camera.
+	-- 2026-11-16 (owner: "make the tone cozy, it is too bright, unreal and hard on the eyes"): the
+	-- look is now a soft, warm afternoon all day. The sun is weaker and the shadows are filled with
+	-- warm skylight, so nothing is glaring white or pitch black; colours are a little muted and
+	-- creamy; contrast is low; bloom only touches real lights.
+	-- 2026-11-17 (owner: "the colours look too gloomy, I want it brighter and more cheerful"): clear
+	-- air instead of the brown haze, fresher and more saturated colours, a touch more exposure and
+	-- brighter shadows. Still no glare: bloom only on real lights, no blown-out whites, nights stay
+	-- lamp-lit and readable.
+	bloom.Intensity = 0.25; bloom.Size = 24; bloom.Threshold = 2.0
+	rays.Intensity = 0.03; rays.Spread = 0.55
+	dof.NearIntensity = 0; dof.FarIntensity = 0.08; dof.FocusDistance = 40; dof.InFocusRadius = 200
+	atmosphere.Offset = 0.12
 	Lighting.GlobalShadows = true
-	Lighting.EnvironmentDiffuseScale = 0.6
-	Lighting.EnvironmentSpecularScale = 0.7
+	Lighting.EnvironmentDiffuseScale = 0.85
+	Lighting.EnvironmentSpecularScale = 0.5
 	Lighting.GeographicLatitude = 16.4 -- Khon Kaen
+	local sky = Lighting:FindFirstChildOfClass("Sky")
+	if not sky then
+		sky = Instance.new("Sky")
+		sky.Name = "GoDashSky"
+		sky.Parent = Lighting
+	end
+	-- a clear humid-sky gradient (our own image, assets/textures/sky_*.png); the clouds in front of it
+	-- are Roblox's live Terrain clouds, so there are no painted cartoon clouds any more
+	local SIDE, UP, DOWN = "rbxassetid://102196248176522", "rbxassetid://122010862183021", "rbxassetid://112916264686066"
+	sky.SkyboxBk, sky.SkyboxFt, sky.SkyboxLf, sky.SkyboxRt = SIDE, SIDE, SIDE, SIDE
+	sky.SkyboxUp, sky.SkyboxDn = UP, DOWN
+	sky.SunAngularSize = 12
+	sky.MoonAngularSize = 9
+	sky.StarCount = 2200
 	local terrain = Workspace:FindFirstChildOfClass("Terrain")
 	if terrain then
 		clouds = terrain:FindFirstChildOfClass("Clouds") or Instance.new("Clouds")
@@ -146,6 +201,7 @@ function Env.start()
 	Workspace:GetAttributeChangedSignal("Wet"):Connect(function() setWet(Workspace:GetAttribute("Wet") or 0) end)
 
 	local rainNow, cloudNow = 0, 0.45
+	local flash = 0 -- lightning: added to the grade for a few frames
 	local nextThunder = os.clock() + 10
 	RunService.RenderStepped:Connect(function(dt)
 		local cam = Workspace.CurrentCamera
@@ -154,7 +210,7 @@ function Env.start()
 		local weather = Workspace:GetAttribute("Weather") or "Sunny"
 		local rainT = Workspace:GetAttribute("Rain") or 0
 		rainNow += (rainT - rainNow) * math.min(1, dt * 0.5)
-		local cloudT = weather == "Sunny" and 0.45 or (weather == "Cloudy" and 0.74 or 0.92)
+		local cloudT = weather == "Sunny" and 0.4 or (weather == "Cloudy" and 0.74 or 0.92)
 		cloudNow += (cloudT - cloudNow) * math.min(1, dt * 0.25)
 
 		-- day curve: 0 at night, 1 in full daylight; golden near sunrise and sunset
@@ -162,26 +218,35 @@ function Env.start()
 		local golden = math.max(smooth(ct, 5.4, 6.4) * (1 - smooth(ct, 7.2, 8.6)), smooth(ct, 15.8, 17.4) * (1 - smooth(ct, 18.6, 19.4)))
 		local gloom = math.clamp(rainNow * 0.9 + (cloudNow - 0.45) * 0.6, 0, 1)
 
-		Lighting.Brightness = lerp(0.9, 2.9, dayK) * (1 - gloom * 0.45)
-		Lighting.Ambient = lerpC(Color3.fromRGB(46, 52, 74), Color3.fromRGB(128, 128, 132), dayK)
-		Lighting.OutdoorAmbient = lerpC(Color3.fromRGB(40, 46, 72), lerpC(Color3.fromRGB(132, 136, 142), Color3.fromRGB(120, 124, 130), gloom), dayK)
-		Lighting.ColorShift_Top = lerpC(Color3.fromRGB(0, 0, 0), Color3.fromRGB(255, 170, 90), golden * (1 - gloom))
-		Lighting.ExposureCompensation = lerp(0.25, 0.05, dayK)
-		Lighting.ShadowSoftness = 0.25 + gloom * 0.5
-		cc.TintColor = lerpC(lerpC(Color3.fromRGB(190, 205, 255), Color3.fromRGB(255, 255, 255), dayK), Color3.fromRGB(255, 226, 190), golden * (1 - gloom))
-		cc.Saturation = lerp(0.12, -0.22, gloom) + golden * 0.08
-		cc.Contrast = 0.06 + golden * 0.05
-		atmosphere.Density = lerp(0.26, 0.5, gloom)
-		atmosphere.Haze = lerp(1.2, 3.2, gloom) + golden * 0.8
-		atmosphere.Color = lerpC(lerpC(Color3.fromRGB(190, 205, 225), Color3.fromRGB(255, 205, 160), golden), Color3.fromRGB(150, 156, 166), gloom)
-		atmosphere.Decay = lerpC(Color3.fromRGB(106, 120, 150), Color3.fromRGB(90, 96, 106), gloom)
-		atmosphere.Glare = golden * 0.6
+		-- sunlight: strong and slightly warm at midday, orange at the ends of the day; skylight fills
+		-- the shadows neutral-to-cool (not blue), streets at night lit mostly by lamps and signs
+		Lighting.Brightness = lerp(1.1, 2.5, dayK) * (1 - gloom * 0.35)
+		-- (night ambient kept high enough that the road stays readable between street lamps)
+		-- (owner, 2026-11-16: "and never so dark that it looks scary": shadows and nights stay readable)
+		Lighting.Ambient = lerpC(Color3.fromRGB(112, 110, 130), Color3.fromRGB(150, 146, 140), dayK)
+		Lighting.OutdoorAmbient = lerpC(Color3.fromRGB(122, 122, 146), lerpC(Color3.fromRGB(160, 162, 166), Color3.fromRGB(140, 142, 146), gloom), dayK)
+		Lighting.ColorShift_Top = lerpC(lerpC(Color3.fromRGB(44, 50, 78), Color3.fromRGB(255, 240, 214), dayK), Color3.fromRGB(255, 176, 104), golden * (1 - gloom))
+		Lighting.ColorShift_Bottom = lerpC(Color3.fromRGB(0, 0, 0), Color3.fromRGB(56, 54, 50), dayK) -- light bounce off sunlit concrete
+		Lighting.ExposureCompensation = lerp(0.25, 0.06, dayK) + gloom * 0.15
+		Lighting.ShadowSoftness = 0.35 + gloom * 0.4
+		cc.TintColor = lerpC(lerpC(Color3.fromRGB(236, 238, 255), Color3.fromRGB(255, 249, 238), dayK), Color3.fromRGB(255, 226, 192), golden * (1 - gloom))
+		cc.Saturation = lerp(0.14, -0.1, gloom) + golden * 0.05 - (1 - dayK) * 0.1 -- fresh by day, colours rest at night
+		cc.Contrast = 0.06 + golden * 0.03 - gloom * 0.04
+		cc.Brightness = 0.02 * dayK + flash
+		-- air: clear and a little blue by day, amber at sunset, blue at night, grey in the rain
+		atmosphere.Density = lerp(0.22, 0.46, gloom) + (1 - dayK) * 0.05
+		atmosphere.Haze = lerp(0.9, 2.8, gloom) + golden * 0.8
+		atmosphere.Color = lerpC(lerpC(lerpC(Color3.fromRGB(70, 80, 110), Color3.fromRGB(200, 218, 236), dayK), Color3.fromRGB(255, 200, 150), golden), Color3.fromRGB(160, 166, 174), gloom)
+		atmosphere.Decay = lerpC(lerpC(Color3.fromRGB(46, 52, 80), Color3.fromRGB(156, 178, 204), dayK), Color3.fromRGB(104, 110, 120), gloom)
+		atmosphere.Glare = (0.02 + golden * 0.14) * (1 - gloom)
+		dof.FarIntensity = lerp(0.08, 0.18, gloom)
 		if clouds then
 			clouds.Cover = cloudNow
-			clouds.Density = lerp(0.45, 0.9, gloom)
-			clouds.Color = lerpC(lerpC(Color3.fromRGB(90, 96, 120), Color3.fromRGB(255, 255, 255), dayK), Color3.fromRGB(120, 126, 136), gloom)
+			clouds.Density = lerp(0.4, 0.9, gloom)
+			clouds.Color = lerpC(lerpC(Color3.fromRGB(100, 106, 132), Color3.fromRGB(255, 255, 255), dayK), Color3.fromRGB(128, 134, 144), gloom)
 		end
-		rays.Intensity = 0.07 * (1 - gloom) + golden * 0.1
+		rays.Intensity = 0.03 * (1 - gloom) + golden * 0.1
+		bloom.Intensity = lerp(0.35, 0.25, dayK) -- signs and lamps glow a little more at night
 
 		rainEmitter.Rate = rainNow * 1400
 		local sfx = not (State.data and State.data.settings and State.data.settings.sfx == false)
@@ -195,14 +260,13 @@ function Env.start()
 		if weather == "Storm" and os.clock() > nextThunder then
 			nextThunder = os.clock() + math.random(7, 18)
 			task.spawn(function()
-				local base = cc.Brightness
-				cc.Brightness = 0.45
+				flash = 0.45
 				task.wait(0.08)
-				cc.Brightness = base
+				flash = 0
 				task.wait(0.1)
-				cc.Brightness = 0.25
+				flash = 0.25
 				task.wait(0.06)
-				cc.Brightness = base
+				flash = 0
 				task.wait(math.random(4, 14) / 10)
 				Feedback.play("boom", 0.7, 0.45 + math.random() * 0.15, 2)
 			end)

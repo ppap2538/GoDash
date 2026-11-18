@@ -11,7 +11,8 @@ local UIState = require(UIRoot.Core.UIState)
 local Speedo = {}
 local C, F, T = UI.C, UI.F, UI.T
 local refs = {} :: { [string]: any }
-local lastKmh, lastIcons, lastPedal = -1, nil :: string?, nil :: boolean?
+local lastKmh, lastIcons, lastPedal, lastAuto = -1, nil :: string?, nil :: boolean?, nil :: boolean?
+Speedo.onAuto = nil :: (() -> ())? -- set by client/AutoDrive
 
 -- info = Drive.info. Called every frame while driving; only writes properties that changed.
 function Speedo.update(info: any)
@@ -37,10 +38,17 @@ function Speedo.update(info: any)
 		lastIcons = icons
 		refs.icons.Text = icons
 	end
+	local auto = info.auto == true
+	if auto ~= lastAuto then
+		lastAuto = auto
+		refs.auto.Text = auto and "🤖 AUTO ON · Q" or "🤖 Auto drive · Q"
+		refs.auto.BackgroundColor3 = auto and C.green or C.black
+		refs.auto.BackgroundTransparency = auto and 0 or 0.55
+	end
 end
 
 function Speedo.build(region: Frame, order: number)
-	local panel = UI.panel(region, { Name = "Speedo", LayoutOrder = order, Size = UDim2.fromOffset(172, 74) })
+	local panel = UI.panel(region, { Name = "Speedo", LayoutOrder = order, Size = UDim2.fromOffset(172, 100) })
 	refs.panel = panel
 	refs.speed = UI.label(panel, "0", T.display, C.white, F.black, { Position = UDim2.fromOffset(10, 4), Size = UDim2.fromOffset(84, 40), TextXAlignment = Enum.TextXAlignment.Right, TextTruncate = Enum.TextTruncate.None })
 	refs.icons = UI.label(panel, "", T.sm, C.white, F.med, { Position = UDim2.fromOffset(100, 6), Size = UDim2.fromOffset(64, 16), TextTruncate = Enum.TextTruncate.None })
@@ -55,6 +63,12 @@ function Speedo.build(region: Frame, order: number)
 	condTrack.Position = UDim2.fromOffset(34, 61)
 	condTrack.Size = UDim2.new(1, -46, 0, 4)
 	refs.setCond = setCond
+	-- auto drive along the GPS route (client/AutoDrive); a tap on touch, Q on a keyboard
+	local auto = UI.new("TextButton", { Name = "Auto", Text = "🤖 Auto drive · Q", TextSize = 12, Font = F.bold, TextColor3 = C.white, AutoButtonColor = true,
+		BackgroundColor3 = C.black, BackgroundTransparency = 0.55, Position = UDim2.fromOffset(8, 72), Size = UDim2.new(1, -16, 0, 22), Parent = panel })
+	UI.corner(auto, 11)
+	auto.Activated:Connect(function() if Speedo.onAuto then Speedo.onAuto() end end)
+	refs.auto = auto
 	UIState.bind("speedo", panel, function() UI.pop(panel, 0.92) end)
 end
 

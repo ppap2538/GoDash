@@ -30,6 +30,7 @@ function RoadGraph.new(map)
 				local edge = {
 					id = #self.edges + 1, a = a, b = b, type = e[3], def = def, len = len,
 					dx = dx / len, dz = dz / len, name = nm and nm[1] or "", thai = nm and nm[2] or "", oneway = e[5],
+					minor = e[3] == "soi" or e[3] == "lane", -- small streets: no signals, no through traffic, thin on the map
 				}
 				table.insert(self.edges, edge)
 				table.insert(a.links, { to = b, len = len, edge = edge })

@@ -34,16 +34,18 @@ Kit.COLORS = {
 	asphalt = Color3.fromRGB(58, 60, 64),
 	asphaltSoi = Color3.fromRGB(72, 74, 78),
 	dirt = Color3.fromRGB(150, 116, 84),
-	walk = Color3.fromRGB(214, 212, 206),
+	-- (2026-11-16 realism pass: dustier sidewalks and concrete, tropical-olive grass instead of lime,
+	-- tinted grey-green window glass instead of navy)
+	walk = Color3.fromRGB(198, 194, 186),
 	curb = Color3.fromRGB(150, 148, 142),
 	line = Color3.fromRGB(240, 240, 235),
 	lineYellow = Color3.fromRGB(238, 196, 52),
-	grass = Color3.fromRGB(98, 150, 74),
-	grassDry = Color3.fromRGB(150, 160, 84),
+	grass = Color3.fromRGB(112, 128, 78),
+	grassDry = Color3.fromRGB(156, 148, 100),
 	paddy = Color3.fromRGB(128, 176, 72),
-	concrete = Color3.fromRGB(206, 204, 198),
-	glass = Color3.fromRGB(70, 84, 98),
-	glassDark = Color3.fromRGB(44, 50, 58),
+	concrete = Color3.fromRGB(196, 192, 184),
+	glass = Color3.fromRGB(62, 70, 70),
+	glassDark = Color3.fromRGB(38, 42, 42),
 	wood = Color3.fromRGB(128, 88, 56),
 	woodDark = Color3.fromRGB(88, 60, 40),
 	roofTile = Color3.fromRGB(176, 84, 56),
@@ -61,10 +63,11 @@ Kit.COLORS = {
 	water = Color3.fromRGB(58, 132, 170),
 }
 
+-- house paint as it looks after a few rainy seasons: creams, beiges, faded ochre, salmon and mint
 Kit.PASTEL = {
-	Color3.fromRGB(238, 226, 196), Color3.fromRGB(226, 234, 214), Color3.fromRGB(240, 214, 204), Color3.fromRGB(210, 226, 238),
-	Color3.fromRGB(244, 236, 220), Color3.fromRGB(232, 220, 236), Color3.fromRGB(216, 216, 212), Color3.fromRGB(246, 232, 188),
-	Color3.fromRGB(200, 222, 214), Color3.fromRGB(236, 200, 180),
+	Color3.fromRGB(228, 216, 190), Color3.fromRGB(214, 210, 188), Color3.fromRGB(226, 200, 182), Color3.fromRGB(200, 206, 196),
+	Color3.fromRGB(232, 224, 206), Color3.fromRGB(216, 202, 196), Color3.fromRGB(206, 202, 194), Color3.fromRGB(232, 214, 168),
+	Color3.fromRGB(196, 212, 198), Color3.fromRGB(222, 192, 168),
 }
 Kit.AWNING = {
 	Color3.fromRGB(200, 60, 50), Color3.fromRGB(40, 120, 190), Color3.fromRGB(240, 170, 40), Color3.fromRGB(40, 150, 90),
@@ -204,6 +207,27 @@ end
 function Kit.nightGlow(part: BasePart)
 	part:SetAttribute("DayMaterial", part.Material.Name)
 	part:AddTag("NightGlow")
+end
+
+-- Facade tiles (tools/make_facades.py, assets/textures/facade): one bay of one floor each, wall drawn
+-- near white (tinted here with the building's paint), glass cut out so the part behind shows: dark
+-- by day, lamp-lit at night. One part with a tiled picture instead of dozens of window parts.
+Kit.FACADE = {
+	apartment = "rbxassetid://78721160464576", tower = "rbxassetid://110147880334075", town = "rbxassetid://75616827941027",
+	ground = "rbxassetid://75857554954134", home = "rbxassetid://92320337126512",
+}
+-- cf = centre of the wall face, its front (-Z) looking out. nu x nv tiles across the face.
+function Kit.facade(m: Instance, cf: CFrame, w: number, h: number, tex: string, nu: number, nv: number, tint: Color3, glow: boolean?)
+	local p = Kit.part(m, Vector3.new(w, h, 0.3), cf, Kit.COLORS.glass, M.SmoothPlastic, { decor = true, name = "Facade" })
+	local t = Instance.new("Texture")
+	t.Face = Enum.NormalId.Front
+	t.Texture = tex
+	t.StudsPerTileU = w / math.max(1, nu)
+	t.StudsPerTileV = h / math.max(1, nv)
+	t.Color3 = tint
+	t.Parent = p
+	if glow then Kit.nightGlow(p) end
+	return p
 end
 
 function Kit.model(parent: Instance, name: string): Model

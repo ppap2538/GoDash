@@ -13,6 +13,7 @@ local Layout = require(script.Parent.UI.Core.Layout)
 local Layers = require(script.Parent.UI.Core.Layers)
 local UIState = require(script.Parent.UI.Core.UIState)
 local State = require(script.Parent.State)
+local Lang = require(script.Parent.Lang)
 
 local Feedback = {}
 Feedback.top = nil :: Frame?
@@ -97,7 +98,7 @@ function Feedback.toast(text: string, kind: string?)
 	local sc = Instance.new("UIScale"); sc.Scale = 0.6; sc.Parent = t
 	UI.tween(sc, 0.22, { Scale = 1 }, Enum.EasingStyle.Back)
 	if kind == "bad" then Feedback.bad() elseif kind == "good" then Feedback.play("tick", 0.4, 2.2) end
-	task.delay(3.4, function()
+	task.delay(3, function()
 		UI.tween(t, 0.25, { BackgroundTransparency = 1 })
 		for _, d in ipairs(t:GetDescendants()) do
 			if d:IsA("TextLabel") then UI.tween(d, 0.25, { TextTransparency = 1 })
@@ -107,12 +108,12 @@ function Feedback.toast(text: string, kind: string?)
 		task.wait(0.3)
 		t:Destroy()
 	end)
-	-- never more than four on screen
+	-- never more than three on screen (2026-11-17: they covered the road)
 	local n = 0
 	for _, c in ipairs(toastStack:GetChildren()) do
 		if c.Name == "Toast" then n += 1 end
 	end
-	if n > 4 then
+	if n > 3 then
 		for _, c in ipairs(toastStack:GetChildren()) do
 			if c.Name == "Toast" then c:Destroy() break end
 		end
@@ -139,6 +140,15 @@ end
 
 function Feedback.reward(r)
 	if not gui then return end
+	if State.cutscene then
+		-- the hand-over scene is still playing: the pay slip comes up when it ends
+		task.spawn(function()
+			local t0 = os.clock()
+			while State.cutscene and os.clock() - t0 < 12 do task.wait(0.1) end
+			Feedback.reward(r)
+		end)
+		return
+	end
 	if r.small then
 		local parts = {}
 		if r.money then table.insert(parts, "+" .. Util.money(r.money)) end
@@ -234,16 +244,18 @@ function Feedback.bubble(pos: Vector3, name: string, text: string)
 	anchor.Transparency = 1; anchor.Size = Vector3.new(0.2, 0.2, 0.2); anchor.CFrame = CFrame.new(pos)
 	anchor.Parent = Workspace
 	local bb = Instance.new("BillboardGui")
-	bb.Size = UDim2.fromOffset(280, 74)
+	-- (2026-11-18) smaller on phones: a world bubble must not cover the road (owner, phone feedback)
+	local touch = Layout.isTouch
+	bb.Size = touch and UDim2.fromOffset(210, 58) or UDim2.fromOffset(280, 74)
 	bb.StudsOffset = Vector3.new(0, 2.5, 0)
 	bb.AlwaysOnTop = true
 	bb.MaxDistance = 220
 	bb.Parent = anchor
-	local card = UI.new("Frame", { BackgroundColor3 = C.card, Size = UDim2.fromScale(1, 1), Parent = bb })
-	UI.corner(card, 16)
+	local card = UI.new("Frame", { BackgroundColor3 = C.card, BackgroundTransparency = touch and 0.08 or 0, Size = UDim2.fromScale(1, 1), Parent = bb })
+	UI.corner(card, touch and 12 or 16)
 	UI.stroke(card, C.green, 2)
-	UI.label(card, name, 13, C.greenDark, F.bold, { Position = UDim2.fromOffset(12, 6), Size = UDim2.new(1, -24, 0, 18) })
-	UI.label(card, text, 15, C.text, F.med, { Position = UDim2.fromOffset(12, 24), Size = UDim2.new(1, -24, 1, -30), TextWrapped = true, TextYAlignment = Enum.TextYAlignment.Top, TextTruncate = Enum.TextTruncate.None })
+	UI.label(card, name, touch and 11 or 13, C.greenDark, F.bold, { Position = UDim2.fromOffset(10, 4), Size = UDim2.new(1, -20, 0, touch and 15 or 18) })
+	UI.label(card, text, touch and 12 or 15, C.text, F.med, { Position = UDim2.fromOffset(10, touch and 19 or 24), Size = UDim2.new(1, -20, 1, touch and -23 or -30), TextWrapped = true, TextYAlignment = Enum.TextYAlignment.Top, TextTruncate = Enum.TextTruncate.None })
 	local sc = Instance.new("UIScale"); sc.Scale = 0; sc.Parent = card
 	UI.tween(sc, 0.22, { Scale = 1 }, Enum.EasingStyle.Back)
 	Feedback.play("tick", 0.3, 1.2)
@@ -266,7 +278,7 @@ function Feedback.start()
 
 	Net.listen("Notify", function(kind, p)
 		if kind == "toast" then
-			Feedback.toast(p.text, p.bad and "bad" or (p.good and "good" or nil))
+			Feedback.toast((p.th and Lang.code == "th") and p.th or p.text, p.bad and "bad" or (p.good and "good" or nil))
 		elseif kind == "levelup" then
 			Feedback.banner("LEVEL UP!  Lv " .. p.level, "Bonus +" .. Util.money(p.bonus) .. " · new jobs may be unlocked", "🎉")
 		elseif kind == "bigwin" then
@@ -280,7 +292,7 @@ function Feedback.start()
 		end
 	end)
 	Net.listen("Reward", Feedback.reward)
-	Net.listen("Dialogue", function(d) Feedback.bubble(d.pos, d.name, d.text) end)
+	Net.listen("Dialogue", function(d) Feedback.bubble(d.pos, d.name, (d.th and Lang.code == "th") and d.th or d.text) end)
 end
 
 return Feedback

@@ -159,6 +159,39 @@ function Rig.sit(rig, cf: CFrame)
 	end
 end
 
+-- Riding pose for an unjointed rig on a motorbike or scooter: hips on the saddle, body leaning
+-- forward, both hands out on the handlebars, legs forward to the footrests, a helmet on.
+-- saddle = the top of the seat, facing saddle.LookVector. The parts stay anchored, so a rider that
+-- is parented inside an anchored vehicle model moves with it (PivotTo) and can never come off.
+function Rig.ride(rig, saddle: CFrame, helmet: Color3?)
+	local rootCf = saddle * CFrame.new(0, 1.0 * K, 0)
+	rig.root.CFrame = rootCf
+	local lean = math.rad(14)
+	local torso = rootCf * CFrame.new(0, -K, 0) * CFrame.Angles(-lean, 0, 0) * CFrame.new(0, K, 0)
+	local head = torso * CFrame.new(0, 1.6 * K, 0) * CFrame.Angles(lean * 0.8, 0, 0)
+	for name, part in pairs(rig.parts) do
+		if name == "Torso" then
+			part.CFrame = torso
+		elseif name == "Head" then
+			part.CFrame = head
+		elseif name == "Hair" then
+			-- the hair part becomes the helmet
+			part.Size = Vector3.new(1.5, 1.3, 1.62) * K
+			part.Color = helmet or part.Color
+			part.Material = Enum.Material.SmoothPlastic
+			part.CFrame = head * CFrame.new(0, 0.2 * K, 0.04 * K)
+		elseif name == "LeftArm" or name == "RightArm" then
+			local sx = name == "LeftArm" and -1 or 1
+			part.CFrame = torso * CFrame.new(sx * 1.45 * K, 0.85 * K, 0) * CFrame.Angles(math.rad(66), 0, math.rad(sx * 9)) * CFrame.new(0, -K, 0)
+		elseif name == "LeftLeg" or name == "RightLeg" then
+			local sx = name == "LeftLeg" and -1 or 1
+			part.CFrame = rootCf * CFrame.new(sx * 0.62 * K, -0.85 * K, 0) * CFrame.Angles(math.rad(56), 0, math.rad(sx * -7)) * CFrame.new(0, -K, 0)
+		else
+			part.CFrame = torso * ((part:GetAttribute("Offset") :: CFrame?) or CFrame.new())
+		end
+	end
+end
+
 -- Walk cycle for a jointed rig. phase in radians, amount 0..1.
 function Rig.walkPose(rig, phase: number, amount: number)
 	local j = rig.joints

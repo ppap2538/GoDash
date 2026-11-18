@@ -1,0 +1,52 @@
+-- The bill after an accident (2026-11-18, owner: "hitting people or other cars should cost money").
+-- client/Accident reports "ped:<speed>" or "car:<speed>" (studs/s at the hit); the amount grows with
+-- the speed and is capped (see below), taken from cash (never below zero), and the City Feed hears about it.
+-- Nothing goes to another player (no reason to stand in someone's way on purpose).
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Shared = ReplicatedStorage.Shared
+local Net = require(Shared.Net)
+local Data = require(script.Parent.PlayerDataService)
+local Fines = require(script.Parent.FineService)
+local City = require(script.Parent.CityRemote)
+
+local Service = {}
+local last = {} :: { [Player]: number }
+
+-- 2026-11-18 owner: "the bill must make sense next to what you earn, or one hit wipes you out and the
+-- fun is gone". A delivery pays about ฿60-250 (Config/Jobs), police tickets are ฿100-300, so a bump at
+-- walking pace costs about one delivery and the worst crash about three to four. Never more than a
+-- quarter of the cash in your pocket (SHARE), so nobody is left broke by one accident.
+-- (Was 600 + 28/stud/s up to 4,500 and 400 + 32 up to 5,000 for the first test build.)
+Service.PED = { base = 120, perSpeed = 5, cap = 450 } -- hospital bill: ~฿165 at 9 studs/s, ฿450 from ~66
+Service.CAR = { base = 80, perSpeed = 5, cap = 600 } -- repair bill: ~฿180 at 20, ~฿355 at 55, ฿600 from ~104
+Service.SHARE = 0.25
+
+function Service.start()
+	game:GetService("Players").PlayerRemoving:Connect(function(p) last[p] = nil end)
+	City.register("accident", function(player, arg)
+		local d = Data.get(player)
+		if not d or type(arg) ~= "string" then return false, "" end
+		local kind, s = arg:match("^(%a+):(%d+)$")
+		local speed = tonumber(s)
+		if (kind ~= "ped" and kind ~= "car") or not speed then return false, "" end
+		if os.clock() - (last[player] or -1e9) < 15 then return false, "" end
+		last[player] = os.clock()
+		local t = kind == "ped" and Service.PED or Service.CAR
+		local amount = math.min(t.cap, math.floor((t.base + t.perSpeed * math.clamp(speed, 0, 200)) / 10 + 0.5) * 10)
+		local cash = math.max(0, math.floor(d.money))
+		amount = math.min(amount, math.max(math.min(cash, 30), math.floor(cash * Service.SHARE / 10) * 10))
+		-- a bad ride also costs a little happiness
+		d.happiness = math.max(0, (d.happiness or 50) - (kind == "ped" and 6 or 3))
+		Data.touch(player, "happiness")
+		-- (2026-11-19) the daily limit (server/FineService): past it the other side lets it go, and the
+		-- client shows a toast instead of the claim scene
+		local ok, took, _, n, limit = Fines.charge(player, "bill", amount, kind == "ped" and "accident:ped" or "accident:car")
+		if not ok then
+			Fines.warn(player, "bill", nil, "", "")
+			return true, "", { amount = 0, waived = true }
+		end
+		return true, "", { amount = took, n = n, limit = limit }
+	end)
+end
+
+return Service

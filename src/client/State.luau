@@ -12,6 +12,7 @@ State.plot = nil :: any -- { id, tier, base, size, house }
 State.farm = nil :: any
 State.target = nil :: any -- { pos, name, kind } set by the GPS app when no job is active
 State.ready = false
+State.cutscene = false -- true while a short scene plays (Cutscene): controls rest, pop-ups wait
 
 local dataListeners, jobListeners, worldListeners = {}, {}, {}
 

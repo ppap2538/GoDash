@@ -19,8 +19,9 @@ local refs = {} :: { [string]: any }
 
 local NAME_W, VALUE_W = 70, 26
 
--- One vital: icon, name ("Energy"), bar, number. Turns red when low.
-local function vital(parent: Instance, icon: string, name: string, color: Color3)
+-- One vital: icon, name ("Food"), bar, number. Turns red when low. inverse = the bar shows what is
+-- used up (fatigue = 100 - energy): it fills as it gets worse and turns red when high.
+local function vital(parent: Instance, icon: string, name: string, color: Color3, inverse: boolean?)
 	local row = UI.new("Frame", { BackgroundTransparency = 1, Parent = parent })
 	UI.label(row, icon, 11, C.white, F.med, { Size = UDim2.new(0, 16, 1, 0), TextXAlignment = Enum.TextXAlignment.Center, TextTruncate = Enum.TextTruncate.None })
 	local nameL = UI.label(row, name, 11, C.textDim, F.bold, { Position = UDim2.fromOffset(18, 0), Size = UDim2.new(0, NAME_W - 20, 1, 0) })
@@ -32,9 +33,10 @@ local function vital(parent: Instance, icon: string, name: string, color: Color3
 	local value = UI.label(row, "", 11, C.white, F.black, { AnchorPoint = Vector2.new(1, 0), Position = UDim2.fromScale(1, 0), Size = UDim2.new(0, VALUE_W, 1, 0),
 		TextXAlignment = Enum.TextXAlignment.Right, TextTruncate = Enum.TextTruncate.None })
 	local function setValue(v: number)
+		local low = v < 25
+		if inverse then v = 100 - v end
 		set(v / 100)
 		value.Text = tostring(math.floor(v + 0.5))
-		local low = v < 25
 		value.TextColor3 = low and C.red or C.white
 		nameL.TextColor3 = low and C.red or C.textDim
 	end
@@ -131,7 +133,7 @@ function Status.build(region: Frame)
 	refs.exp = UI.label(panel, "0 / 100 EXP", T.xs, C.textDim, F.med, { Position = UDim2.fromOffset(66, 47), Size = UDim2.new(1, -78, 0, 12) })
 	local vitals = UI.new("Frame", { BackgroundTransparency = 1, Parent = panel })
 	refs.vitals = vitals
-	local r1, setEnergy = vital(vitals, "⚡", "Energy", C.yellow)
+	local r1, setEnergy = vital(vitals, "😪", "Fatigue", C.orange, true)
 	local r2, setHunger = vital(vitals, "🍜", "Food", C.orange)
 	local r3, setHappy = vital(vitals, "😊", "Happy", C.pink)
 	refs.rows = { r1, r2, r3 }

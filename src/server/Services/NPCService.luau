@@ -5,10 +5,12 @@ local Workspace = game:GetService("Workspace")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage.Shared
 local Rig = require(Shared.Rig)
+local RiderPose = require(Shared.RiderPose)
 local Dialogue = require(Shared.Config.Dialogue)
 local Net = require(Shared.Net)
 local Kit = require(script.Parent.Parent.World.Kit)
 local Assets = require(script.Parent.Parent.World.Assets)
+local Solid = require(script.Parent.Parent.World.Solid)
 
 local NPC = {}
 local handlers = {} -- [kind] = fn(player, id, promptPart)
@@ -21,6 +23,8 @@ local OUTFIT = {
 	agri = "farmer", seedshop = "farmer", farm = "farmer", hub = "rider", police = "police", hospital = "nurse",
 	gas = "shopkeeper", dealer = "shopkeeper", homestore = "shopkeeper", mall = "shopkeeper", bus = "shopkeeper",
 	station = "shopkeeper", reststop = "shopkeeper",
+	-- 2026-11-18 landmark batch (the front-desk person / guard)
+	government = "staff", museum = "staff", school = "staff",
 }
 
 function NPC.handle(kind: string, fn)
@@ -69,6 +73,7 @@ function NPC.static(cf: CFrame, outfit: string?, name: string?, seed: number?)
 	local rig = Rig.build({ outfit = outfit, name = name or "Staff", seed = seed })
 	Rig.place(rig, cf)
 	rig.model:AddTag("GoDashNPC")
+	pcall(Solid.body, rig.model, 0.5, 6.5) -- people on foot can't walk through staff
 	rig.model.Parent = folder
 	return rig
 end
@@ -114,6 +119,7 @@ end
 
 -- Seat a job NPC on a vehicle: pose it at the seat frame and weld every part to the chassis.
 function NPC.board(rig, chassis: BasePart, seatCf: CFrame)
+	Solid.unbody(rig.model)
 	Rig.sit(rig, seatCf)
 	for _, p in ipairs(rig.model:GetChildren()) do
 		if p:IsA("BasePart") then
@@ -122,6 +128,57 @@ function NPC.board(rig, chassis: BasePart, seatCf: CFrame)
 			w.Part1 = p
 			w.Parent = p
 			p.Anchored = false
+		end
+	end
+end
+
+-- The avatar models (ReplicatedStorage.GoDashModels "Ped1"...) by name; empty in a place without them.
+local peds: { string }? = nil
+function NPC.pedNames(): { string }
+	if not peds then
+		peds = {}
+		local store = ReplicatedStorage:FindFirstChild("GoDashModels")
+		if store then
+			for _, m in ipairs(store:GetChildren()) do
+				if m:IsA("Model") and m.Name:sub(1, 3) == "Ped" then table.insert(peds :: { string }, m.Name) end
+			end
+			table.sort(peds :: { string })
+		end
+	end
+	return peds :: { string }
+end
+
+-- A posed avatar figure (RiderPose): "stand", "hail", "pillion" or "sit". Anchored, in the NPC folder.
+-- Returns a person record ({ model, mesh = true }, so NPC.despawn works) or nil.
+function NPC.figure(cf: CFrame, pedName: string?, pose: string, helmet: Color3?)
+	local store = ReplicatedStorage:FindFirstChild("GoDashModels")
+	local t = store and pedName and store:FindFirstChild(pedName)
+	if not t then return nil end
+	local ok, m = pcall(RiderPose.build, t, cf, helmet, pose)
+	if not ok or not m then return nil end
+	m.Name = "Passenger"
+	m:AddTag("GoDashNPC")
+	if pose == "stand" or pose == "hail" then pcall(Solid.body, m, 0.45, 6.5) end -- solid while waiting (removed in weldTo)
+	m.Parent = folder
+	return { model = m, mesh = true, parts = {} }
+end
+
+-- Fix a posed figure onto a moving vehicle: weld every part to the chassis. The joints and the
+-- Humanoid are removed first, so nothing in the figure pulls on the vehicle's physics.
+function NPC.weldTo(person, chassis: BasePart)
+	local m = person.model
+	Solid.unbody(m)
+	for _, d in ipairs(m:GetDescendants()) do
+		if d:IsA("Humanoid") or d:IsA("AnimationConstraint") or d:IsA("Motor6D") or d:IsA("Weld") then d:Destroy() end
+	end
+	for _, d in ipairs(m:GetDescendants()) do
+		if d:IsA("BasePart") then
+			d.Massless = true
+			local w = Instance.new("WeldConstraint")
+			w.Part0 = chassis
+			w.Part1 = d
+			w.Parent = d
+			d.Anchored = false
 		end
 	end
 end

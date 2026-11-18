@@ -4,6 +4,7 @@
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TextService = game:GetService("TextService")
 local Shared = ReplicatedStorage.Shared
 local Game = require(Shared.Config.Game)
 local Vehicles = require(Shared.Config.Vehicles)
@@ -108,15 +109,104 @@ function Service.spawnAt(player: Player, vehicleId: string, cf: CFrame)
 	prompt.MaxActivationDistance = 12
 	prompt.RequiresLineOfSight = false
 	prompt.KeyboardKeyCode = Enum.KeyCode.F
+	prompt:SetAttribute("ForUser", player.UserId) -- only the owner sees "Drive" (client UI/Interactions/Prompt)
 	prompt.Parent = chassis
+	local mounting = false
 	prompt.Triggered:Connect(function(p)
-		if p ~= player then
-			Net.fire(p, "Notify", "toast", { text = "That's " .. player.DisplayName .. "'s vehicle", bad = true })
-			return
-		end
+		if p ~= player or mounting then return end
 		local hum = p.Character and p.Character:FindFirstChildOfClass("Humanoid")
-		if hum and hum.Health > 0 and not seat.Occupant then seat:Sit(hum) end
+		local root = p.Character and p.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
+		if not hum or hum.Health <= 0 or seat.Occupant or not root then return end
+		-- walk up to the seat's side first (left of a motorbike, the driver's door of a car), then get on
+		-- (2026-11-18 realism pass: no more popping onto the seat from a few metres away)
+		mounting = true
+		local lx = chassis.CFrame:PointToObjectSpace(seat.Position).X
+		local sideSign = def.class == "car" and (lx >= 0 and 1 or -1) or -1
+		local out = def.class == "car" and (def.wid / 2 + 1.4) or 2.1
+		local side = (chassis.CFrame * CFrame.new(sideSign * out, 0, 0)).Position
+		local flat = Vector3.new(side.X - root.Position.X, 0, side.Z - root.Position.Z)
+		if flat.Magnitude > 2.5 then
+			hum:MoveTo(Vector3.new(side.X, root.Position.Y, side.Z))
+			local t0 = os.clock()
+			while os.clock() - t0 < 1.8 and hum.Parent and hum.Health > 0 do
+				task.wait(0.05)
+				local f = Vector3.new(side.X - root.Position.X, 0, side.Z - root.Position.Z)
+				if f.Magnitude < 2 then break end
+			end
+		end
+		mounting = false
+		if hum.Parent and hum.Health > 0 and not seat.Occupant and model.Parent then seat:Sit(hum) end
 	end)
+	-- Friends ride along (2026-11-17 growth plan): everyone else sees "Ride along" on the vehicle.
+	-- The owner decides who may: friends (default), anyone, or nobody (Phone > Settings).
+	if (model:GetAttribute("Seats") or 0) > 0 then
+		local ride = Instance.new("ProximityPrompt")
+		ride.Name = "RideAlong"
+		ride.ActionText = "Ride along"
+		ride.ObjectText = player.DisplayName
+		ride.MaxActivationDistance = 10
+		ride.RequiresLineOfSight = false
+		ride.KeyboardKeyCode = Enum.KeyCode.F
+		ride:SetAttribute("NotForUser", player.UserId)
+		ride.Parent = chassis
+		ride.Triggered:Connect(function(p)
+			if p == player then return end
+			local hum = p.Character and p.Character:FindFirstChildOfClass("Humanoid")
+			if not hum or hum.Health <= 0 or hum.SeatPart then return end
+			local od = Data.get(player)
+			local rule = od and od.settings and od.settings.rideAlong or "friends"
+			if rule == "off" then
+				Net.fire(p, "Notify", "toast", { text = player.DisplayName .. " isn't taking passengers", th = player.DisplayName .. " ไม่รับคนซ้อน", bad = true })
+				return
+			end
+			if rule ~= "all" then
+				local okF, friends = pcall(function() return p:IsFriendsWith(player.UserId) end)
+				if not (okF and friends) then
+					Net.fire(p, "Notify", "toast", { text = "Only " .. player.DisplayName .. "'s friends can ride along", th = "เฉพาะเพื่อนของ " .. player.DisplayName .. " ที่ขึ้นได้", bad = true })
+					return
+				end
+			end
+			-- a free passenger point (job passengers use the first ones; friends fill from the back)
+			local body = model:FindFirstChild("Body")
+			if not body then return end
+			local taken = {}
+			for _, s in ipairs(model:GetChildren()) do
+				if s.Name == "PaxSeat" and s:IsA("Seat") then
+					if s.Occupant then taken[s:GetAttribute("Slot")] = true else s:Destroy() end
+				end
+			end
+			local slot
+			for i = model:GetAttribute("Seats") or 0, 1, -1 do
+				if not taken[i] and body:FindFirstChild("Pax" .. i) then slot = i break end
+			end
+			if not slot or model:GetAttribute("PaxBusy") then
+				Net.fire(p, "Notify", "toast", { text = "No free seat", th = "ที่นั่งเต็มแล้ว", bad = true })
+				return
+			end
+			local att = body:FindFirstChild("Pax" .. slot) :: Attachment
+			local s = Instance.new("Seat")
+			s.Name = "PaxSeat"
+			s:SetAttribute("Slot", slot)
+			s.Size = Vector3.new(1.4, 0.3, 1.4)
+			s.Transparency = 1
+			s.CanCollide = false
+			s.CanTouch = false
+			s.CanQuery = false
+			s.Massless = true
+			s.CFrame = att.WorldCFrame
+			local w = Instance.new("WeldConstraint")
+			w.Part0 = body
+			w.Part1 = s
+			w.Parent = s
+			s.Parent = model
+			s:Sit(hum)
+			s:GetPropertyChangedSignal("Occupant"):Connect(function()
+				if not s.Occupant then task.delay(0.5, function() if s.Parent and not s.Occupant then s:Destroy() end end) end
+			end)
+			Net.fire(player, "Notify", "toast", { text = "👫 " .. p.DisplayName .. " is riding with you", th = "👫 " .. p.DisplayName .. " ขึ้นรถมาด้วยแล้ว", good = true })
+			Net.fire(p, "Notify", "toast", { text = "👫 Riding with " .. player.DisplayName .. " · Space to get off", th = "👫 นั่งไปกับ " .. player.DisplayName .. " · กด Space เพื่อลง", good = true })
+		end)
+	end
 	local entry = {
 		model = model, chassis = chassis, seat = seat, def = def, id = vehicleId, owned = owned,
 		lastPos = chassis.Position, lastSpeed = 0, tele = { harsh = 0, crashes = 0, dist = 0, top = 0 },
@@ -204,6 +294,8 @@ local function garage(player: Player, op: string, vehicleId: string?, arg: any)
 	if not owned then return false, "You don't own that vehicle" end
 
 	if op == "spawn" then
+		local loan = d.loans and d.loans[def.id]
+		if loan and loan.repo then return false, "Repossessed! Pay the overdue instalments in the Finance app" end
 		return spawnNearPlayer(player, def.id)
 	elseif op == "upgrade" then
 		local up
@@ -239,6 +331,70 @@ local function garage(player: Player, op: string, vehicleId: string?, arg: any)
 			Service.spawnAt(player, def.id, cf - Vector3.new(0, v.model:GetAttribute("RideHeight"), 0))
 		end
 		return true, "Painted " .. Vehicles.COLORS[idx].name
+	elseif op == "style" then
+		-- arg = { kind = "glow" | "sticker" | "horn" | "plate", value = index or plate text }
+		if type(arg) ~= "table" then return false, "Bad request" end
+		local kind, value = arg.kind, arg.value
+		local price = Vehicles.STYLE_PRICES[kind]
+		if not price then return false, "Bad request" end
+		if def.pedal and kind ~= "horn" then return false, "A bicycle can only change its bell" end
+		owned.style = type(owned.style) == "table" and owned.style or {}
+		local st = owned.style
+		local free = false
+		if kind == "plate" then
+			if type(value) ~= "string" then return false, "Bad request" end
+			local text = value:gsub("^%s+", ""):gsub("%s+$", ""):gsub("%s+", " ")
+			if text == "" then
+				free = true
+				text = ""
+			else
+				local n = utf8.len(text)
+				if not n or n > Vehicles.PLATE_MAX then return false, "Up to " .. Vehicles.PLATE_MAX .. " characters" end
+				-- Thai letters and digits, A-Z, space and dash only
+				for _, c in utf8.codes(text) do
+					local ok = (c >= 0x0E01 and c <= 0x0E5B) or (c >= 48 and c <= 57) or (c >= 65 and c <= 90) or (c >= 97 and c <= 122) or c == 32 or c == 45
+					if not ok then return false, "Only Thai letters, A-Z, numbers and -" end
+				end
+				text = text:upper()
+				-- everyone can read a plate: Roblox's filter decides, and a filtered plate is refused
+				local okF, res = pcall(function()
+					local r = TextService:FilterStringAsync(text, player.UserId, Enum.TextFilterContext.PublicChat)
+					return r:GetNonChatStringForBroadcastAsync()
+				end)
+				if not okF then return false, "The plate check is busy, try again" end
+				if res ~= text then return false, "That plate isn't allowed" end
+			end
+			if (st.plate or "") == text then return false, "That's already your plate" end
+			value = text
+		else
+			value = tonumber(value)
+			if value == nil then return false, "Bad request" end
+			local list = kind == "glow" and Vehicles.GLOWS or (kind == "sticker" and Vehicles.STICKERS or (kind == "exhaust" and Vehicles.EXHAUSTS or Vehicles.HORNS))
+			if kind == "horn" or kind == "exhaust" then
+				if not list[value] then return false, "Unknown choice" end
+				free = value == 1
+			else
+				if value ~= 0 and not list[value] then return false, "Unknown choice" end
+				free = value == 0
+				-- pass and season cosmetics (Config/Vehicles "need")
+				local need = value ~= 0 and list[value].need
+				if need == "vip" and not player:GetAttribute("VIP") then return false, "Needs the VIP pass" end
+				if need == "neon" and not player:GetAttribute("NeonPro") then return false, "Needs the Neon Pro pass" end
+				if need and need ~= "vip" and need ~= "neon" and not (type(d.unlocks) == "table" and d.unlocks[need]) then return false, "Unlocked in the Season Pass" end
+				if need then free = true end -- already paid for with the pass / the season
+			end
+			if (st[kind] or ((kind == "horn" or kind == "exhaust") and 1 or 0)) == value then return false, "Already fitted" end
+		end
+		if not free and not Economy.spend(player, price, "style:" .. kind) then return false, "Not enough money (" .. Util.money(price) .. ")" end
+		st[kind] = value
+		Data.touch(player, "vehicles")
+		require(script.Parent.StoreService).badge(player, "style")
+		local v = active[player]
+		if v and v.id == def.id and v.model and v.model.Parent then
+			if kind == "plate" then v.model:SetAttribute("PlateText", value) end
+			pcall(Factory.style, v.model, def, owned, player.UserId)
+		end
+		return true, free and "Changed" or ("Fitted for " .. Util.money(price))
 	elseif op == "refuel" then
 		local need = def.fuelCap - owned.fuel
 		if need < 0.05 then return false, "Tank is full" end
@@ -289,8 +445,9 @@ function Service.start(w, deps)
 		if v.model:GetAttribute("Signal") ~= signal then v.model:SetAttribute("Signal", signal) end
 	end, 12)
 
-	-- the driver's client reports going down / rolling over in a corner
-	Net.on("VehicleFall", {}, function(player)
+	-- the driver's client reports going down (thrown off in a crash, a speed bump at full speed) or a
+	-- hard landing; speed = studs/s at the moment. The rider is hurt too (server/HealthService).
+	Net.on("VehicleFall", { "number?" }, function(player, speed)
 		local v = Service.driving(player)
 		if not v then return end
 		v.tele.crashes += 1
@@ -298,6 +455,7 @@ function Service.start(w, deps)
 		v.stats = Vehicles.computeStats(v.def, v.owned)
 		sync(v)
 		Net.fire(player, "Notify", "crash", { damage = true })
+		require(script.Parent.HealthService).injure(player, v.def.class == "car" and "car" or "bike", math.clamp(tonumber(speed) or 30, 0, 200))
 	end, 0.5)
 
 	NPC.handle("dealer", function(player) Net.fire(player, "OpenUI", "garage", { mode = "dealer" }) end)

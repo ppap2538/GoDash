@@ -41,6 +41,21 @@ function OfferCard.update()
 	end
 end
 
+-- the bonus line is built from parts on the server ("🌧 Rain bonus +25% · 🍱 Lunch rush +15%"): translate each part
+local BONUS_TH = {
+	["🌙 Night +10%"] = "🌙 กลางคืน +10%", ["💦 Songkran +30%"] = "💦 สงกรานต์ +30%", ["🔥 Rush Hour +50%"] = "🔥 ชั่วโมงเร่งด่วน +50%",
+	["🍱 Lunch rush +15%"] = "🍱 ช่วงพักเที่ยง +15%", ["🍛 Dinner rush +15%"] = "🍛 ช่วงมื้อเย็น +15%",
+}
+local function bonusLine(s: string): string
+	if Lang.code ~= "th" or s == "" then return s end
+	local out = {}
+	for seg in (s .. " · "):gmatch("(.-) · ") do
+		local rain = seg:match("^🌧 Rain bonus %+(%d+)%%$")
+		table.insert(out, rain and ("🌧 โบนัสฝน +" .. rain .. "%") or BONUS_TH[seg] or seg)
+	end
+	return table.concat(out, " · ")
+end
+
 local function refresh(job)
 	local o = job and job.offer
 	if o then
@@ -61,7 +76,7 @@ local function refresh(job)
 		refs.from.Text = (o.mode == "ride" and "🧍 Pick up: " or "🍱 From: ") .. Lang.name(o.pickup)
 		refs.to.Text = "📍 To: " .. Lang.name(o.dropoff)
 		refs.info.Text = ("%s trip · %s to pick-up · %s · +%d EXP"):format(Util.dist(o.dist), Util.dist(o.toPickup), o.item, o.exp)
-		refs.bonus.Text = o.bonus or ""
+		refs.bonus.Text = bonusLine(o.bonus or "")
 	else
 		shownId = nil
 	end
@@ -85,6 +100,8 @@ function OfferCard.build(region: Frame, order: number)
 	refs.info = UI.label(card, "", T.sm, C.textDim, F.med, { Position = UDim2.fromOffset(14, 94), Size = UDim2.new(1, -28, 0, 16) })
 	UI.fitText(refs.info, T.sm, 9)
 	refs.bonus = UI.label(card, "", T.sm, C.yellow, F.bold, { Position = UDim2.fromOffset(14, 112), Size = UDim2.new(1, -28, 0, 16) })
+	refs.bonus:SetAttribute("NoTranslate", true) -- bonusLine() does it part by part
+	UI.fitText(refs.bonus, T.sm, 9)
 	local timerTrack, _, timerFill = UI.glassBar(card, C.green, 5)
 	timerTrack.Position = UDim2.fromOffset(14, 134)
 	timerTrack.Size = UDim2.new(1, -28, 0, 5)

@@ -5,8 +5,12 @@ local InsertService = game:GetService("InsertService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Models = require(ReplicatedStorage.Shared.Config.Models)
 
+local Plants = require(ReplicatedStorage.Shared.Config.Plants)
+local Solid = require(script.Parent.Solid)
+
 local Assets = {}
 local templates = {}
+local byKind = {}
 local loaded = false
 
 local function normalise(model: Model, def)
@@ -56,7 +60,30 @@ function Assets.load()
 	end
 	local t0 = os.clock()
 	while pending > 0 and os.clock() - t0 < 25 do task.wait(0.1) end
-	print(("[Assets] %d mesh models loaded, %d unavailable (builders use their own parts for those)"):format(n, failed + pending))
+	-- the vegetation library is prepared in Studio (tools/setup_plants.luau) and kept in the place
+	local plants = 0
+	local folder = game:GetService("ServerStorage"):FindFirstChild("GoDashPlants")
+	if folder then
+		for _, m in ipairs(folder:GetChildren()) do
+			if m:IsA("Model") then
+				local model = m:Clone()
+				if pcall(normalise, model, { collide = false }) then
+					local kind = Plants[m.Name] and Plants[m.Name].kind or "plant"
+					templates[m.Name] = model
+					byKind[kind] = byKind[kind] or {}
+					table.insert(byKind[kind], m.Name)
+					plants += 1
+				end
+			end
+		end
+		for _, list in pairs(byKind) do table.sort(list) end
+	end
+	print(("[Assets] %d mesh models loaded, %d unavailable (builders use their own parts for those), %d plants"):format(n, failed + pending, plants))
+end
+
+-- Names of the plant models of one kind ("rain", "mango", "koon", "coconut", ...), in a fixed order.
+function Assets.plants(kind: string): { string }
+	return byKind[kind] or {}
 end
 
 function Assets.has(name: string): boolean
@@ -68,6 +95,17 @@ function Assets.template(name: string): Model?
 	return templates[name]
 end
 
+-- Light street furniture a vehicle can knock over (the client tips it over and puts it back later).
+local KNOCKABLE = { chair = true, plant = true, trash = true }
+-- An invisible box a person on foot bumps into (World/Solid): footprint scale, height cap.
+-- Vehicles are not stopped by it (parked bikes and props stay as they were for driving).
+local BODY = {
+	chair = { 0.8, 4 }, plant = { 0.55, 5 }, shrub = { 0.7, 4 }, aircon = { 0.9, 4 },
+	v_bicycle = { 0.8, 4 }, v_moped = { 0.85, 4.5 }, v_scooter = { 0.85, 4.5 }, v_bigbike = { 0.85, 4.5 }, v_sport = { 0.85, 4.5 },
+	v_sedan = { 0.92, 6 }, v_hatch = { 0.92, 6 }, v_pickup = { 0.92, 6.5 }, v_suv = { 0.92, 6.5 }, v_lux = { 0.92, 6 }, v_super = { 0.92, 5 },
+	npc_vendor = { 0.45, 6.5 }, npc_man = { 0.45, 6.5 }, npc_student = { 0.45, 6.5 },
+}
+
 -- cf = where the bottom centre goes, front toward cf's -Z. Returns the clone or nil.
 function Assets.place(parent: Instance, name: string, cf: CFrame, scale: number?): Model?
 	local t = templates[name]
@@ -75,6 +113,9 @@ function Assets.place(parent: Instance, name: string, cf: CFrame, scale: number?
 	local m = t:Clone()
 	if scale and math.abs(scale - 1) > 0.01 then m:ScaleTo(scale) end
 	m:PivotTo(cf)
+	if KNOCKABLE[name] then m:AddTag("Knockable") end
+	local body = BODY[name]
+	if body then Solid.body(m, body[1], body[2]) end
 	m.Parent = parent
 	return m
 end

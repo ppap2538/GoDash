@@ -13,6 +13,9 @@ tools/sync.json
 # jacaranda_tree.bin alone is 199 MB, over GitHub's 100 MB file limit.
 assets/models_src/
 
+# Local backups of generated map data (2026-11-18)
+backups/
+
 # Caches
 data/polyhaven_index.json
 __pycache__/

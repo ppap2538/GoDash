@@ -121,7 +121,7 @@ function Places.nightmarket(m, base, poi, rng, out)
 	end
 	-- gate arch
 	for _, sx in ipairs({ -12, 12 }) do Kit.part(m, V3(1.4, 14, 1.4), base * CF(sx, 7, -d / 2 + 3), Color3.fromRGB(170, 40, 40), M.Metal) end
-	bigSign(m, base * CF(0, 14, -d / 2 + 3), 28, 4.6, Color3.fromRGB(170, 40, 40), "ตลาดโต้รุ่ง", "TON RUNG NIGHT MARKET")
+	bigSign(m, base * CF(0, 14, -d / 2 + 3), 28, 4.6, Color3.fromRGB(170, 40, 40), poi.style == "walk" and poi.thai or "ตลาดโต้รุ่ง", poi.style == "walk" and "WALKING STREET · SATURDAY" or "TON RUNG NIGHT MARKET")
 	-- eating tables
 	for x = -24, 24, 16 do
 		Kit.part(m, V3(5, 0.4, 5), base * CF(x, 2.8, 0), C.metal, M.Metal)
@@ -171,7 +171,7 @@ function Places.hospital(m, base, poi, rng, out)
 	local cz = 16 - (d - 50) / 2 - 0.5
 	Kit.part(m, V3(3, 10, 0.6), base * CF(0, 44, cz), Color3.fromRGB(40, 170, 90), M.Neon, { decor = true })
 	Kit.part(m, V3(10, 3, 0.6), base * CF(0, 44, cz), Color3.fromRGB(40, 170, 90), M.Neon, { decor = true })
-	bigSign(m, base * CF(0, 14.6, 16 - (d - 50) / 2 - 15.6), 38, 4, Color3.fromRGB(60, 150, 110), "โรงพยาบาลขอนแก่น", "KHON KAEN HOSPITAL")
+	bigSign(m, base * CF(0, 14.6, 16 - (d - 50) / 2 - 15.6), 38, 4, Color3.fromRGB(60, 150, 110), poi.thai, string.upper(poi.name))
 	for x = -w / 2 + 12, w / 2 - 12, 30 do S.tree(m, base * CF(x, 0, -d / 2 + 8), rng, "small") end
 	out.door = world(base, 0, 3, 16 - (d - 50) / 2 - 10)
 	out.npc = base * CF(7, 0.3, 16 - (d - 50) / 2 - 6)
@@ -198,7 +198,7 @@ function Places.bus(m, base, poi, rng, out)
 	Kit.part(m, V3(w - 40, 18, 40), base * CF(0, 9, d / 2 - 24), Color3.fromRGB(230, 226, 214), M.Concrete)
 	local g = Kit.part(m, V3(w - 60, 10, 0.5), base * CF(0, 6, d / 2 - 44.2), C.glass, M.Glass, { decor = true, transparency = 0.2 })
 	Kit.nightGlow(g)
-	bigSign(m, base * CF(0, 22, d / 2 - 44.4), 60, 6.5, Color3.fromRGB(40, 90, 170), "สถานีขนส่งผู้โดยสารขอนแก่น", "KHON KAEN BUS TERMINAL")
+	bigSign(m, base * CF(0, 22, d / 2 - 44.4), 60, 6.5, Color3.fromRGB(40, 90, 170), poi.id == "bus" and "สถานีขนส่งผู้โดยสารขอนแก่น" or poi.thai, string.upper(poi.name))
 	-- platform canopy
 	Kit.part(m, V3(w - 30, 0.8, 22), base * CF(0, 14, -4), Color3.fromRGB(40, 90, 170), M.Metal, { decor = true, shadow = true })
 	for x = -w / 2 + 22, w / 2 - 22, 34 do
@@ -248,7 +248,7 @@ end
 
 function Places.university(m, base, poi, rng, out)
 	local w, d = poi.w, poi.d
-	Kit.part(m, V3(w, 0.5, d), base * CF(0, 0.05, 0), Color3.fromRGB(110, 160, 84), M.Grass, { name = "Pad" })
+	Kit.part(m, V3(w, 0.5, d), base * CF(0, 0.05, 0), Color3.fromRGB(122, 138, 86), M.Grass, { name = "Pad", variant = "GD_Grass" })
 	-- gate (two brick pylons + beam) at the front centre
 	local brick = Color3.fromRGB(170, 86, 64)
 	for _, sx in ipairs({ -24, 24 }) do
@@ -256,15 +256,12 @@ function Places.university(m, base, poi, rng, out)
 		Kit.part(m, V3(10, 2, 10), base * CF(sx, 27, -d / 2 + 8), C.gold, M.SmoothPlastic, { decor = true })
 	end
 	Kit.part(m, V3(56, 5, 5), base * CF(0, 22, -d / 2 + 8), brick, M.Brick)
-	bigSign(m, base * CF(0, 22, -d / 2 + 5.2), 44, 4, brick, "มหาวิทยาลัยขอนแก่น", "KHON KAEN UNIVERSITY")
+	bigSign(m, base * CF(0, 22, -d / 2 + 5.2), 44, 4, brick, poi.thai, string.upper(poi.name))
 	-- avenue + main hall with clock tower
 	Kit.part(m, V3(26, 0.3, d - 50), base * CF(0, 0.4, -10), C.asphaltSoi, M.Asphalt, { decor = true })
 	Kit.part(m, V3(150, 30, 34), base * CF(0, 15, d / 2 - 24), Color3.fromRGB(232, 222, 200), M.Concrete)
 	Kit.gable(m, base * CF(0, 0, d / 2 - 24), 156, 40, 12, 30, brick, M.Slate)
-	for f = 0, 2 do
-		local g = Kit.part(m, V3(136, 4.6, 0.4), base * CF(0, 6 + f * 9, d / 2 - 41.2), C.glass, M.Glass, { decor = true })
-		if f > 0 then Kit.nightGlow(g) end
-	end
+	Kit.facade(m, base * CF(0, 15, d / 2 - 41.2), 150, 30, Kit.FACADE.town, 9, 3, Color3.fromRGB(232, 222, 200), true)
 	Kit.part(m, V3(16, 62, 16), base * CF(0, 31, d / 2 - 44), Color3.fromRGB(232, 222, 200), M.Concrete)
 	Kit.part(m, V3(18, 3, 18), base * CF(0, 63, d / 2 - 44), brick, M.Slate, { decor = true })
 	local clock = Kit.cyl(m, 10, 0.6, base * CF(0, 52, d / 2 - 52.2) * Angles(rad(90), 0, 0), C.white, M.SmoothPlastic, { decor = true })
@@ -275,8 +272,8 @@ function Places.university(m, base, poi, rng, out)
 			local x = sx * (60 + k * 86)
 			if math.abs(x) < w / 2 - 40 then
 				Kit.part(m, V3(70, 24 + k * 6, 40), base * CF(x, 12 + k * 3, 10), Kit.PASTEL[rng:NextInteger(1, #Kit.PASTEL)], M.Concrete)
-				local g = Kit.part(m, V3(60, 14 + k * 6, 0.4), base * CF(x, 13 + k * 3, -10.2), C.glass, M.Glass, { decor = true })
-				Kit.nightGlow(g)
+				local bh = 24 + k * 6
+				Kit.facade(m, base * CF(x, bh / 2, -10.2), 70, bh, Kit.FACADE.tower, 7, math.floor(bh / 10 + 0.5), Color3.fromRGB(226, 224, 216), true)
 			end
 		end
 		for z = -d / 2 + 24, 0, 22 do
@@ -456,6 +453,230 @@ function Places.reststop(m, base, poi, rng, out)
 	out.door = world(base, 14, 3, d / 2 - 19)
 	out.npc = base * CF(18, 0.3, d / 2 - 17)
 	out.extra = { { kind = "rest", pos = world(base, -10, 3, 2), action = "Rest", object = "Sala (free energy)" } }
+end
+
+---------------------------------------------------------------------------------------------------
+-- 2026-11-18 landmark batch: government offices, museums, the city gate, the provincial stadium and
+-- the big public schools, each with its real name (public places only) and the look Thais know them by.
+---------------------------------------------------------------------------------------------------
+local CREAM = Color3.fromRGB(240, 232, 212)
+local GOV_ROOF = Color3.fromRGB(196, 96, 40) -- the orange tile of Thai government buildings
+
+-- the national flag on a pole (red, white, blue twice as wide, white, red)
+local function flagpole(m: Instance, base: CFrame, x: number, z: number)
+	Kit.cyl(m, 0.7, 36, base * CF(x, 18, z), C.metal, M.Metal)
+	Kit.ball(m, 1.4, base * CF(x, 36.6, z), C.gold, M.Metal, { decor = true })
+	local stripes = { { Color3.fromRGB(200, 30, 40), 1 }, { C.white, 1 }, { Color3.fromRGB(30, 40, 120), 2 }, { C.white, 1 }, { Color3.fromRGB(200, 30, 40), 1 } }
+	local y = 34.5
+	for _, s in ipairs(stripes) do
+		local h = s[2] * 0.7
+		Kit.part(m, V3(6.2, h, 0.15), base * CF(x + 3.5, y - h / 2, z), s[1], M.Fabric, { decor = true })
+		y -= h
+	end
+end
+
+-- the long low wall with the name by the gate (every Thai government office and school has one)
+local function nameWall(m: Instance, base: CFrame, x: number, z: number, w: number, col: Color3, thai: string, en: string)
+	Kit.part(m, V3(w, 6, 3), base * CF(x, 3, z), Color3.fromRGB(226, 220, 204), M.Concrete)
+	Kit.part(m, V3(w + 1, 0.8, 3.6), base * CF(x, 6.4, z), col, M.Concrete, { decor = true })
+	bigSign(m, base * CF(x, 3.6, z - 1.7), w - 4, 4.2, col, thai, string.upper(en))
+end
+
+function Places.government(m, base, poi, rng, out)
+	local w, d = poi.w, poi.d
+	local style = poi.style or "office"
+	local hall = style == "hall"
+	Kit.part(m, V3(w, 0.5, d), base * CF(0, 0.05, 0), Color3.fromRGB(122, 150, 86), M.Grass, { name = "Pad", variant = "GD_Grass" })
+	local floors = hall and 4 or 3
+	local fh = 11
+	local h = floors * fh
+	local bw = math.min(w - 26, hall and 170 or 110)
+	local bd = hall and 44 or 36
+	local bz = d / 2 - bd / 2 - 8
+	local roof = style == "police" and Color3.fromRGB(110, 50, 40) or GOV_ROOF
+	local signCol = style == "police" and Color3.fromRGB(110, 40, 40) or Color3.fromRGB(50, 70, 120)
+	-- driveway and forecourt
+	Kit.part(m, V3(24, 0.3, d - bd - 8), base * CF(0, 0.4, -bd / 2 - 4), C.concrete, M.Concrete, { decor = true })
+	Kit.part(m, V3(bw * 0.7, 0.3, 18), base * CF(0, 0.42, bz - bd / 2 - 9), C.concrete, M.Concrete, { decor = true })
+	-- the building
+	Kit.part(m, V3(bw, h, bd), base * CF(0, h / 2, bz), CREAM, M.Concrete)
+	for f = 1, floors do
+		local g = Kit.part(m, V3(bw - 8, 5, 0.4), base * CF(0, (f - 1) * fh + 6, bz - bd / 2 - 0.2), C.glassDark, M.Glass, { decor = true })
+		if f % 2 == 1 then Kit.nightGlow(g) end
+		Kit.part(m, V3(bw, 0.8, 1.4), base * CF(0, f * fh - 0.4, bz - bd / 2 - 0.6), Color3.fromRGB(226, 216, 196), M.Concrete, { decor = true })
+	end
+	-- two-tier Thai roof
+	Kit.gable(m, base * CF(0, 0, bz), bw + 6, bd + 6, 10, h, roof, M.Slate)
+	Kit.gable(m, base * CF(0, 0, bz), bw * 0.5, bd + 8, 9, h + 7, roof, M.Slate)
+	-- portico on columns, with its own small gable, the name over it
+	local pw = hall and 54 or 36
+	local pz = bz - bd / 2 - 7
+	local cols = hall and 6 or 4
+	Kit.part(m, V3(pw, 1, 14), base * CF(0, fh * 2 - 0.5, pz), CREAM, M.Concrete, { decor = true, shadow = true })
+	Kit.gable(m, base * CF(0, 0, pz), pw + 2, 15, 7, fh * 2, roof, M.Slate)
+	for i = 0, cols - 1 do
+		Kit.cyl(m, 2.2, fh * 2, base * CF(-pw / 2 + 3 + i * (pw - 6) / (cols - 1), fh, pz - 5), C.white, M.Concrete)
+	end
+	Kit.part(m, V3(pw + 4, 1.2, 7), base * CF(0, 0.6, pz - 9.5), C.white, M.Concrete, { decor = true })
+	bigSign(m, base * CF(0, fh * 2 + 3.2, pz - 7.6), pw - 6, 3.4, signCol, poi.thai, nil)
+	-- name wall by the gate, flagpole, trees along the front
+	nameWall(m, base, -w / 2 + 32, -d / 2 + 6, 50, signCol, poi.thai, poi.name)
+	flagpole(m, base, w / 2 - 22, -d / 2 + 18)
+	for x = -w / 2 + 12, w / 2 - 12, 30 do
+		if math.abs(x) > 18 and math.abs(x - (-w / 2 + 32)) > 30 then S.tree(m, base * CF(x, 0, -d / 2 + 20), rng, "rain") end
+	end
+	S.parkedBikes(m, base * CF(w / 2 - 20, 0.3, bz - bd / 2 - 12), 4, rng)
+	out.door = world(base, 0, 3, pz - 13)
+	out.npc = base * CF(6, 0.3, pz - 11)
+end
+
+function Places.museum(m, base, poi, rng, out)
+	local w, d = poi.w, poi.d
+	pad(m, base, w, d, Color3.fromRGB(206, 198, 180))
+	local bw, bd = math.min(w - 24, 96), math.min(d - 30, 46)
+	local bz = d / 2 - bd / 2 - 8
+	-- raised platform, one tall storey, a steep Isan roof with a second gable over the entrance
+	Kit.part(m, V3(bw + 8, 3, bd + 8), base * CF(0, 1.5, bz), Color3.fromRGB(196, 186, 166), M.Concrete)
+	Kit.part(m, V3(bw, 16, bd), base * CF(0, 11, bz), Color3.fromRGB(234, 224, 200), M.Concrete)
+	local roofCol = Color3.fromRGB(150, 70, 48)
+	Kit.gable(m, base * CF(0, 0, bz), bw + 8, bd + 8, 16, 19, roofCol, M.Slate)
+	Kit.gable(m, base * CF(0, 0, bz - bd / 2 - 4), 34, 12, 12, 16, roofCol, M.Slate)
+	for _, sx in ipairs({ -14, -5, 5, 14 }) do Kit.cyl(m, 1.8, 13, base * CF(sx, 9.5, bz - bd / 2 - 7), Color3.fromRGB(150, 110, 80), M.Wood) end
+	local g = Kit.part(m, V3(26, 9, 0.4), base * CF(0, 8.5, bz - bd / 2 - 0.2), C.glassDark, M.Glass, { decor = true })
+	Kit.nightGlow(g)
+	Kit.part(m, V3(30, 3, 8), base * CF(0, 1.5, bz - bd / 2 - 10), Color3.fromRGB(220, 212, 196), M.Concrete, { decor = true })
+	nameWall(m, base, 0, -d / 2 + 6, math.min(w - 20, 60), Color3.fromRGB(110, 60, 40), poi.thai, poi.name)
+	for x = -w / 2 + 10, w / 2 - 10, 26 do
+		if math.abs(x) > 34 then S.tree(m, base * CF(x, 0, -d / 2 + 16), rng, "small") end
+	end
+	out.door = world(base, 0, 3, bz - bd / 2 - 14)
+	out.npc = base * CF(6, 3.2, bz - bd / 2 - 10)
+end
+
+-- Khon Kaen City Gate: two tall pillars with tiered tops and a beam carrying the name, in a small garden.
+function Places.citygate(m, base, poi, rng, out)
+	local w, d = poi.w, poi.d
+	Kit.part(m, V3(w, 0.5, d), base * CF(0, 0.05, 0), Color3.fromRGB(122, 150, 86), M.Grass, { name = "Pad", variant = "GD_Grass" })
+	Kit.part(m, V3(40, 0.3, d), base * CF(0, 0.4, 0), Color3.fromRGB(188, 160, 120), M.Brick, { decor = true })
+	-- (2026-11-18 v2: the plain brick posts became a Thai-style gateway: cream pillars on brick plinths,
+	-- stepped pinnacles with lotus-bud finials, a two-tier tiled roof over the beam, lamps on the posts)
+	local brick = Color3.fromRGB(176, 90, 60)
+	local cream = Color3.fromRGB(242, 230, 200)
+	local roofCol = Color3.fromRGB(170, 70, 44)
+	local trim = Color3.fromRGB(196, 150, 70)
+	for _, sx in ipairs({ -1, 1 }) do
+		local x = sx * 17
+		Kit.part(m, V3(11, 4, 11), base * CF(x, 2, 0), brick, M.Brick) -- plinth
+		Kit.part(m, V3(8, 26, 8), base * CF(x, 17, 0), cream, M.Concrete)
+		for _, y in ipairs({ 8, 16, 24 }) do -- carved bands
+			Kit.part(m, V3(8.6, 0.8, 8.6), base * CF(x, y, 0), trim, M.Concrete, { decor = true })
+		end
+		-- stepped pinnacle
+		local size, y = 9.4, 30
+		for tier = 1, 4 do
+			local h = tier == 1 and 2 or 1.8
+			Kit.part(m, V3(size, h, size), base * CF(x, y + h / 2, 0), tier % 2 == 1 and cream or trim, M.Concrete, { decor = true })
+			y += h
+			size -= 1.9
+		end
+		Kit.ball(m, 2.6, base * CF(x, y + 1.2, 0), trim, M.Concrete, { decor = true }) -- lotus bud
+		Kit.part(m, V3(0.6, 4, 0.6), base * CF(x, y + 4, 0), trim, M.Metal, { decor = true })
+		-- lamps on the inner faces
+		for _, ly in ipairs({ 12 }) do
+			local lamp = Kit.ball(m, 1.8, base * CF(x - sx * 4.8, ly, -2), Color3.fromRGB(255, 236, 190), M.SmoothPlastic, { decor = true })
+			Kit.nightLight(lamp, 40, Color3.fromRGB(255, 220, 160), 1.8); Kit.nightGlow(lamp)
+		end
+	end
+	-- the beam with the name, and a two-tier roof over it
+	Kit.part(m, V3(42, 5, 5), base * CF(0, 25.5, 0), cream, M.Concrete)
+	Kit.part(m, V3(42, 0.8, 5.6), base * CF(0, 23.2, 0), trim, M.Concrete, { decor = true })
+	Kit.gable(m, base * CF(0, 0, 0), 40, 9, 4.5, 28, roofCol, M.Slate)
+	Kit.gable(m, base * CF(0, 0, 0), 24, 7, 4, 31.5, roofCol, M.Slate)
+	bigSign(m, base * CF(0, 25.5, -2.7), 30, 3.6, Color3.fromRGB(120, 40, 30), poi.thai, string.upper(poi.name))
+	local spot = Kit.part(m, V3(30, 0.3, 0.6), base * CF(0, 22.6, -3), Color3.fromRGB(255, 236, 200), M.SmoothPlastic, { decor = true })
+	Kit.nightLight(spot, 30, Color3.fromRGB(255, 225, 180), 1.4); Kit.nightGlow(spot)
+	for _, sx in ipairs({ -1, 1 }) do
+		for _, sz in ipairs({ -1, 1 }) do S.tree(m, base * CF(sx * (w / 2 - 8), 0, sz * (d / 2 - 8)), rng, "small") end
+	end
+	out.door = world(base, 0, 3, -d / 2 + 4)
+end
+
+-- The provincial stadium: running track round a pitch, grandstands on the long sides, floodlights.
+function Places.stadium(m, base, poi, rng, out)
+	local w, d = poi.w, poi.d
+	pad(m, base, w, d, Color3.fromRGB(180, 176, 168))
+	local tw, td = w - 30, d - 50
+	Kit.part(m, V3(tw, 0.4, td), base * CF(0, 0.4, 6), Color3.fromRGB(176, 80, 60), M.SmoothPlastic, { name = "Track", decor = true })
+	Kit.part(m, V3(tw - 26, 0.5, td - 26), base * CF(0, 0.5, 6), Color3.fromRGB(86, 150, 66), M.Grass, { decor = true })
+	local white = Color3.fromRGB(240, 240, 236)
+	Kit.part(m, V3(0.6, 0.1, td - 30), base * CF(0, 0.8, 6), white, M.SmoothPlastic, { decor = true })
+	for _, sx in ipairs({ -1, 1 }) do
+		Kit.part(m, V3(0.5, 6, 0.5), base * CF(sx * (tw / 2 - 16), 3.4, 6 - 7), white, M.Metal, { decor = true })
+		Kit.part(m, V3(0.5, 6, 0.5), base * CF(sx * (tw / 2 - 16), 3.4, 6 + 7), white, M.Metal, { decor = true })
+		Kit.part(m, V3(0.5, 0.5, 14.5), base * CF(sx * (tw / 2 - 16), 6.4, 6), white, M.Metal, { decor = true })
+	end
+	-- grandstands (stepped) on the two long sides, the main one roofed
+	for _, sz in ipairs({ -1, 1 }) do
+		local zc = 6 + sz * (td / 2 + 8)
+		for k = 0, 4 do
+			Kit.part(m, V3(tw - 30, 2.4 + k * 2.4, 3), base * CF(0, 1.2 + k * 1.2, zc + sz * k * 3), Color3.fromRGB(200, 196, 188), M.Concrete)
+		end
+		if sz == 1 then
+			Kit.part(m, V3(tw - 26, 1, 18), base * CF(0, 18, zc + 6), Color3.fromRGB(40, 90, 160), M.Metal, { decor = true, shadow = true })
+			for x = -(tw - 30) / 2, (tw - 30) / 2, (tw - 30) / 4 do Kit.cyl(m, 1, 18, base * CF(x, 9, zc + 14), C.metal, M.Metal) end
+		end
+	end
+	for _, sx in ipairs({ -1, 1 }) do
+		for _, sz in ipairs({ -1, 1 }) do
+			local x, z = sx * (w / 2 - 8), 6 + sz * (td / 2 + 4)
+			Kit.cyl(m, 1.2, 46, base * CF(x, 23, z), C.metal, M.Metal)
+			local lamps = Kit.part(m, V3(8, 4, 1), base * CF(x, 47, z), Color3.fromRGB(250, 250, 240), M.SmoothPlastic, { decor = true })
+			Kit.nightLight(lamps, 120, Color3.fromRGB(255, 250, 235), 2.4); Kit.nightGlow(lamps)
+		end
+	end
+	nameWall(m, base, 0, -d / 2 + 5, math.min(w - 40, 70), Color3.fromRGB(40, 90, 160), poi.thai, poi.name)
+	out.door = world(base, 0, 3, -d / 2 + 10)
+end
+
+-- A school or college front: gate pylons with the name arch, a long open-corridor teaching block behind
+-- the forecourt, the flag in the middle of the yard (where assembly is held every morning).
+function Places.school(m, base, poi, rng, out)
+	local w, d = poi.w, poi.d
+	local college = poi.style == "college"
+	pad(m, base, w, d, Color3.fromRGB(196, 188, 170))
+	local trim = college and Color3.fromRGB(60, 80, 140) or ({ Color3.fromRGB(150, 60, 50), Color3.fromRGB(60, 110, 70), Color3.fromRGB(90, 60, 130) })[rng:NextInteger(1, 3)]
+	-- teaching block
+	local bw, bd = math.min(w - 16, college and 124 or 110), 26
+	local floors = college and 4 or 3
+	local fh = 10
+	local h = floors * fh
+	local bz = d / 2 - bd / 2 - 4
+	Kit.part(m, V3(bw, h, bd - 6), base * CF(0, h / 2, bz + 3), Color3.fromRGB(240, 234, 216), M.Concrete)
+	for f = 1, floors do
+		local y = (f - 1) * fh
+		Kit.part(m, V3(bw, 0.6, 6), base * CF(0, y + 0.3, bz - bd / 2 + 3), Color3.fromRGB(214, 206, 188), M.Concrete, { decor = true })
+		if f > 1 then Kit.part(m, V3(bw, 2.8, 0.4), base * CF(0, y + 1.7, bz - bd / 2 + 0.3), trim, M.Concrete, { decor = true }) end
+		local win = Kit.part(m, V3(bw - 4, 4.2, 0.3), base * CF(0, y + 5.2, bz - bd / 2 + 6.1), C.glass, M.Glass, { decor = true })
+		if f == 1 then Kit.nightGlow(win) end
+	end
+	Kit.part(m, V3(bw, 0.6, 6), base * CF(0, h + 0.3, bz - bd / 2 + 3), Color3.fromRGB(214, 206, 188), M.Concrete, { decor = true })
+	Kit.gable(m, base * CF(0, 0, bz), bw + 4, bd + 4, 7, h, trim, M.Slate)
+	-- yard with the flag
+	flagpole(m, base, 0, bz - bd / 2 - 16)
+	-- gate: two pylons and the name arch over the entrance
+	for _, sx in ipairs({ -14, 14 }) do
+		Kit.part(m, V3(4, 16, 4), base * CF(sx, 8, -d / 2 + 3), trim, M.Concrete)
+	end
+	Kit.part(m, V3(34, 4.6, 2.6), base * CF(0, 15, -d / 2 + 3), Color3.fromRGB(240, 234, 216), M.Concrete)
+	bigSign(m, base * CF(0, 15, -d / 2 + 1.5), 32, 3.6, trim, poi.thai, string.upper(poi.name))
+	-- fence either side of the gate
+	for _, sx in ipairs({ -1, 1 }) do
+		Kit.part(m, V3(w / 2 - 18, 3, 0.6), base * CF(sx * (w / 4 + 8), 1.5, -d / 2 + 2), Color3.fromRGB(226, 220, 204), M.Concrete)
+	end
+	S.parkedBikes(m, base * CF(-w / 2 + 16, 0.3, -d / 2 + 12), 5, rng)
+	S.tree(m, base * CF(w / 2 - 10, 0, -d / 2 + 14), rng, "rain")
+	out.door = world(base, 0, 3, -d / 2 + 8)
+	out.npc = base * CF(5, 0.3, -d / 2 + 9)
 end
 
 return Places

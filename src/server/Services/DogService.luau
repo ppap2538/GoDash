@@ -8,8 +8,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Net = require(ReplicatedStorage.Shared.Net)
 
 local Service = {}
-local MAX_DOGS = 16
-local SPACING = 320 -- studs between two dogs' homes
+local MAX_DOGS = 140 -- (2026-11-16: was 16; the sois felt empty. 2026-11-18: 40 -> 140 for the whole tambon)
+local SPACING = 240 -- studs between two dogs' homes
 local NOTICE = 60 -- a dog notices you this close to its home
 local LEASH = 170 -- and gives up this far from home
 local CHASE_SPEED = 33 -- a bicycle tops out a little above this
@@ -31,7 +31,7 @@ function Service.start(world, deps)
 		if (not radius) or (pos - centre).Magnitude < radius - 200 then
 			local soi = #n.links > 0
 			for _, l in ipairs(n.links) do
-				if l.edge.type ~= "soi" then soi = false break end
+				if not l.edge.minor then soi = false break end
 			end
 			if soi then table.insert(candidates, n) end
 		end
@@ -110,6 +110,11 @@ function Service.start(world, deps)
 								d.target = p
 								d.started = now
 								setState(d, "chase")
+								-- (2026-11-17) say so: a soi dog on your tail is half the fun
+								local v = vehicles.driving(p)
+								if not v or v.def.class == "bike" then
+									Net.fire(p, "Notify", "toast", { text = "🐕💨 A soi dog is chasing you! Get away!", th = "🐕💨 หมาซอยไล่! บิดหนีเร็ว!", bad = true })
+								end
 								break
 							end
 						end
@@ -117,6 +122,11 @@ function Service.start(world, deps)
 				elseif d.state == "chase" then
 					local pos = d.target and roots[d.target]
 					if not pos or now - d.started > 16 or flat(pos - d.home).Magnitude > LEASH then
+						local p = d.target
+						if p and pos then
+							Net.fire(p, "Notify", "toast", { text = "😅 You got away from the soi dog", th = "😅 รอดจากหมาซอยแล้ว", good = true })
+							if math.random() < 0.4 then Net.fire(p, "Notify", "feed", { key = "dog_chase", vars = { pos = d.home } }) end
+						end
 						d.target = nil
 						setState(d, "return")
 					else
@@ -131,7 +141,8 @@ function Service.start(world, deps)
 								lifestyle.add(p, -4, nil, -10)
 								local tele = vehicles.telemetry(p)
 								if tele then tele.dog = (tele.dog or 0) + 1 end
-								Net.fire(p, "Notify", "toast", { text = "🐕 A soi dog bit you!  −10 happiness", bad = true })
+								Net.fire(p, "Notify", "toast", { text = "🐕 A soi dog bit you!  −10 happiness", th = "🐕 โดนหมาซอยงับ! ความสุข −10", bad = true })
+								Net.fire(p, "Notify", "feed", { key = "dog_bite", vars = { pos = d.home } })
 								d.target = nil
 								setState(d, "return")
 							end

@@ -8,11 +8,11 @@ local Players = game:GetService("Players")
 local Net = {}
 
 -- client -> server (fire and forget)
-local EVENTS_UP = { "JobSetOnline", "JobRespond", "JobAction", "JobCancel", "VehicleState", "VehicleFall", "ClientReady" }
+local EVENTS_UP = { "JobSetOnline", "JobRespond", "JobAction", "JobCancel", "VehicleState", "VehicleFall", "ClientReady", "JobChoice", "Social", "ZebraRun" }
 -- server -> client
-local EVENTS_DOWN = { "DataSync", "Notify", "JobOffer", "JobUpdate", "Dialogue", "Reward", "OpenUI", "PlotSync", "FarmSync" }
+local EVENTS_DOWN = { "DataSync", "Notify", "JobOffer", "JobUpdate", "Dialogue", "Reward", "OpenUI", "PlotSync", "FarmSync", "JobEvent" }
 -- client -> server with an answer {ok, message, extra}
-local FUNCTIONS = { "Shop", "Garage", "Bank", "Housing", "Inventory", "Mission", "Farm", "Settings", "GetWorld" }
+local FUNCTIONS = { "Shop", "Garage", "Bank", "Housing", "Inventory", "Mission", "Farm", "Settings", "GetWorld", "City", "GetSkyline" }
 
 local IS_SERVER = RunService:IsServer()
 local folder: Instance

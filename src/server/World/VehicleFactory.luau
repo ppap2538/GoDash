@@ -7,6 +7,8 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
 local Assets = require(script.Parent.Assets)
+local Rig = require(ReplicatedStorage.Shared.Rig)
+local RiderPose = require(ReplicatedStorage.Shared.RiderPose)
 
 local Factory = {}
 
@@ -403,6 +405,127 @@ local function buildMesh(def, model: Model, body: BasePart, add, owned)
 	}
 end
 
+-- Styling (แต่งซิ่ง, 2026-11-17): underglow, number plate, bag / plate sticker, horn. Looks only. Parts
+-- are named "Style_*" and rebuilt whenever the owner changes something (also on a moving vehicle:
+-- welds keep the offsets from the body as it is now). plateText = the filtered custom plate or nil.
+function Factory.style(model: Model, def, owned, ownerId: number?)
+	local body = model:FindFirstChild("Body") :: BasePart?
+	if not body then return end
+	for _, c in ipairs(model:GetChildren()) do
+		if c.Name:sub(1, 6) == "Style_" then c:Destroy() end
+	end
+	local st = (owned and type(owned.style) == "table") and owned.style or {}
+	model:SetAttribute("Horn", st.horn or 1)
+	model:SetAttribute("Exhaust", st.exhaust or 1)
+	local ownerPlayer = ownerId and ownerId > 0 and game:GetService("Players"):GetPlayerByUserId(ownerId) or nil
+	local vip = ownerPlayer ~= nil and ownerPlayer:GetAttribute("VIP") == true
+	if def.pedal then return end -- a bicycle has no plate or wiring
+	local L, W, H = def.len, def.wid, def.height
+	local ride = model:GetAttribute("RideHeight") or (def.wheelR + 0.9)
+	local bike = def.class == "bike"
+	local function part(name: string, size: Vector3, cf: CFrame, color: Color3, mat: Enum.Material?): Part
+		local p = Instance.new("Part")
+		p.Name = name
+		p.Size = size
+		p.Color = color
+		p.Material = mat or M.SmoothPlastic
+		p.CanCollide = false; p.CanTouch = false; p.CanQuery = false
+		p.Massless = true
+		p.CastShadow = false
+		p.CFrame = body.CFrame * cf
+		local w = Instance.new("WeldConstraint")
+		w.Part0 = body
+		w.Part1 = p
+		w.Parent = p
+		p.Parent = model
+		return p
+	end
+	local function gui(p: BasePart, face: Enum.NormalId, ppsv: number): SurfaceGui
+		local g = Instance.new("SurfaceGui")
+		g.Face = face
+		g.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+		g.PixelsPerStud = ppsv
+		g.LightInfluence = 0.3
+		g.MaxDistance = 90
+		g.Parent = p
+		return g
+	end
+	local function text(parent: Instance, s: string, color: Color3, pos: UDim2, size: UDim2, font: Enum.Font?)
+		local t = Instance.new("TextLabel")
+		t.BackgroundTransparency = 1
+		t.Text = s
+		t.TextScaled = true
+		t.Font = font or Enum.Font.GothamBlack
+		t.TextColor3 = color
+		t.Position = pos
+		t.Size = size
+		t.Parent = parent
+		return t
+	end
+
+	-- underglow: a neon strip under the body and a light on the road
+	local glow = Vehicles.GLOWS[st.glow or 0]
+	if glow then
+		local strip = part("Style_Glow", V3(bike and 0.45 or W * 0.78, 0.08, L * (bike and 0.5 or 0.78)), CF(0, -ride + (bike and 0.75 or 0.55), 0), glow.color, M.Neon)
+		if glow.rainbow then strip:SetAttribute("Rainbow", true) end -- client/Styling cycles the colour
+		local sl = Instance.new("SurfaceLight")
+		sl.Face = Enum.NormalId.Bottom
+		sl.Color = glow.color
+		sl.Range = bike and 7 or 11
+		sl.Angle = 150
+		sl.Brightness = 3
+		sl.Shadows = false
+		sl.Parent = strip
+	end
+
+	-- number plate at the back (Thai style: white, black letters, the province underneath)
+	local plateText = model:GetAttribute("PlateText")
+	if type(plateText) ~= "string" or plateText == "" then plateText = Vehicles.defaultPlate(ownerId or 0) end
+	local pw, ph = bike and 1.15 or 2.0, bike and 0.78 or 0.62
+	local plate = part("Style_Plate", V3(pw, ph, 0.05), CF(0, (bike and H * 0.36 or H * 0.3) - ride, L / 2 + 0.04), Color3.fromRGB(246, 246, 240))
+	local pg = gui(plate, Enum.NormalId.Back, 60)
+	local frame = Instance.new("Frame")
+	frame.BackgroundTransparency = 1
+	frame.Size = UDim2.fromScale(1, 1)
+	frame.Parent = pg
+	local stroke = Instance.new("UIStroke")
+	stroke.Thickness = vip and 6 or 3
+	stroke.Color = vip and Color3.fromRGB(230, 180, 40) or Color3.fromRGB(30, 30, 30) -- VIPs get a gold frame
+	stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	stroke.Parent = frame
+	text(frame, plateText, Color3.fromRGB(20, 20, 22), UDim2.fromScale(0.05, 0.06), UDim2.fromScale(0.9, 0.58))
+	text(frame, "ขอนแก่น", Color3.fromRGB(20, 20, 22), UDim2.fromScale(0.15, 0.64), UDim2.fromScale(0.7, 0.3), Enum.Font.GothamBold)
+
+	-- sticker: both sides of the delivery bag on two wheels, a strip above the plate on cars
+	local sticker = Vehicles.STICKERS[st.sticker or 0]
+	if sticker then
+		local bag = model:FindFirstChild("Bag") :: BasePart?
+		local function decorate(g: SurfaceGui)
+			local f = Instance.new("Frame")
+			f.BackgroundColor3 = sticker.color
+			f.Size = UDim2.fromScale(0.86, 0.5)
+			f.Position = UDim2.fromScale(0.07, 0.25)
+			f.Parent = g
+			local c = Instance.new("UICorner")
+			c.CornerRadius = UDim.new(0.25, 0)
+			c.Parent = f
+			text(f, sticker.icon .. " " .. sticker.text, Color3.new(1, 1, 1), UDim2.fromScale(0.06, 0.12), UDim2.fromScale(0.88, 0.76))
+		end
+		if bike and bag then
+			-- a thin card on each side face of the bag, so the bag's own logo stays
+			for _, sx in ipairs({ -1, 1 }) do
+				local card = part("Style_Sticker", V3(0.04, bag.Size.Y * 0.9, bag.Size.Z * 0.95), body.CFrame:ToObjectSpace(bag.CFrame) * CF(sx * (bag.Size.X / 2 + 0.03), 0, 0), bag.Color)
+				card.Transparency = 1
+				decorate(gui(card, sx < 0 and Enum.NormalId.Left or Enum.NormalId.Right, 50))
+			end
+		elseif not bike then
+			local strip = part("Style_Sticker", V3(2.4, 0.5, 0.04), CF(0, H * 0.3 - ride + ph / 2 + 0.32, L / 2 + 0.03), Color3.new(1, 1, 1))
+			strip.Transparency = 1
+			decorate(gui(strip, Enum.NormalId.Back, 50))
+		end
+	end
+end
+
 -- cf = where the chassis centre goes. owned = the player's saved state for this vehicle.
 function Factory.build(def, owned, cf: CFrame, ownerId: number?): Model
 	local model = Instance.new("Model")
@@ -485,6 +608,8 @@ function Factory.build(def, owned, cf: CFrame, ownerId: number?): Model
 	model:SetAttribute("Lights", false)
 	model:SetAttribute("Brake", false)
 	model:SetAttribute("Signal", 0)
+	if owned and type(owned.style) == "table" and type(owned.style.plate) == "string" then model:SetAttribute("PlateText", owned.style.plate) end
+	pcall(Factory.style, model, def, owned, ownerId)
 	model:AddTag("GoDashVehicle")
 	return model
 end
@@ -497,6 +622,53 @@ function Factory.display(def, cf: CFrame, colorIndex: number?): Model
 		if d:IsA("BasePart") then d.Anchored = true end
 	end
 	local seat = m:FindFirstChild("DriveSeat")
+	if seat then seat:Destroy() end
+	return m
+end
+
+local HELMETS = {
+	Color3.fromRGB(30, 30, 34), Color3.fromRGB(236, 236, 232), Color3.fromRGB(200, 50, 44), Color3.fromRGB(40, 90, 170),
+	Color3.fromRGB(240, 190, 40), Color3.fromRGB(240, 120, 150), Color3.fromRGB(28, 168, 84),
+}
+
+-- AI traffic copy: like display(), and every two-wheeler carries a rider. (Until 2026-11-16 traffic
+-- used display(), the parked-showroom copy, so AI motorbikes drove around with nobody on them.)
+-- The rider's parts are anchored inside the vehicle model; the client moves the whole model, so the
+-- rider cannot be left behind, float or drop off.
+function Factory.traffic(def, cf: CFrame, colorIndex: number?, seed: number?): Model
+	local m = Factory.build(def, { color = colorIndex or 1, fuel = 0, condition = 100 }, cf, 0)
+	m:RemoveTag("GoDashVehicle")
+	pcall(Factory.style, m, def, nil, (seed or 1) * 7919) -- every car its own plate
+	for _, d in ipairs(m:GetDescendants()) do
+		if d:IsA("BasePart") then d.Anchored = true end
+	end
+	local seat = m:FindFirstChild("DriveSeat")
+	if seat and def.class == "bike" then
+		local rng = Random.new(seed or 1)
+		local saddle = (seat :: BasePart).CFrame * CF(0, 0.15, 0)
+		local helmet = HELMETS[rng:NextInteger(1, #HELMETS)]
+		-- a real figure (one of the avatar models) when the place has them, else the block figure
+		local rider: Model? = nil
+		local store = ReplicatedStorage:FindFirstChild("GoDashModels")
+		local peds = {}
+		if store then
+			for _, p in ipairs(store:GetChildren()) do
+				if p:IsA("Model") and p.Name:sub(1, 3) == "Ped" then table.insert(peds, p) end
+			end
+			table.sort(peds, function(a, b) return a.Name < b.Name end)
+		end
+		if #peds > 0 then
+			local ok, res = pcall(RiderPose.build, peds[rng:NextInteger(1, #peds)], saddle, helmet)
+			if ok then rider = res end
+		end
+		if not rider then
+			local rig = Rig.build({ name = "Rider", seed = rng:NextInteger(1, 1e6), outfit = rng:NextNumber() < 0.3 and "rider" or nil })
+			Rig.ride(rig, saddle, helmet)
+			rider = rig.model
+		end
+		(rider :: Model).Parent = m
+		m:SetAttribute("HasRider", true)
+	end
 	if seat then seat:Destroy() end
 	return m
 end

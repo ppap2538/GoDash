@@ -16,6 +16,8 @@ local Lang = require(script.Parent.Lang)
 
 local GPS = {}
 local C, F = UI.C, UI.F
+local UIS = game:GetService("UserInputService")
+local TOUCH = UIS.TouchEnabled and not UIS.KeyboardEnabled
 local player = Players.LocalPlayer
 local graph
 GPS.distance = 0
@@ -24,13 +26,48 @@ GPS.path = nil :: { Vector3 }?
 
 local ROAD_COL = {
 	highway = Color3.fromRGB(250, 204, 96), main = Color3.fromRGB(244, 246, 248), street = Color3.fromRGB(196, 202, 212), soi = Color3.fromRGB(112, 120, 132),
+	lane = Color3.fromRGB(88, 96, 108),
 }
-local ROAD_PX = { highway = 4, main = 3, street = 2, soi = 1 }
+local ROAD_PX = { highway = 4, main = 3, street = 2, soi = 1, lane = 1 }
 local POI_ICON = {
 	hub = "🏠", mall = "🛍", station = "🚉", hospital = "🏥", bus = "🚌", nightmarket = "🏮", police = "🚓", market = "🥬", dealer = "🚗",
-	homestore = "🛋", stupa = "🛕", reststop = "⛱", agri = "🌾", seedshop = "🌱", farm = "🚜", gas = "⛽",
+	homestore = "🛋", stupa = "🛕", reststop = "⛱", agri = "🌾", seedshop = "🌱", farm = "🚜", gas = "⛽", university = "🎓",
+	cafe = "☕", convenience = "🏪", restaurant = "🍜", home = "🏡", checkpoint = "🚨",
+	-- 2026-11-18 landmark batch
+	government = "🏛", museum = "🏺", citygate = "🚩", stadium = "🏟", school = "🏫",
 }
 GPS.POI_ICON = POI_ICON
+
+-- Police checkpoints (server/PoliceService): { kind, name, pos, cf (gate centre, looking along the road), width }
+function GPS.checkpoints(): { any }
+	local out = {}
+	local f = ReplicatedStorage:FindFirstChild("GoDashCheckpoints")
+	if f then
+		for _, v in ipairs(f:GetChildren()) do
+			if v:IsA("CFrameValue") then
+				table.insert(out, { kind = "checkpoint", name = "Police checkpoint", pos = v.Value.Position, cf = v.Value, width = v:GetAttribute("Width") or 20 })
+			end
+		end
+	end
+	return out
+end
+
+-- Every place a player can go (owner, 2026-11-16: "every place you can go must be on the map"):
+-- the landmarks, every shop, café and restaurant, and the player's own home and allotment.
+-- small = a shop, drawn a little smaller so the landmarks still stand out.
+function GPS.places(): { any }
+	local out = {}
+	local w = State.world
+	if w then
+		for _, p in ipairs(w.pois) do table.insert(out, p) end
+		for _, s in ipairs(w.shops or {}) do
+			table.insert(out, { id = s.id, kind = s.kind, name = s.name, thai = s.thai, pos = s.pos, small = true })
+		end
+	end
+	if State.plot and State.plot.base then table.insert(out, { kind = "home", name = "My Home", pos = State.plot.base.Position }) end
+	if State.farm and State.farm.pos then table.insert(out, { kind = "farm", name = "My Allotment (" .. tostring(State.farm.id) .. ")", pos = State.farm.pos }) end
+	return out
+end
 
 local folder, beacon, beaconLabel
 local ribbonPool, ribbonUsed = {}, 0
@@ -62,40 +99,106 @@ end
 ---------------------------------------------------------------------------------------------------
 -- world: ribbon + beacon
 ---------------------------------------------------------------------------------------------------
-local function ribbon(a: Vector3, b: Vector3)
+-- The route is a row of arrows flowing along the LEFT lane (Thailand drives on the left), not a
+-- band down the middle of the road (owner, 2026-11-16). Each piece is a Beam lying flat on the
+-- road with our arrow texture (assets/textures/route_chevron.png).
+local ROUTE_TEX = "rbxassetid://77994894090203"
+local routeHost: Part? = nil
+
+local function ribbon(a: Vector3, b: Vector3, width: number)
 	ribbonUsed += 1
-	local p = ribbonPool[ribbonUsed]
-	if not p then
-		p = Instance.new("Part")
-		p.Anchored = true; p.CanCollide = false; p.CanQuery = false; p.CanTouch = false; p.CastShadow = false
-		p.Material = Enum.Material.SmoothPlastic
-		p.Color = Color3.fromRGB(0, 220, 120)
-		p.Transparency = 0.25
-		p.Parent = folder
-		ribbonPool[ribbonUsed] = p
+	local it = ribbonPool[ribbonUsed]
+	if not it then
+		if not routeHost then
+			local h = Instance.new("Part")
+			h.Name = "Route"
+			h.Anchored = true; h.CanCollide = false; h.CanQuery = false; h.CanTouch = false
+			h.Transparency = 1
+			h.Size = Vector3.new(1, 1, 1)
+			h.Parent = folder
+			routeHost = h
+		end
+		local a0, a1 = Instance.new("Attachment"), Instance.new("Attachment")
+		a0.Parent = routeHost
+		a1.Parent = routeHost
+		local beam = Instance.new("Beam")
+		beam.Attachment0, beam.Attachment1 = a0, a1
+		beam.FaceCamera = false
+		beam.Texture = ROUTE_TEX
+		beam.TextureMode = Enum.TextureMode.Static
+		beam.TextureLength = 7
+		beam.TextureSpeed = -0.9 -- texture lengths per second; negative = toward Attachment0, the far end (measured in Studio 2026-11-16)
+		beam.Color = ColorSequence.new(Color3.new(1, 1, 1))
+		beam.Transparency = NumberSequence.new(0.04)
+		beam.LightEmission = 0.2
+		beam.LightInfluence = 0.3
+		beam.Segments = 1
+		beam.ZOffset = 0.05
+		beam.Parent = routeHost
+		it = { beam = beam, a0 = a0, a1 = a1 }
+		ribbonPool[ribbonUsed] = it
 	end
-	local len = (b - a).Magnitude
-	p.Size = Vector3.new(1.4, 0.06, len)
-	p.CFrame = CFrame.lookAt((a + b) / 2 + Vector3.new(0, 0.42, 0), b + Vector3.new(0, 0.42, 0))
-	p.Parent = folder
+	local dir = (b - a).Unit
+	-- flat on the road: the attachments' X runs along the route and their Y across it; the arrows in
+	-- the texture point from Attachment1 to Attachment0, so Attachment0 is the far end
+	local cf = CFrame.fromMatrix(Vector3.zero, dir, dir:Cross(Vector3.yAxis))
+	it.a0.WorldCFrame = cf + b
+	it.a1.WorldCFrame = cf + a
+	it.beam.Width0, it.beam.Width1 = width, width
+	it.beam.Enabled = true
 end
+
+local function leftOf(d: Vector3): Vector3
+	return Vector3.new(d.Z, 0, -d.X) -- +X east, +Z south
+end
+
+GPS.lane = nil :: { Vector3 }? -- the route shifted into the left lane (client/AutoDrive follows it)
 
 local function drawRibbon(path: { Vector3 }?, from: Vector3)
 	ribbonUsed = 0
-	if path then
-		for i = 1, #path - 1 do
-			local a, b = path[i], path[i + 1]
-			-- only what is near enough to be seen
-			if (a - from).Magnitude < 1100 or (b - from).Magnitude < 1100 then
-				local len = (b - a).Magnitude
-				local pieces = math.max(1, math.ceil(len / 1800))
-				for k = 0, pieces - 1 do
-					ribbon(a:Lerp(b, k / pieces), a:Lerp(b, (k + 1) / pieces))
+	GPS.lane = nil
+	if path and #path >= 2 then
+		-- how far left of the centre line each piece runs: the middle of the left half of that street
+		local n = #path
+		local off = table.create(n - 1, 5)
+		for i = 1, n - 1 do
+			local mid = (path[i] + path[i + 1]) / 2
+			if (mid - from).Magnitude < 520 then
+				local e = graph:nearest(mid)
+				if e then off[i] = math.max(2.6, e.def.width / 4) end
+			end
+		end
+		local pts = table.create(n)
+		for i = 1, n do
+			local dp = i > 1 and (path[i] - path[i - 1]) or nil
+			local dn = i < n and (path[i + 1] - path[i]) or nil
+			local lp = dp and dp.Magnitude > 0.1 and leftOf(dp.Unit) or nil
+			local ln = dn and dn.Magnitude > 0.1 and leftOf(dn.Unit) or nil
+			local o = (off[math.max(1, i - 1)] + off[math.min(n - 1, i)]) / 2
+			local shift
+			if lp and ln then
+				local m = lp + ln
+				if m.Magnitude < 0.3 then
+					shift = ln * o -- doubling back
+				else
+					m = m.Unit
+					shift = m * (o / math.max(0.5, m:Dot(ln))) -- mitre, so the row of arrows turns the corner in its lane
 				end
+			else
+				shift = (lp or ln or Vector3.zero) * o
+			end
+			pts[i] = Vector3.new(path[i].X + shift.X, 0.52, path[i].Z + shift.Z)
+		end
+		GPS.lane = pts
+		for i = 1, n - 1 do
+			local a, b = pts[i], pts[i + 1]
+			-- only what is near enough to be seen
+			if ((a - from).Magnitude < 700 or (b - from).Magnitude < 700) and (b - a).Magnitude > 1.5 then
+				ribbon(a, b, off[i] < 4 and 3.2 or 4.2)
 			end
 		end
 	end
-	for i = ribbonUsed + 1, #ribbonPool do ribbonPool[i].Parent = nil end
+	for i = ribbonUsed + 1, #ribbonPool do ribbonPool[i].beam.Enabled = false end
 end
 
 local function ensureBeacon()
@@ -108,16 +211,20 @@ local function ensureBeacon()
 	beacon.Color = Color3.fromRGB(0, 220, 120)
 	beacon.Transparency = 0.7
 	beacon.Size = Vector3.new(110, 3, 3)
+	-- the name card over the pin (2026-11-18, owner: on a phone it covered the road ahead): smaller on
+	-- touch screens, a little see-through, and only shown when you are close (BEACON_LABEL_NEAR); from
+	-- far away the light pillar, the route arrows and the minimap show the way
 	local bb = Instance.new("BillboardGui")
-	bb.Size = UDim2.fromOffset(250, 58)
+	bb.Name = "Label"
+	bb.Size = TOUCH and UDim2.fromOffset(168, 38) or UDim2.fromOffset(240, 54)
 	bb.StudsOffset = Vector3.new(0, 14, 0)
 	bb.AlwaysOnTop = true
 	bb.MaxDistance = 1e6
 	bb.Parent = beacon
-	local card = UI.new("Frame", { BackgroundColor3 = C.green, Size = UDim2.fromScale(1, 1), Parent = bb })
-	UI.corner(card, 16)
-	UI.stroke(card, C.white, 2)
-	beaconLabel = UI.label(card, "", 15, C.white, F.bold, { Size = UDim2.new(1, -16, 1, 0), Position = UDim2.fromOffset(8, 0), TextXAlignment = Enum.TextXAlignment.Center, TextWrapped = true })
+	local card = UI.new("Frame", { BackgroundColor3 = C.green, BackgroundTransparency = 0.12, Size = UDim2.fromScale(1, 1), Parent = bb })
+	UI.corner(card, TOUCH and 12 or 16)
+	UI.stroke(card, C.white, TOUCH and 1.5 or 2)
+	beaconLabel = UI.label(card, "", TOUCH and 12 or 15, C.white, F.bold, { Size = UDim2.new(1, -12, 1, 0), Position = UDim2.fromOffset(6, 0), TextXAlignment = Enum.TextXAlignment.Center, TextWrapped = true })
 	-- a disc on the ground shows the interaction range
 	local ring = Instance.new("Part")
 	ring.Name = "Ring"
@@ -161,13 +268,15 @@ local function rebuildMinimap(pos: Vector3)
 	end
 	for _, f in ipairs(mm.icons) do f:Destroy() end
 	mm.icons = {}
-	if State.world then
-		for _, p in ipairs(State.world.pois) do
-			if (p.pos - pos).Magnitude < 1700 then
-				local l = UI.label(canvas, POI_ICON[p.kind] or "📍", 13, C.white, F.med, { AnchorPoint = Vector2.new(0.5, 0.5), Size = UDim2.fromOffset(18, 18),
-					Position = UDim2.new(0.5, (p.pos.X - pos.X) * MM_SCALE, 0.5, (p.pos.Z - pos.Z) * MM_SCALE), TextXAlignment = Enum.TextXAlignment.Center, ZIndex = 8 })
-				table.insert(mm.icons, l)
-			end
+	local shown = GPS.places()
+	for _, cp in ipairs(GPS.checkpoints()) do table.insert(shown, cp) end
+	for _, p in ipairs(shown) do
+		if (p.pos - pos).Magnitude < 1700 then
+			local px = p.small and 14 or 18
+			local l = UI.label(canvas, POI_ICON[p.kind] or "📍", p.small and 10 or 13, C.white, F.med, { AnchorPoint = Vector2.new(0.5, 0.5), Size = UDim2.fromOffset(px, px),
+				Position = UDim2.new(0.5, (p.pos.X - pos.X) * MM_SCALE, 0.5, (p.pos.Z - pos.Z) * MM_SCALE), TextXAlignment = Enum.TextXAlignment.Center, ZIndex = p.small and 7 or 8 })
+			l:SetAttribute("NoTranslate", true)
+			table.insert(mm.icons, l)
 		end
 	end
 	mm.routeDirty = true
@@ -189,13 +298,19 @@ end
 local function buildMinimap()
 	local holder = HUD.mapHolder
 	if not holder then return end
-	mm.canvas = UI.new("Frame", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), Parent = holder })
+	-- The map turns with you: what is ahead is at the top (owner, 2026-11-16). A rotated frame is not
+	-- clipped by ClipsDescendants, so the turning part lives in a CanvasGroup, which clips anything.
+	local clip = UI.new("CanvasGroup", { Name = "Clip", BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), Parent = holder })
+	UI.corner(clip, UI.R.lg)
+	mm.rotor = UI.new("Frame", { Name = "Rotor", BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromScale(1, 1), Parent = clip })
+	mm.canvas = UI.new("Frame", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), Parent = mm.rotor })
 	mm.arrow = UI.label(holder, "▲", 16, C.green, F.black, { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(20, 20),
 		TextXAlignment = Enum.TextXAlignment.Center, ZIndex = 20, TextStrokeTransparency = 0, TextStrokeColor3 = C.white })
 	mm.dot = UI.new("Frame", { BackgroundColor3 = Color3.fromRGB(0, 220, 120), AnchorPoint = Vector2.new(0.5, 0.5), Size = UDim2.fromOffset(12, 12), ZIndex = 19, Visible = false, Parent = holder })
 	UI.corner(mm.dot, 6)
 	UI.stroke(mm.dot, C.white, 2)
-	UI.label(holder, "N", 10, C.white, F.bold, { Position = UDim2.fromOffset(6, 4), Size = UDim2.fromOffset(14, 12), ZIndex = 21 })
+	mm.north = UI.label(holder, "N", 11, Color3.fromRGB(255, 120, 110), F.black, { AnchorPoint = Vector2.new(0.5, 0.5), Size = UDim2.fromOffset(14, 14), ZIndex = 21,
+		TextXAlignment = Enum.TextXAlignment.Center, TextStrokeTransparency = 0.3 })
 end
 
 ---------------------------------------------------------------------------------------------------
@@ -223,7 +338,7 @@ function GPS.drawCity(parent: Frame)
 		UI.corner(f, 12)
 	end
 	for _, e in ipairs(graph.edges) do
-		if e.type ~= "soi" then
+		if not e.minor then
 			lineFrame(canvas, e.a.pos, e.b.pos, origin, scale, e.type == "highway" and 3 or (e.type == "main" and 2 or 1), ROAD_COL[e.type], 5 - e.def.id)
 		end
 	end
@@ -243,6 +358,14 @@ function GPS.start()
 	buildMinimap()
 	HUD.gps = GPS
 	State.onWorld(function() mm.origin = Vector3.new(1e9, 0, 0) end) -- redraw icons
+	task.spawn(function() -- checkpoints move: redraw the icons when they do
+		local f = ReplicatedStorage:WaitForChild("GoDashCheckpoints", 60)
+		if not f then return end
+		local function dirty() mm.origin = Vector3.new(1e9, 0, 0) end
+		f.ChildAdded:Connect(dirty)
+		f.ChildRemoved:Connect(dirty)
+		dirty()
+	end)
 
 	local lastPathPos, lastPathT = Vector3.zero, 0
 	task.spawn(function()
@@ -267,7 +390,9 @@ function GPS.start()
 					ensureBeacon()
 					beacon.CFrame = CFrame.new(t.pos.X, 80, t.pos.Z) * CFrame.Angles(0, 0, math.rad(90))
 					beacon.Ring.CFrame = CFrame.new(t.pos.X, 0.5, t.pos.Z) * CFrame.Angles(0, 0, math.rad(90))
-					beaconLabel.Text = (t.label or Lang.t(t.name)) .. "\n" .. Lang.t(Util.dist(Util.flatDist(pos, t.pos)))
+					local away = Util.flatDist(pos, t.pos)
+					beaconLabel.Text = (t.label or Lang.t(t.name)) .. "\n" .. Lang.t(Util.dist(away))
+					beacon.Label.Enabled = away < (TOUCH and 260 or 520)
 					beacon.Parent = folder
 					-- arriving at a waypoint (not a job) clears it
 					if not t.job and Util.flatDist(pos, t.pos) < 40 then
@@ -292,19 +417,38 @@ function GPS.start()
 		end
 	end)
 
-	RunService.RenderStepped:Connect(function()
+	local heading = 0
+	RunService.RenderStepped:Connect(function(dt)
 		local char = player.Character
 		local r = char and char:FindFirstChild("HumanoidRootPart")
 		if not r or not mm.canvas then return end
 		local pos = r.Position
 		mm.canvas.Position = UDim2.fromOffset((mm.origin.X - pos.X) * MM_SCALE, (mm.origin.Z - pos.Z) * MM_SCALE)
-		local look = r.CFrame.LookVector
-		mm.arrow.Rotation = math.deg(math.atan2(look.X, -look.Z))
+		-- heading = where the view is pointing (on a vehicle the camera sits behind it); the map turns
+		-- the other way so that direction is always up, and the arrow in the middle stays pointing up
+		local cam = Workspace.CurrentCamera
+		local look = cam and cam.CFrame.LookVector or r.CFrame.LookVector
+		if look.X * look.X + look.Z * look.Z < 0.05 then look = r.CFrame.LookVector end -- looking straight down
+		local want = math.atan2(look.X, -look.Z)
+		local diff = (want - heading + math.pi) % (2 * math.pi) - math.pi
+		heading += diff * math.min(1, dt * 10)
+		local deg = math.deg(heading)
+		mm.rotor.Rotation = -deg
+		mm.arrow.Rotation = 0
+		for _, l in ipairs(mm.icons) do l.Rotation = deg end -- place icons stay upright
+		local ms = HUD.mapSize
+		local c, sn = math.cos(-heading), math.sin(-heading)
+		do
+			-- N rides the edge of the map toward north
+			local nx, ny = sn, -c
+			local k = math.min((ms.X / 2 - 10) / math.max(math.abs(nx), 0.001), (ms.Y / 2 - 10) / math.max(math.abs(ny), 0.001))
+			mm.north.Position = UDim2.new(0.5, nx * k, 0.5, ny * k)
+		end
 		local t = GPS.target()
 		if t then
-			local dx, dz = (t.pos.X - pos.X) * MM_SCALE, (t.pos.Z - pos.Z) * MM_SCALE
+			local wx, wz = (t.pos.X - pos.X) * MM_SCALE, (t.pos.Z - pos.Z) * MM_SCALE
+			local dx, dz = wx * c - wz * sn, wx * sn + wz * c
 			-- keep the target dot inside the minimap, whatever size the layout gave it
-			local ms = HUD.mapSize
 			local hx, hz = ms.X / 2 - 7, ms.Y / 2 - 7
 			local k = math.max(math.abs(dx) / hx, math.abs(dz) / hz, 1)
 			mm.dot.Position = UDim2.new(0.5, dx / k, 0.5, dz / k)

@@ -1,41 +1,46 @@
-// Download Khon Kaen city-centre data from OpenStreetMap (ODbL, © OpenStreetMap contributors).
-//   node tools/osm_fetch.mjs
+// Download the map data for Tambon Nai Mueang, Khon Kaen, from OpenStreetMap (ODbL, © OpenStreetMap contributors).
+//   node tools/osm_fetch.mjs            -> data/osm_tambon.json
+// Then: python -I tools/plan_streets.py [preview.png] (it runs tools/osm_to_map.py first).
+// 2026-11-18: the whole tambon (OSM relation 21404983) instead of a 2.5 x 3.8 km box (data/osm_raw.json,
+// kept in backups/map_v1_2026-11-18), with the plain "service" alleys, land use and named public places.
 import { writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const out = join(here, "..", "data", "osm_raw.json");
-// south, west, north, east
-const BBOX = process.env.BBOX || "16.4030,102.8170,16.4420,102.8450";
-const q = `[out:json][timeout:90];
+const out = join(here, "..", "data", "osm_tambon.json");
+// south, west, north, east: the tambon's box plus a hair
+const B = process.env.BBOX || "16.3975,102.8020,16.4825,102.8785";
+const q = `[out:json][timeout:180][maxsize:536870912];
 (
-  way["highway"~"^(trunk|primary|secondary|tertiary|unclassified|residential|living_street|trunk_link|primary_link|secondary_link|tertiary_link)$"](${BBOX});
-  way["natural"="water"](${BBOX});
-  relation["natural"="water"](${BBOX});
-  way["railway"="rail"](${BBOX});
-  way["leisure"="park"](${BBOX});
-  node["amenity"~"^(restaurant|cafe|fast_food|fuel|hospital|police|bus_station|marketplace|university|school|place_of_worship|bank|pharmacy)$"](${BBOX});
-  node["shop"~"^(mall|convenience|supermarket|department_store)$"](${BBOX});
-  way["amenity"~"^(hospital|police|bus_station|marketplace|university|school|place_of_worship|fuel)$"](${BBOX});
-  way["shop"~"^(mall|supermarket|department_store)$"](${BBOX});
-  way["tourism"](${BBOX});
-  node["tourism"](${BBOX});
-  way["railway"="station"](${BBOX});
-  node["railway"="station"](${BBOX});
+  rel(21404983);
+  way["highway"~"^(motorway|trunk|primary|secondary|tertiary|unclassified|residential|living_street|service|motorway_link|trunk_link|primary_link|secondary_link|tertiary_link|pedestrian)$"](${B});
+  way["natural"="water"](${B});
+  relation["natural"="water"](${B});
+  way["waterway"~"^(river|canal|stream)$"](${B});
+  way["railway"~"^(rail|station|platform)$"](${B});
+  node["railway"="station"](${B});
+  way["leisure"~"^(park|stadium|sports_centre|pitch|golf_course)$"](${B});
+  way["landuse"~"^(residential|commercial|retail|industrial|military|cemetery|religious|education|institutional|grass|farmland|meadow|orchard)$"](${B});
+  nwr["amenity"](${B});
+  nwr["office"~"^(government|administrative)$"](${B});
+  nwr["government"](${B});
+  nwr["shop"~"^(mall|supermarket|department_store|convenience|marketplace)$"](${B});
+  nwr["tourism"](${B});
+  nwr["historic"](${B});
 );
 out geom;`;
 
 const servers = [
   "https://overpass-api.de/api/interpreter",
   "https://overpass.kumi.systems/api/interpreter",
-  "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
   "https://overpass.openstreetmap.fr/api/interpreter",
+  "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
 ];
 for (const url of servers) {
   try {
     const ctl = new AbortController();
-    const timer = setTimeout(() => ctl.abort(), 120000);
+    const timer = setTimeout(() => ctl.abort(), 240000);
     const res = await fetch(url, {
       method: "POST",
       headers: { "content-type": "application/x-www-form-urlencoded", "user-agent": "osm-fetch/1.0" },
@@ -50,13 +55,7 @@ for (const url of servers) {
     }
     writeFileSync(out, text);
     const j = JSON.parse(text);
-    const kinds = {};
-    for (const e of j.elements) {
-      const k = e.type + ":" + (e.tags?.highway ? "highway" : e.tags?.natural || e.tags?.railway || e.tags?.amenity || e.tags?.shop || e.tags?.tourism || e.tags?.leisure || "?");
-      kinds[k] = (kinds[k] || 0) + 1;
-    }
-    console.log("OK", url, "bytes", text.length, "elements", j.elements.length);
-    console.log(JSON.stringify(kinds));
+    console.log("OK", url, "MB", (text.length / 1e6).toFixed(1), "elements", j.elements.length);
     process.exit(0);
   } catch (e) {
     console.log("ERR", url, String(e.cause?.code || e.message));

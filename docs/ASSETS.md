@@ -38,11 +38,20 @@ Files are kept in `assets/textures/` (1k JPG). They were uploaded to Roblox as I
 
 Tools: `tools/polyhaven_pick.mjs` (search / resolve download links), `tools/polyhaven_download.mjs` (download).
 
+Sky: `assets/textures/sky_side.png`, `sky_up.png`, `sky_down.png` are our own procedural gradient (made with a short
+numpy script on 2026-11-16, no third-party content), uploaded as images 102196248176522 / 122010862183021 /
+112916264686066 and set as the skybox in `src/client/Env.luau`. The clouds are Roblox's built-in Terrain clouds.
+
 ## 3. Audio
 
 | Sound | Source | Licence |
 |---|---|---|
 | Engine loops, rain, birds, traffic, tyre skid (ids in `src/shared/Config/Sounds.luau`) | Roblox Creator Store, publisher "ProSoundEffects" | Roblox-licensed sound library, free for use in Roblox experiences |
+| Crash one-shots (Metal Crash 3 / 4, Debris Glass 4, Vehicle Bottom Out Scrape Bump) and the AI car horn (Ferrari 308 Dual Air Horns 4), added 2026-11-16 | Roblox Creator Store, publisher "ProSoundEffects" | same Roblox-licensed library |
+| Soi dog barks ("Coyotes Gruff Barking 8 / 13 (SFX)"), added 2026-11-16 | Roblox Creator Store, publisher "ProSoundEffects" | same Roblox-licensed library |
+| Vehicle detail and crash (2026-11-17): Tire Constant 1, Barstow Wind Light Blustery Low Howl 2, Bicycle Brake Squeal, Audi Car Door 5, Bicycle Bell, Bicycle Pedal 1, Human Body Impact on Vehicle 3, Body Fall Thud 2, Body Fall Heavy Rustle 2 | Roblox Creator Store, publisher "ProSoundEffects" | same Roblox-licensed library |
+| Street life (2026-11-17): whistle (municipal officer), phone ring (finance company), puddle splash (Songkran) | Roblox Creator Store, publisher "ProSoundEffects" | same Roblox-licensed library |
+| Street-life music (2026-11-17): mor lam for the party truck, Songkran festival music | Roblox Creator Store music, publisher "DistrokidOfficial" | Roblox-licensed music library |
 | UI clicks, chimes, thunder | sounds that ship with the Roblox engine (`rbxasset://sounds/...`), pitch-shifted in code | part of the engine |
 
 ## 4. 3D models (imported)
@@ -83,7 +92,7 @@ Made inside Studio with the Assistant's mesh and avatar generators, on the game 
 | What | Keys / names | Where it lives |
 |---|---|---|
 | 11 vehicle bodies | `v_bicycle`, `v_moped`, `v_scooter`, `v_sedan`, `v_hatch`, `v_pickup`, `v_sport`, `v_bigbike`, `v_suv`, `v_lux`, `v_super` | asset ids in `Config/Models.luau`; also used for parked scooters |
-| 2 trees | `tree_rain`, `tree_palm` | `Config/Models.luau` |
+| 2 trees | `tree_rain`, `tree_palm` | `Config/Models.luau`. No longer planted (2026-11-16): replaced by the vegetation library, section 7 |
 | 3 shop staff | `npc_vendor`, `npc_man`, `npc_student` | `Config/Models.luau` |
 | 3 pedestrians (R15 avatars) | `Ped1`, `Ped2`, `Ped3` | **only in the cloud place**: `ReplicatedStorage.GoDashModels` (not in `src/`) |
 | 1 street dog | `Dog1` | **only in the cloud place**: `ReplicatedStorage.GoDashModels` |
@@ -96,6 +105,39 @@ back to simple part-built figures there.
 - Radio (`Config/Radio.luau`): 11 tracks from the Roblox Creator Store music library published by
   "DistrokidOfficial", which Roblox licenses for use in experiences. Outside links (YouTube etc.) cannot be played
   in Roblox.
-- Pedestrian walk: Roblox's default R15 walk animation (`rbxassetid://507777826`).
-- Dog bark: **no sound yet**. Every bark found in the Creator Store was a user upload with no verifiable licence
-  (several were clips from other games), so the dog shows a bark bubble instead.
+- Background music, station "GoDash Beat" (added 2026-11-16): 15 tracks from the same Roblox-licensed libraries,
+  publishers "APMOfficial" (APM Music: Going Places, Sunrise Workout, Stepping Up, Happy Song, Bright Start A, Out And
+  About A, Cheerful Happy Pop, J Funk, Whole Wide World - Instrumental) and "DistrokidOfficial" (Bright Heart House,
+  Afterglow Beats, Euphoric Twirl Union, Happy Pop Air, Fizzy Radiance, Thailand Electronic Synthwave). Asset ids are
+  in `Config/Radio.luau`. Tracks named after other artists' songs were left out.
+- Pedestrian and cutscene walk: Roblox's current default R15 walk animation (`rbxassetid://913402848`, since
+  2026-11-17; before that the older `507777826`).
+- Dog bark: see section 3 (Pro Sound Effects). User-uploaded barks in the Creator Store were not used: no verifiable licence.
+
+## 7. Vegetation library (our own models and textures)
+
+Made on 2026-11-16 to replace the two generated trees, which looked like clay.
+
+| What | How it was made | Licence |
+|---|---|---|
+| Leaf cards: `assets/textures/veg/veg_*.png` (broadleaf / mango, rain tree, golden shower with flowers, palm fronds + banana leaf, frangipani, hedge / bougainvillea / grass) | drawn by `tools/make_leaf_cards.py` (Pillow), no third-party content | ours |
+| Palm bark `bark_palm.png`, `rough_matte.png` | drawn by us | ours |
+| Tree bark `bark_tree.jpg` | the trunk colour map of Poly Haven's `jacaranda_tree` (https://polyhaven.com/a/jacaranda_tree), scaled to 512 px | CC0 1.0 |
+| 16 plant models `assets/models/veg_*.glb` | built by `tools/blender_trees.py` in Blender 4.5: branching trunks, leaf cards modelled on both sides. 28 - 5,300 triangles each (`assets/models/veg_report.json`) | ours |
+
+Uploaded to Roblox as Model assets (ids in `src/shared/Config/Plants.luau`): rain tree x2, mango x2, shade tree x2,
+golden shower x2 (Khon Kaen's flower), frangipani, coconut palm x2, royal palm, banana clump, hedge shrub,
+bougainvillea, grass tuft.
+
+Roblox imports the leaf texture as a plain texture, which would show each card as a solid rectangle. `tools/setup_plants.luau`
+(run once in Studio) gives the leaves a SurfaceAppearance with a see-through background and stores the finished plants in
+`ServerStorage.GoDashPlants`. That folder exists **only in the cloud place**; a place built from `src/` alone uses the
+part-built trees instead.
+
+## 8. Our own interface art and sounds
+
+| What | How it was made | Licence |
+|---|---|---|
+| Route arrow `assets/textures/route_chevron.png` (the GPS arrows on the road) | drawn with Pillow on 2026-11-16 | ours |
+| Facade tiles `assets/textures/facade/facade_*.png` (apartment, tower, townhouse upper / ground, home) | drawn by `tools/make_facades.py` (Pillow) on 2026-11-16; ids in `src/server/World/Blocks.luau` | ours |
+| Dog bark `assets/sfx/dog_bark.wav` | synthesised by `tools/make_bark.py` (numpy): no recording, no third-party file. Not uploaded yet (see docs/OVERHAUL.md section 5) | ours |

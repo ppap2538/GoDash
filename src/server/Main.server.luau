@@ -22,27 +22,21 @@ end
 local t0 = os.clock()
 local mapFolder = Workspace:FindFirstChild("Map")
 local baked = mapFolder ~= nil and mapFolder:GetAttribute("Built") == true and mapFolder:GetAttribute("Partial") ~= true
--- Live servers build the whole city; Studio builds only the centre so Play starts quickly.
+-- The whole city is planned here; buildings are drawn around the players as they move (World/Streamer),
+-- so every address, shop and landmark on the map can be used for jobs.
 local RunService = game:GetService("RunService")
-local devRadius = nil
-if not baked then devRadius = RunService:IsStudio() and Game.DEV_RADIUS or Game.LIVE_RADIUS end
-local world = Builder.build(Map, baked and { planOnly = true } or { radius = devRadius })
+local world = Builder.build(Map, baked and { planOnly = true } or nil)
 Workspace:SetAttribute("WorldBaked", baked)
-world.radius = devRadius
-if devRadius then
-	-- keep jobs inside the part of the city that exists in this session
-	local function within(list)
-		local out = {}
-		for _, e in ipairs(list) do
-			if (Vector3.new(e.pos.X, 0, e.pos.Z) - Map.center).Magnitude <= devRadius - 60 then table.insert(out, e) end
-		end
-		return out
-	end
-	world.addresses = within(world.addresses)
-	world.restaurants = within(world.restaurants)
-	print(("[GoDash] city built within %d studs of the centre (%d addresses, %d restaurants). See Game.DEV_RADIUS / Game.LIVE_RADIUS.")
-		:format(devRadius, #world.addresses, #world.restaurants))
+-- nothing is a ghost: posts, stalls, chairs and people block a walker (World/Solid)
+local Solid = require(script.Parent.World.Solid)
+Solid.start()
+if world.stream then world.stream.onBuilt = function(folder) task.spawn(Solid.area, folder, true) end end
+for _, name in ipairs({ "Places", "Chunks" }) do
+	local f = Workspace.Map:FindFirstChild(name)
+	if f then Solid.area(f) end
 end
+if baked then Solid.area(Workspace.Map) end
+world.radius = Game.TRAFFIC_RADIUS -- AI traffic and street dogs stay within this distance of the centre
 
 local Data = require(Services.PlayerDataService)
 local Economy = require(Services.EconomyService)
@@ -58,9 +52,15 @@ local Job = require(Services.JobService)
 local Farming = require(Services.FarmingService)
 local HousingService = require(Services.HousingService)
 local TrafficService = require(Services.TrafficService)
+local PoliceService = require(Services.PoliceService)
+local CityRemote = require(Services.CityRemote)
+local StreetService = require(Services.StreetService)
+local FinanceService = require(Services.FinanceService)
+local LicenseService = require(Services.LicenseService)
 
 local deps = { missions = Missions, lifestyle = Lifestyle, weather = Weather, time = Time, vehicles = Vehicle, npc = NPC }
 
+safe("Metrics", require(Services.MetricsService).start)
 safe("Time", Time.start)
 safe("Weather", Weather.start)
 safe("NPC", NPC.start, world)
@@ -72,9 +72,28 @@ safe("Shop", Shop.start, world, deps)
 safe("Vehicle", Vehicle.start, world, deps)
 safe("Job", Job.start, world, deps)
 safe("Traffic", TrafficService.start, world, deps)
+safe("Police", PoliceService.start, world, deps)
+safe("City", CityRemote.start)
+safe("Board", require(Services.LeaderboardService).start, world)
+-- Tier-A plan (2026-11-17): Robux store + codes + name tags, season pass, rider company, Rush Hour
+safe("Store", require(Services.StoreService).start)
+safe("Season", require(Services.SeasonService).start)
+safe("Company", require(Services.CompanyService).start)
+safe("Events", require(Services.EventService).start)
+safe("Accidents", require(Services.AccidentService).start) -- 2026-11-18: hitting people or cars costs money
+safe("Health", require(Services.HealthService).start) -- 2026-11-18: falls add up to injuries; the hospital treats them
+safe("Street", StreetService.start, world, deps)
+safe("Finance", FinanceService.start, world, deps)
+safe("Licence", LicenseService.start, world, deps)
 safe("Dogs", require(Services.DogService).start, world, deps)
 safe("Farming", Farming.start, world, deps)
 safe("Housing", HousingService.start, world, deps)
+safe("Solid", function()
+	for _, name in ipairs({ "StreetLife", "PoliceCheckpoints" }) do
+		local f = Workspace:FindFirstChild(name)
+		if f then Solid.area(f) end
+	end
+end)
 
 -- Static world info for the client's map and GPS.
 Net.fn("GetWorld", {}, function(player)
@@ -84,13 +103,28 @@ Net.fn("GetWorld", {}, function(player)
 	end
 	local shops = {}
 	for _, s in ipairs(world.shops) do
-		table.insert(shops, { id = s.id, kind = s.kind, name = s.name, pos = s.pos })
+		table.insert(shops, { id = s.id, kind = s.kind, name = s.name, thai = s.thai, pos = s.pos })
 	end
 	local farm = Farming.farmOf(player)
+	-- 2026-11-18: zebra crossings (client/Peds sends people across, the fine is in TrafficService) and the
+	-- lakeside paths (joggers, lake sounds)
+	local lakes = {}
+	for _, l in ipairs(world.lakes or {}) do
+		table.insert(lakes, { name = l.name, thai = l.thai, path = l.path, open = l.open, x = l.x, z = l.z, stalls = l.stalls, sign = l.sign, pier = l.pier,
+			gym = l.gym, pieces = l.pieces })
+	end
 	return true, nil, {
-		pois = pois, shops = shops, busStops = world.busStops, plots = HousingService.list(),
+		pois = pois, shops = shops, food = Shop.places(), busStops = world.busStops, plots = HousingService.list(),
 		farm = farm and { id = farm.id, pos = farm.base.Position } or nil, mock = Data.isMock(),
+		zebras = world.zebras or {}, lakes = lakes,
 	}
+end, 2)
+
+-- The far city outline (World/Skyline): asked for once by client/Backdrop.
+Net.fn("GetSkyline", {}, function()
+	local s = world.skyline
+	if not s then return false, "Not ready" end
+	return true, nil, s
 end, 2)
 
 Net.fn("Settings", { "string", "any" }, function(player, key, value)
@@ -99,8 +133,12 @@ Net.fn("Settings", { "string", "any" }, function(player, key, value)
 	local s = d.settings
 	if key == "steer" and type(value) == "number" and value == value then
 		s.steer = math.clamp(value, 0.5, 2)
-	elseif (key == "assist" or key == "music" or key == "sfx") and type(value) == "boolean" then
+	elseif (key == "assist" or key == "music" or key == "sfx" or key == "bgm") and type(value) == "boolean" then
 		s[key] = value
+	elseif key == "rideAlong" and (value == "friends" or value == "all" or value == "off") then
+		s.rideAlong = value
+	elseif key == "quality" and (value == "auto" or value == "low" or value == "medium" or value == "high") then
+		s.quality = value -- client/Perf: graphics detail (2026-11-18)
 	elseif key == "lang" and (value == "en" or value == "th") then
 		s.lang = value
 		s.langChosen = true
@@ -113,6 +151,8 @@ end, 6)
 
 -- Characters: spawn at the rider hub, bring the starter vehicle, respawn after death.
 local hub = world.pois.hub
+-- the streets around the hub stand before the first player arrives
+if not baked then world.stream:ensureAround(hub and hub.pos or Map.center, 560) end
 local spawnIndex = 0
 local function spawnCf(): CFrame
 	spawnIndex += 1
@@ -139,7 +179,9 @@ Data.onLoaded(function(player, d)
 	task.delay(2.5, function()
 		if not player.Parent or not hub then return end
 		local base = hub.base
-		local cf = base * CFrame.new(-12 + (spawnIndex % 4) * 6, 0.6, -hub.d / 2 + 22) * CFrame.Angles(0, math.rad(90), 0)
+		-- nose towards the street (the lot's front is -Z); side by side, 6 studs apart
+		-- (2026-11-16: was turned 90° and every new rider started facing the next building's wall)
+		local cf = base * CFrame.new(-12 + (spawnIndex % 4) * 6, 0.6, -hub.d / 2 + 22)
 		Vehicle.spawnAt(player, d.activeVehicle, cf)
 		if d.stats.deliveries == 0 and d.stats.playSeconds < 30 then
 			Net.fire(player, "Notify", "welcome", { name = player.DisplayName, city = Map.name })
@@ -151,6 +193,50 @@ end)
 --   QaMoney = number -> gives money to every player     QaLevel = number -> sets the level
 --   QaClock / QaWeather are read by the time and weather services
 if RunService:IsStudio() then
+	-- QA window into the plan (command bar / tests): ServerStorage.GoDashQa:Invoke("stats") or
+	-- :Invoke("lots", x1, z1, x2, z2) -> "x,z,ux,uz,w,dp,kind;..." for the lots in that box.
+	local qa = Instance.new("BindableFunction")
+	qa.Name = "GoDashQa"
+	qa.OnInvoke = function(op, x1, z1, x2, z2)
+		if op == "stats" then
+			local st = world.stream:stats()
+			local parts = 0
+			for _, d in ipairs(Workspace.Map:GetDescendants()) do
+				if d:IsA("BasePart") then parts += 1 end
+			end
+			return ("lots=%d addresses=%d chunks=%d built=%d queued=%d parts=%d planSeconds=%.2f lotSeconds=%.2f")
+				:format(world.lots, #world.addresses, st.chunks, st.built, st.queued, parts, world.buildSeconds, world.planLotsSeconds)
+		elseif op == "lots" then
+			local out = {}
+			for _, lot in ipairs(world.lotList) do
+				if lot.x >= x1 and lot.x <= x2 and lot.z >= z1 and lot.z <= z2 then
+					local r = lot.base.RightVector
+					table.insert(out, ("%d,%d,%.3f,%.3f,%d,%d,%s"):format(lot.x, lot.z, r.X, r.Z, lot.w, lot.dp, lot.kind))
+				end
+			end
+			return table.concat(out, ";")
+		end
+		return nil
+	end
+	qa.Parent = game:GetService("ServerStorage")
+	-- QaFocus = Vector3: stream (and so build) the city around that point for every player; nil = back to the character
+	local focusPart: Part? = nil
+	Workspace:GetAttributeChangedSignal("QaFocus"):Connect(function()
+		local v = Workspace:GetAttribute("QaFocus")
+		if typeof(v) == "Vector3" then
+			if not focusPart then
+				local f = Instance.new("Part")
+				f.Name = "QaFocus"; f.Anchored = true; f.Transparency = 1; f.CanCollide = false; f.CanQuery = false; f.CanTouch = false
+				f.Size = Vector3.new(1, 1, 1)
+				f.Parent = Workspace
+				focusPart = f
+			end
+			(focusPart :: Part).Position = v
+			for _, p in ipairs(Players:GetPlayers()) do p.ReplicationFocus = focusPart end
+		else
+			for _, p in ipairs(Players:GetPlayers()) do p.ReplicationFocus = nil end
+		end
+	end)
 	Workspace:GetAttributeChangedSignal("QaMoney"):Connect(function()
 		local n = Workspace:GetAttribute("QaMoney")
 		if type(n) ~= "number" then return end
@@ -165,6 +251,25 @@ if RunService:IsStudio() then
 			if d then d.level = math.clamp(math.floor(n), 1, Game.MAX_LEVEL); Data.touch(p, "level") end
 		end
 		Workspace:SetAttribute("QaLevel", nil)
+	end)
+	-- QaInjury = number: set every player's injury (server/HealthService) to test the hospital
+	Workspace:GetAttributeChangedSignal("QaInjury"):Connect(function()
+		local n = Workspace:GetAttribute("QaInjury")
+		if type(n) ~= "number" then return end
+		for _, p in ipairs(Players:GetPlayers()) do
+			local d = Data.get(p)
+			if d then d.injury = math.clamp(math.floor(n), 0, 100); Data.touch(p, "injury"); p:SetAttribute("Injury", d.injury) end
+		end
+		Workspace:SetAttribute("QaInjury", nil)
+	end)
+	-- QaNeeds = true: fill energy, hunger and happiness (orders pause while a rider is starving)
+	Workspace:GetAttributeChangedSignal("QaNeeds"):Connect(function()
+		if not Workspace:GetAttribute("QaNeeds") then return end
+		for _, p in ipairs(Players:GetPlayers()) do
+			local d = Data.get(p)
+			if d then d.energy, d.hunger, d.happiness = 100, 100, 100; Data.touch(p, "energy"); Data.touch(p, "hunger"); Data.touch(p, "happiness") end
+		end
+		Workspace:SetAttribute("QaNeeds", nil)
 	end)
 end
 
