@@ -315,6 +315,10 @@ function EngineSound:horn()
 	elseif style == 4 then
 		oneShot(self.chassis, Sounds.horn, 0.45, 1.6)
 		task.delay(0.16, function() oneShot(self.chassis, Sounds.horn, 0.45, 1.6) end)
+	elseif style == 6 then -- tuk-tuk: three quick high beeps
+		for i = 0, 2 do task.delay(i * 0.11, function() oneShot(self.chassis, Sounds.horn, 0.4, 1.9) end) end
+	elseif style == 7 then -- a little rising tune (do re mi sol), our own
+		for i, p in ipairs({ 1, 1.12, 1.26, 1.5 }) do task.delay((i - 1) * 0.16, function() oneShot(self.chassis, Sounds.horn, 0.45, base * p * 0.8) end) end
 	elseif self.def.class == "car" then
 		oneShot(self.chassis, Sounds.horn, 0.6, self.p.pitch >= 1 and 1.05 or 0.92)
 	else

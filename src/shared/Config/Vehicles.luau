@@ -137,6 +137,9 @@ Vehicles.HORNS = {
 	{ name = "Air horn", thai = "แตรลม", air = true, pitch = 1 },
 	{ name = "Beep beep", thai = "ปิ๊ดๆ", pitch = 1.55 },
 	{ name = "Bell", thai = "กระดิ่ง", bell = true, pitch = 1 },
+	-- 2026-11-19 (TikTok toys: more horns)
+	{ name = "Tuk-tuk", thai = "ตุ๊กตุ๊ก", pitch = 1.9 },
+	{ name = "Little tune", thai = "แตรเพลง", pitch = 1 },
 }
 Vehicles.PLATE_MAX = 8 -- characters on a custom plate (Thai letters, A-Z, digits, space, dash)
 -- The plate everyone gets until they buy their own: two Thai letters and a number from the user id.
@@ -144,6 +147,18 @@ local PLATE_LETTERS = { "กข", "กง", "ขค", "ฆม", "งษ", "จ�
 function Vehicles.defaultPlate(userId: number): string
 	local n = math.abs(userId)
 	return PLATE_LETTERS[n % #PLATE_LETTERS + 1] .. " " .. tostring(1000 + math.floor(n / 16) % 9000)
+end
+-- Custom plates are picked, not typed (2026-11-19, for opening the game to all ages: players never type
+-- text others see): a word from this list and a number 1-999 ("ซิ่ง 99"). Plates bought before stay.
+Vehicles.PLATE_WORDS = {
+	"ซิ่ง", "แซ่บ", "เท่", "ไว", "เฮง", "รวย", "ปัง", "ชิล", "หล่อ", "สวย", "GO", "KK", "FAST", "RIDE", "ISAN", "COOL",
+}
+for _, l in ipairs(PLATE_LETTERS) do table.insert(Vehicles.PLATE_WORDS, l) end
+Vehicles.PLATE_LUCKY = { 9, 99, 168, 555, 789, 999 }
+function Vehicles.plateText(word: number, num: number): string?
+	local w = Vehicles.PLATE_WORDS[word]
+	if not w or num ~= math.floor(num) or num < 1 or num > 999 then return nil end
+	return w .. " " .. tostring(num)
 end
 
 function Vehicles.upgradePrice(v: Vehicle, upgradeId: string, nextLevel: number): number

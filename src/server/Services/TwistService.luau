@@ -48,8 +48,39 @@ local function nearestShop(kind: string, from: Vector3)
 	return best, bd
 end
 
+-- Memos from the customer (2026-11-19, TikTok toys "funny orders"): the notes people really type in the
+-- delivery app, a third of the time, shown when the job is taken. Jokes only: nothing changes the job.
+local MEMOS = {
+	food = {
+		{ "Not spicy please. But 20 chillies on the side.", "ไม่เผ็ดนะคะ แต่ขอพริกแยก 20 เม็ด" },
+		{ "Don't call when you arrive, just shout the dog's name: Khao Tang.", "ถึงแล้วไม่ต้องโทร ตะโกนเรียกหมาได้เลย ชื่อข้าวตัง" },
+		{ "Tell the cook: tastier than yesterday, please.", "ฝากบอกแม่ค้าว่า ขอแบบอร่อยกว่าเมื่อวาน" },
+		{ "Don't ring the bell, the baby just fell asleep 🤫", "อย่ากดกริ่งนะ ลูกเพิ่งหลับ 🤫" },
+		{ "Three sets of cutlery please. It's just me.", "ขอช้อนส้อม 3 ชุด กินคนเดียวค่ะ" },
+		{ "Hang it on the door by the cactus pot (there are 12).", "แขวนไว้หน้าประตู ข้างกระถางกระบองเพชร (มี 12 กระถาง)" },
+		{ "Not angry if you're late. Just a little sulky.", "มาช้าไม่โกรธนะ แค่งอนนิดนึง" },
+		{ "Call before you arrive. I won't pick up though.", "โทรมาก่อนถึงนะ แต่ไม่รับสายนะ" },
+		{ "The third pink house... or the fourth, I forget.", "บ้านสีชมพูหลังที่ 3 ...หรือ 4 จำไม่ได้" },
+		{ "Lots of straws please, it's for an art project.", "ขอหลอดเยอะ ๆ จะเอาไปทำงานประดิษฐ์" },
+		{ "My cat loves riders. Expect your hand to be licked.", "แมวที่บ้านชอบไรเดอร์ เตรียมโดนเลียมือ" },
+		{ "Bring some encouragement too, I have an exam tomorrow.", "ฝากซื้อกำลังใจมาด้วย พรุ่งนี้สอบ" },
+	},
+	ride = {
+		{ "Luk thung music all the way, please.", "ขอเปิดเพลงลูกทุ่งตลอดทางนะ" },
+		{ "Three big bags and one chicken.", "มีกระเป๋าใบใหญ่ 3 ใบ กับไก่ 1 ตัว" },
+		{ "I'm in a big hurry! Drive slowly though, I'm scared.", "รีบมากกก แต่ขับช้า ๆ นะ กลัว" },
+		{ "Going on a first date. Hype me up, please.", "จะไปเดทแรก ช่วยอวยหน่อย" },
+		{ "Waiting outside the corner shop... every corner shop in the soi.", "ยืนรอหน้าร้านสะดวกซื้อ...ทุกร้านในซอยเลย" },
+	},
+}
+
 -- after the job module's own onAccept (the customer already waits at the real door)
 function Twists.onAccept(player: Player, job)
+	local memos = MEMOS[job.mode]
+	if memos and rng:NextNumber() < 0.33 then
+		local m = memos[rng:NextInteger(1, #memos)]
+		task.delay(1.2, toast, player, "📝 " .. who(job) .. ": " .. m[1], "📝 " .. who(job) .. ": " .. m[2])
+	end
 	if rng:NextNumber() > CHANCE then return end
 	local pool = POOL[job.mode]
 	if not pool then return end

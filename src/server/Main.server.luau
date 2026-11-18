@@ -88,6 +88,7 @@ safe("Pets", require(Services.PetService).start) -- 2026-11-19: adopt a soi dog;
 safe("Boats", require(Services.BoatService).start, world) -- 2026-11-19: swan pedal boats at the lakeside piers (client/Boats)
 safe("Stunts", require(Services.StuntService).start, deps) -- 2026-11-19: wheelie / burnout personal bests (client/Stunts)
 safe("TimeTrial", require(Services.TimeTrialService).start, world, deps) -- 2026-11-19: lap of Bueng Kaen Nakhon against the clock
+safe("CarMeet", require(Services.CarMeetService).start, world, deps) -- 2026-11-19: night car meet at the KK Plaza car park
 safe("Accidents", require(Services.AccidentService).start) -- 2026-11-18: hitting people or cars costs money
 safe("Health", require(Services.HealthService).start) -- 2026-11-18: falls add up to injuries; the hospital treats them
 safe("Street", StreetService.start, world, deps)

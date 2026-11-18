@@ -342,28 +342,19 @@ local function garage(player: Player, op: string, vehicleId: string?, arg: any)
 		local st = owned.style
 		local free = false
 		if kind == "plate" then
-			if type(value) ~= "string" then return false, "Bad request" end
-			local text = value:gsub("^%s+", ""):gsub("%s+$", ""):gsub("%s+", " ")
-			if text == "" then
+			-- (2026-11-19, all ages) picked, not typed: { w = word index, n = 1-999 } (Config/Vehicles.PLATE_WORDS),
+			-- or "" for the standard plate. Typed plates are no longer accepted.
+			local text
+			if value == "" then
 				free = true
 				text = ""
+			elseif type(value) == "table" and type(value.w) == "number" and type(value.n) == "number" then
+				text = Vehicles.plateText(value.w, value.n)
+				if not text then return false, "Unknown choice" end
 			else
-				local n = utf8.len(text)
-				if not n or n > Vehicles.PLATE_MAX then return false, "Up to " .. Vehicles.PLATE_MAX .. " characters" end
-				-- Thai letters and digits, A-Z, space and dash only
-				for _, c in utf8.codes(text) do
-					local ok = (c >= 0x0E01 and c <= 0x0E5B) or (c >= 48 and c <= 57) or (c >= 65 and c <= 90) or (c >= 97 and c <= 122) or c == 32 or c == 45
-					if not ok then return false, "Only Thai letters, A-Z, numbers and -" end
-				end
-				text = text:upper()
-				-- everyone can read a plate: Roblox's filter decides, and a filtered plate is refused
-				local okF, res = pcall(function()
-					local r = TextService:FilterStringAsync(text, player.UserId, Enum.TextFilterContext.PublicChat)
-					return r:GetNonChatStringForBroadcastAsync()
-				end)
-				if not okF then return false, "The plate check is busy, try again" end
-				if res ~= text then return false, "That plate isn't allowed" end
+				return false, "Bad request"
 			end
+			local _ = TextService
 			if (st.plate or "") == text then return false, "That's already your plate" end
 			value = text
 		else

@@ -1,6 +1,7 @@
 -- Phone app "Styling" (แต่งซิ่ง, 2026-11-17 growth plan): underglow, a custom number plate, a sticker
 -- and the horn for each owned vehicle. Looks only, no driving numbers. The server (VehicleService
--- "style") charges, filters the plate text and refits the vehicle if it is out on the road.
+-- "style") charges and refits the vehicle if it is out on the road. Plates are picked (a word + a
+-- number), never typed (2026-11-19: all ages).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local SoundService = game:GetService("SoundService")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
@@ -18,7 +19,7 @@ local C, F = UI.C, UI.F
 local L = Lang.pick
 local PURPLE = Color3.fromRGB(120, 60, 200)
 local selected: string? = nil
-local plateDraft = ""
+local plateWord, plateNum = 1, 99 -- the plate being picked (Config/Vehicles.PLATE_WORDS, 1-999)
 
 local function noT(l: Instance)
 	l:SetAttribute("NoTranslate", true)
@@ -40,6 +41,8 @@ local function preview(style: number)
 	elseif style == 2 then play(Sounds.horn, 0.75, 0.6)
 	elseif style == 3 then play(Sounds.horn, 0.82, 0.6); task.delay(0.22, function() play(Sounds.horn, 0.78, 0.6) end)
 	elseif style == 4 then play(Sounds.horn, 1.6, 0.45); task.delay(0.16, function() play(Sounds.horn, 1.6, 0.45) end)
+	elseif style == 6 then for i = 0, 2 do task.delay(i * 0.11, function() play(Sounds.horn, 1.9, 0.4) end) end
+	elseif style == 7 then for i, p in ipairs({ 1, 1.12, 1.26, 1.5 }) do task.delay((i - 1) * 0.16, function() play(Sounds.horn, 1.1 * p, 0.45) end) end
 	else play(Sounds.horn, 1.05, 0.55) end
 end
 
@@ -131,35 +134,32 @@ local function screen()
 
 		-- plate
 		ui.section(L("NUMBER PLATE · ", "ป้ายทะเบียน · ") .. Util.money(Vehicles.STYLE_PRICES.plate))
-		local card = ui.bigCard(96)
+		-- (2026-11-19, all ages) pick a word and a number instead of typing: nobody types text others see
+		local card = ui.bigCard(150)
 		noT(UI.label(card, L("Now: ", "ตอนนี้: ") .. ((st.plate and st.plate ~= "") and st.plate or (Vehicles.defaultPlate(game.Players.LocalPlayer.UserId) .. L(" (standard)", " (ป้ายปกติ)"))), 13, C.text, F.bold,
 			{ Position = UDim2.fromOffset(12, 8), Size = UDim2.new(1, -24, 0, 18) }))
-		local box = Instance.new("TextBox")
-		box.PlaceholderText = L("e.g. ซิ่ง 99", "เช่น ซิ่ง 99")
-		box.Text = plateDraft
-		box.ClearTextOnFocus = false
-		box.Font = F.bold
-		box.TextSize = 16
-		box.TextColor3 = C.text
-		box.BackgroundColor3 = C.bg
-		box.Position = UDim2.fromOffset(12, 32)
-		box.Size = UDim2.new(1, -110, 0, 36)
-		box.Parent = card
-		box:SetAttribute("NoTranslate", true)
-		UI.corner(box, 10)
-		box:GetPropertyChangedSignal("Text"):Connect(function()
-			plateDraft = box.Text
-			if utf8.len(plateDraft) and utf8.len(plateDraft) > Vehicles.PLATE_MAX then
-				local cut = utf8.offset(plateDraft, Vehicles.PLATE_MAX + 1)
-				if cut then box.Text = plateDraft:sub(1, cut - 1) end
-			end
-		end)
+		local words = Vehicles.PLATE_WORDS
+		local plate = noT(UI.label(card, Vehicles.plateText(plateWord, plateNum) or "", 22, C.black, F.black,
+			{ Position = UDim2.fromOffset(12, 32), Size = UDim2.new(1, -110, 0, 36), TextXAlignment = Enum.TextXAlignment.Center, BackgroundTransparency = 0,
+				BackgroundColor3 = Color3.fromRGB(250, 250, 244) }))
+		UI.corner(plate, 8)
+		UI.stroke(plate, C.black, 2)
+		local function refresh() plate.Text = Vehicles.plateText(plateWord, plateNum) or "" end
 		noT(UI.button(card, L("Fit", "ติดป้าย"), { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -12, 0, 32), Size = UDim2.fromOffset(86, 36), TextSize = 14, BackgroundColor3 = PURPLE }, function()
-			if plateDraft ~= "" then fit("plate", plateDraft) end
+			fit("plate", { w = plateWord, n = plateNum })
 		end))
-		noT(UI.label(card, L(("Up to %d characters: Thai letters, A-Z, numbers. Everyone can see it, so it is checked."):format(Vehicles.PLATE_MAX),
-			("ไม่เกิน %d ตัว: ตัวอักษรไทย A-Z ตัวเลข ทุกคนเห็นได้ จึงมีการตรวจคำ"):format(Vehicles.PLATE_MAX)), 11, C.sub, F.med,
-			{ Position = UDim2.fromOffset(12, 72), Size = UDim2.new(1, -24, 0, 18), TextWrapped = true }))
+		local function stepper(y: number, label: string, onMinus, onPlus)
+			noT(UI.label(card, label, 12, C.sub, F.bold, { Position = UDim2.fromOffset(12, y), Size = UDim2.fromOffset(70, 30) }))
+			noT(UI.button(card, "◀", { Position = UDim2.fromOffset(84, y), Size = UDim2.fromOffset(40, 30), TextSize = 14, BackgroundColor3 = C.dark }, function() onMinus(); refresh() end))
+			noT(UI.button(card, "▶", { Position = UDim2.fromOffset(128, y), Size = UDim2.fromOffset(40, 30), TextSize = 14, BackgroundColor3 = C.dark }, function() onPlus(); refresh() end))
+		end
+		stepper(76, L("Word", "คำ"), function() plateWord = (plateWord - 2) % #words + 1 end, function() plateWord = plateWord % #words + 1 end)
+		stepper(110, L("Number", "เลข"), function() plateNum = plateNum > 1 and plateNum - 1 or 999 end, function() plateNum = plateNum < 999 and plateNum + 1 or 1 end)
+		-- lucky numbers in one tap
+		for i, n in ipairs(Vehicles.PLATE_LUCKY) do
+			noT(UI.button(card, tostring(n), { Position = UDim2.new(0, 176 + (i - 1) * 46, 0, 110), Size = UDim2.fromOffset(42, 30), TextSize = 12, BackgroundColor3 = Color3.fromRGB(200, 150, 40) },
+				function() plateNum = n; refresh() end))
+		end
 		if st.plate and st.plate ~= "" then
 			ui.row("↩", L("Back to the standard plate", "กลับไปใช้ป้ายปกติ"), nil, L("Free", "ฟรี"), function() fit("plate", "") end, { btnWidth = 60 })
 		end

@@ -496,8 +496,17 @@ ghost scene are still to take.
 | 20 | Stunts (`client/Drive` + `client/Stunts`, `server/StuntService`): wheelie = R or the touch 🔥 button (body pivots ~24° on the rear axle), burnout = handbrake + gas standing still on a motorbike (rear wheel spins, smoke, the bike stays); timer chip, personal bests in d.stats; others see it through the vehicle's "Stunt" attribute | PASS: wheelie lifts the front (with the dog in the basket). NOT TESTED: burnout, the record toast (needs ≥ 1.5 s), others' view |
 | 21 | Lake lap (`server/TimeTrialService`, `client/TimeTrial`): 6 gates on the big roads round Bueng Kaen Nakhon from the road graph, start/finish nearest the pier; chip near the start -> arches, GPS to the next gate, clock; the server checks the gates in order 10x/s, refuses laps under the believable minimum (86 s), keeps stats.bestLap and a weekly OrderedDataStore board shown on the sign at the start | PASS: chip, arming, START·FINISH arch, GPS ribbon. NOT TESTED: a whole lap (RAM ran out) |
 
-**Batch 2 (TikTok toys, still to do):** night car meet + more exhausts and horns; funny orders and random events; first 10
-minutes with gradual unlocks.
+**Batch 2c (2026-11-19)**
+
+| # | What | State |
+|---|---|---|
+| 22 | Plates are picked, not typed (all ages: nobody types text others see): a word from `Vehicles.PLATE_WORDS` (ซิ่ง, แซ่บ, GO, KK, the Thai letter pairs...) + 1-999, lucky-number buttons; the server refuses typed plates (`{ w, n }` or "" only). Plates bought before stay | PASS: picked plate accepted, typed text refused. Phone UI NOT TESTED by eye |
+| 23 | Customer memos (TwistService): a third of the jobs show a funny note from the customer when taken (12 food, 5 ride), jokes only | NOT TESTED (needs a job) |
+| 24 | Two more horns in Styling: ตุ๊กตุ๊ก (three quick beeps) and แตรเพลง (our own 4-note tune) | NOT TESTED by ear |
+| 25 | Night car meet (`server/CarMeetService`): 20:30-02:00 game time, 11 tuned display cars and bikes with underglow, stickers and lucky plates in the KK Plaza car park, a lit banner "มีตติ้งรถซิ่ง ทุกคืน" and a speaker stack; one toast a night to everyone | PASS: 11 cars, banner lit at 21:00. The banner then moved behind the cars (it stood in a bus stop): NOT TESTED there |
+
+**Still to do:** the first 10 minutes with gradual unlocks (needs a design pass with the owner: it changes what new riders
+see first); random city events.
 
 **Batch 3 (all ages):** plates from presets instead of typed text, content check (crash and injury = mild, ghosts =
 mild fear), the maturity questionnaire, the refundable 1,000 R$ fee (ask the owner first), a full phone test.
