@@ -28,6 +28,8 @@ local GPS = require(script.Parent.GPS)
 local Feedback = require(script.Parent.Feedback)
 local Perf = require(script.Parent.Perf)
 local State = require(script.Parent.State)
+local Lang = require(script.Parent.Lang)
+local L = Lang.pick
 
 local Peds = {}
 local player = Players.LocalPlayer
@@ -45,6 +47,7 @@ local RUN_ANIM = "rbxassetid://913376220" -- Roblox's own R15 run (its stride fi
 local folder
 local rng = Random.new()
 local all = {} -- every pedestrian state (client/Accident looks for one in front of your vehicle)
+local animHook = nil :: ((any, string, number, boolean?) -> ())? -- set by startAvatars: plays a person's walk / run / idle
 
 ---------------------------------------------------------------------------------------------------
 -- the hour of the day
@@ -117,7 +120,7 @@ function Peds.hit(chassis: BasePart, halfLen: number, halfWid: number)
 	local cf = chassis.CFrame
 	local now = os.clock()
 	for _, p in ipairs(all) do
-		if p.active and p.pos and not (p.downUntil and now < p.downUntil + 4) then
+		if p.active and p.pos and not p.scripted and not (p.downUntil and now < p.downUntil + 4) then
 			local rel = cf:PointToObjectSpace(p.pos + Vector3.new(0, 2, 0))
 			if math.abs(rel.X) < halfWid + 0.9 and math.abs(rel.Z) < halfLen + 0.9 and math.abs(rel.Y) < 6 then
 				p.downUntil = now + 6.5
@@ -139,7 +142,7 @@ function Peds.makeWay(origin: Vector3, dir: Vector3, halfW: number, reach: numbe
 	local now = os.clock()
 	local side = Vector3.new(-dir.Z, 0, dir.X)
 	for _, p in ipairs(all) do
-		if p.active and p.pos and p.role ~= "cross" and not (p.downUntil and now < p.downUntil) then
+		if p.active and p.pos and p.role ~= "cross" and not p.scripted and not (p.downUntil and now < p.downUntil) then
 			local rel = Vector3.new(p.pos.X - origin.X, 0, p.pos.Z - origin.Z)
 			local along, lat = rel:Dot(dir), rel:Dot(side)
 			if along > -3 and along < reach and math.abs(lat) < halfW + 1.8 then
@@ -158,6 +161,7 @@ function Peds.vanish(p)
 	if not p then return end
 	p.downUntil = nil
 	p.active = false
+	p.scripted = nil
 	if p.model then p.model.Parent = nil end
 	if p.rig then p.rig.model.Parent = nil end
 end
@@ -219,7 +223,11 @@ local function nextGoal(p)
 	-- stay on the side of the new street that is nearer, so people rarely cross the road
 	local a, b = linePoint(ne, s, 1), linePoint(ne, s, -1)
 	local side = (a - p.pos).Magnitude <= (b - p.pos).Magnitude and 1 or -1
-	if rng:NextNumber() < 0.12 then side = -side end -- but sometimes they do cross
+	p.lookFirst = nil
+	if rng:NextNumber() < 0.12 then
+		side = -side -- but sometimes they do cross: looking out for traffic first (advance)
+		p.lookFirst = true
+	end
 	p.edge, p.dir, p.s, p.side = ne, dir, s, side
 	p.goal = side > 0 and a or b
 end
@@ -375,9 +383,200 @@ local function steer(p, dir: Vector3, now: number)
 	end
 end
 
+---------------------------------------------------------------------------------------------------
+-- Watching the traffic (2026-11-19, owner: "people walk as if the cars were not there; they should get
+-- out of the way a little"). Every ~0.12 s the vehicles near the camera are listed with their speed (a
+-- physics vehicle's own velocity, or how far a scripted AI car moved since the last look). Someone
+-- standing in the strip a vehicle will cover in the next DODGE_AHEAD seconds steps out of it to the open
+-- side (hurrying, or jumping when it is already close, with a start), turns to watch it go by, then
+-- carries on. Someone about to cross a street looks both ways first and waits while something comes.
+---------------------------------------------------------------------------------------------------
+local DODGE_AHEAD, DODGE_MARGIN, WATCH_R = 2.3, 1.15, 160
+local VEHICLE_FOLDERS = { "Vehicles", "Traffic", "GoDashLocalTraffic" }
+local movers = {} -- this look's moving vehicles: { model, pos, dir, speed, hw, hl, mine }
+local lastSeen = setmetatable({}, { __mode = "k" }) :: { [Model]: { pos: Vector3, t: number } }
+local extents = setmetatable({}, { __mode = "k" }) :: { [Model]: Vector3 }
+local moverAt = 0
+local shoutAt = 0
+
+local function scanMovers(now: number, camPos: Vector3)
+	table.clear(movers)
+	local myModel
+	do
+		local char = player.Character
+		local hum = char and char:FindFirstChildOfClass("Humanoid")
+		local seat = hum and hum.SeatPart
+		myModel = seat and seat:FindFirstAncestorWhichIsA("Model")
+	end
+	for _, fname in ipairs(VEHICLE_FOLDERS) do
+		local f = Workspace:FindFirstChild(fname)
+		if not f then continue end
+		for _, m in ipairs(f:GetChildren()) do
+			if not m:IsA("Model") then continue end
+			local pos = m:GetPivot().Position
+			if (pos - camPos).Magnitude > WATCH_R then continue end
+			local seen = lastSeen[m]
+			local vel
+			local pp = m.PrimaryPart
+			if pp and not pp.Anchored then vel = pp.AssemblyLinearVelocity end
+			if (not vel or vel.Magnitude < 0.5) and seen and now - seen.t > 0.03 and now - seen.t < 0.6 then
+				vel = (pos - seen.pos) / (now - seen.t)
+			end
+			if seen then seen.pos, seen.t = pos, now else lastSeen[m] = { pos = pos, t = now } end
+			local flat = vel and Vector3.new(vel.X, 0, vel.Z) or Vector3.zero
+			local speed = flat.Magnitude
+			if speed > 3.5 then
+				local ext = extents[m]
+				if not ext then
+					local _, size = m:GetBoundingBox()
+					ext = size
+					extents[m] = ext
+				end
+				table.insert(movers, { model = m, pos = pos, dir = flat / speed, speed = math.min(speed, 120),
+					hw = math.min(ext.X, ext.Z) / 2, hl = math.max(ext.X, ext.Z) / 2, mine = m == myModel })
+			end
+		end
+	end
+end
+
+-- the vehicle whose path p stands in, when it gets there, and how far p is off its middle line
+local function threat(p)
+	local best, bestT, bestLat
+	for _, v in ipairs(movers) do
+		local rx, rz = p.pos.X - v.pos.X, p.pos.Z - v.pos.Z
+		local along = rx * v.dir.X + rz * v.dir.Z
+		if along > -v.hl * 0.5 and along < v.hl + v.speed * DODGE_AHEAD + 2 and math.abs(p.pos.Y - v.pos.Y) < 8 then
+			local lat = rx * -v.dir.Z + rz * v.dir.X
+			if math.abs(lat) < v.hw + DODGE_MARGIN then
+				local t = math.max(0, along - v.hl) / v.speed
+				if not bestT or t < bestT then best, bestT, bestLat = v, t, lat end
+			end
+		end
+	end
+	return best, bestT, bestLat
+end
+
+local function startDodge(p, v, t: number, lat: number, now: number)
+	local side = Vector3.new(-v.dir.Z, 0, v.dir.X)
+	local sg = lat >= 0 and 1 or -1
+	if math.abs(lat) < 0.35 and p.edge and p.side then
+		-- right in the middle of its path: the kerb / house side of the street
+		local e = p.edge
+		local house = Vector3.new(-e.dz * p.side, 0, e.dx * p.side)
+		sg = house:Dot(side) >= 0 and 1 or -1
+	end
+	local from = p.pos + Vector3.new(0, 2, 0)
+	local to
+	for _, s in ipairs({ sg, -sg }) do
+		local need = math.max(0.3, v.hw + DODGE_MARGIN + 1 - lat * s)
+		if need < 7.5 and not blockedFrom(from, side * s, need + 0.3) then
+			to = p.pos + side * s * need
+			break
+		end
+	end
+	-- (boxed in against a wall: press flat where they are and watch it squeeze past)
+	local dist = to and (to - p.pos).Magnitude or 0
+	local speed = math.clamp(dist / math.max(t - 0.1, 0.22), 5.5, 10) -- (a sprint at most: a person, not a cat)
+	p.dodge = { to = to or p.pos, speed = speed, untilT = now + t + (2 * v.hl) / v.speed + 0.7, model = v.model }
+	p.idleUntil = 0
+	if t < 0.75 then
+		p.hopAt = now -- a start: a little jump back
+		if v.mine and now - shoutAt > 7 then
+			shoutAt = now
+			local lines = {
+				L("Hey! Watch it!", "เฮ้ย! ระวังหน่อย!"),
+				L("Whoa! Slow down!", "โอ๊ย! ขับช้าๆ หน่อย!"),
+				L("Careful!", "ระวังสิ!"),
+			}
+			Feedback.bubble(p.pos + Vector3.new(0, 6.2, 0), L("Pedestrian", "คนเดินถนน"), lines[rng:NextInteger(1, #lines)])
+		end
+	end
+end
+
+-- Is something coming toward pos (or right there)? People about to cross wait for it.
+local function vehicleComing(pos: Vector3): (boolean, Vector3?)
+	for _, v in ipairs(movers) do
+		local rel = Vector3.new(pos.X - v.pos.X, 0, pos.Z - v.pos.Z)
+		local d = rel.Magnitude
+		if d < 13 then return true, v.pos end
+		local closing = rel:Dot(v.dir) / d * v.speed
+		if closing > 3 and d / closing < 3.6 then return true, v.pos end
+	end
+	return false, nil
+end
+
+local function watchTraffic(list, now: number, camPos: Vector3)
+	if now < moverAt then return end
+	moverAt = now + 0.12
+	scanMovers(now, camPos)
+	if #movers == 0 then return end
+	for _, p in ipairs(list) do
+		if p.active and p.pos and not p.dodge and not p.scripted and not (p.downUntil and now < p.downUntil)
+			and not (p.noDodgeUntil and now < p.noDodgeUntil) and (p.pos - camPos).Magnitude < WATCH_R then
+			local v, t, lat = threat(p)
+			if not v then
+				p.noticeAt = nil
+			elseif not p.noticeAt then
+				-- people need a moment to notice: longer when it comes from behind (they hear it first) or
+				-- while they stand looking at something; a vehicle that turns up close can still catch them
+				local toV = Vector3.new(v.pos.X - p.pos.X, 0, v.pos.Z - p.pos.Z)
+				local behind = toV.Magnitude > 0.1 and p.look and p.look:Dot(toV.Unit) < 0
+				p.noticeAt = now + rng:NextNumber(0.18, 0.45) + (behind and 0.3 or 0) + (now < (p.idleUntil or 0) and 0.2 or 0)
+			elseif now >= p.noticeAt then
+				p.noticeAt = nil
+				startDodge(p, v, t, lat, now)
+			end
+		end
+	end
+end
+
+-- One step of stepping out of the way (instead of the person's own walk). Returns true while moving.
+local function advanceDodge(p, dt: number, now: number): boolean
+	local d = p.dodge
+	local to = d.to - p.pos
+	local flat = Vector3.new(to.X, 0, to.Z)
+	local dist = flat.Magnitude
+	local moving = dist > 0.12
+	if moving then
+		local step = math.min(dist, d.speed * dt)
+		p.pos += flat / dist * step
+		local look = p.look:Lerp(flat / dist, math.min(1, dt * 10))
+		p.look = look.Magnitude > 0.01 and look.Unit or p.look
+	else
+		-- out of the way: turn and watch it go by
+		local m = d.model
+		local vp = m and m.Parent and m:GetPivot().Position
+		if vp then
+			local w = Vector3.new(vp.X - p.pos.X, 0, vp.Z - p.pos.Z)
+			if w.Magnitude > 0.5 then
+				local look = p.look:Lerp(w.Unit, math.min(1, dt * 6))
+				p.look = look.Magnitude > 0.01 and look.Unit or p.look
+			end
+		end
+		if now > d.untilT then
+			p.dodge = nil
+			p.idleUntil = now + rng:NextNumber(0.3, 0.9)
+		end
+	end
+	return moving
+end
+
 -- One step of walking. Returns true while the ped is moving.
 local function advance(p, dt: number, now: number, raining: boolean): boolean
 	if now < p.idleUntil then return false end
+	-- about to cross the street: look both ways, wait while something is coming
+	if p.lookFirst then
+		local coming, at = vehicleComing(p.pos)
+		if coming then
+			p.idleUntil = now + 0.5
+			if at then
+				local w = Vector3.new(at.X - p.pos.X, 0, at.Z - p.pos.Z)
+				if w.Magnitude > 0.5 then p.look = w.Unit end
+			end
+			return false
+		end
+		p.lookFirst = nil
+	end
 	local to = p.goal - p.pos
 	local flat = Vector3.new(to.X, 0, to.Z)
 	local dist = flat.Magnitude
@@ -752,11 +951,29 @@ local function startAvatars(templates: { Model })
 		local ok2, s = pcall(function() return p.animator:LoadAnimation(idle) end)
 		if ok1 and w then w.Looped = true; p.walk = w end
 		if ok2 and s then s.Looped = true; p.idle = s end
-		if p.sporty then
-			local ok3, r = pcall(function() return p.animator:LoadAnimation(run) end)
-			if ok3 and r then r.Looped = true; p.run = r end
+		-- (everyone can run now: joggers, and anyone hurrying out of a vehicle's way)
+		local ok3, r = pcall(function() return p.animator:LoadAnimation(run) end)
+		if ok3 and r then r.Looped = true; p.run = r end
+	end
+	-- anim = "walk" | "run" | "idle" | "none" (lying down); speed = how fast the body moves (studs/s)
+	local function setAnim(p, anim: string, speed: number, raining: boolean?)
+		tracks(p)
+		if anim == "run" and not p.run then anim = "walk" end
+		if anim ~= p.anim or not p.started then
+			p.anim, p.started = anim, true
+			p.moving = anim == "walk" or anim == "run"
+			local quick = anim == "none" and 0.05 or 0.3
+			if p.walk then if anim == "walk" then p.walk:Play(0.25) else p.walk:Stop(quick) end end
+			if p.run then if anim == "run" then p.run:Play(0.2) else p.run:Stop(quick) end end
+			if p.idle then if anim == "idle" then p.idle:Play(0.4) else p.idle:Stop(quick) end end
+		end
+		if anim == "run" then
+			p.run:AdjustSpeed(speed / (16 * p.hScale) * 1.3)
+		elseif anim == "walk" and p.walk then
+			p.walk:AdjustSpeed(speed * (raining and 1.2 or 1) / (WALK_NATURAL * p.hScale))
 		end
 	end
+	animHook = setAnim
 
 	RunService.Heartbeat:Connect(function(dt)
 		local me = rootPos()
@@ -768,10 +985,15 @@ local function startAvatars(templates: { Model })
 		local camPos = cam and cam.CFrame.Position
 		local want = math.floor(#list * density(h) * Perf.scale * Perf.limit("peds"))
 		checkZebra(now)
+		if camPos then watchTraffic(list, now, camPos) end
 		for i, p in ipairs(list) do
-			if i > want then
-				if p.active then p.active = false; release(p); p.model.Parent = nil end
+			if p.scripted then
+				-- a cutscene has this person now (client/Cutscene, client/Replay): it moves them
+				continue
+			elseif i > want then
+				if p.active then p.active = false; release(p); p.dodge = nil; p.model.Parent = nil end
 			elseif not p.active or (p.pos - me).Magnitude > DESPAWN or retired(p, h, camPos) then
+				p.dodge, p.lookFirst = nil, nil
 				if spawnAny(p, me, list) then
 					p.active = true
 					p.root.CFrame = CFrame.lookAt(p.pos + Vector3.new(0, p.height, 0), p.pos + Vector3.new(0, p.height, 0) + p.look)
@@ -784,9 +1006,8 @@ local function startAvatars(templates: { Model })
 				-- knocked down by a vehicle (Peds.hit): lie still, then get up
 				if not p.downPosed then
 					p.downPosed = true
-					if p.walk then p.walk:Stop(0.05) end
-					if p.run then p.run:Stop(0.05) end
-					if p.idle then p.idle:Stop(0.05) end
+					p.dodge = nil
+					setAnim(p, "none", 0)
 				end
 				lying(p, p.root)
 			else
@@ -794,25 +1015,23 @@ local function startAvatars(templates: { Model })
 					p.downPosed, p.downUntil, p.started = nil, nil, nil -- back on their feet; the tracks restart below
 				end
 				local moving
-				if p.role == "jog" then moving = advanceJog(p, dt)
+				local speed = p.speed
+				if p.dodge then
+					speed = p.dodge.speed
+					moving = advanceDodge(p, dt, now)
+				elseif p.role == "jog" then moving = advanceJog(p, dt)
 				elseif p.role == "cross" then moving = advanceCross(p, dt, now)
 				else moving = advance(p, dt, now, raining) end
-				local at = p.pos + Vector3.new(0, p.height, 0)
+				-- a start (startDodge): a quick little jump
+				local hop = 0
+				if p.hopAt then
+					local k = (now - p.hopAt) / 0.42
+					if k >= 1 then p.hopAt = nil else hop = math.sin(k * math.pi) * 0.9 end
+				end
+				local at = p.pos + Vector3.new(0, p.height + hop, 0)
 				p.root.CFrame = CFrame.lookAt(at, at + p.look)
-				tracks(p)
-				local anim = moving and ((p.role == "jog" and p.run) and "run" or "walk") or "idle"
-				if anim ~= p.anim or not p.started then
-					p.anim, p.started = anim, true
-					p.moving = moving
-					if p.walk then if anim == "walk" then p.walk:Play(0.3) else p.walk:Stop(0.35) end end
-					if p.run then if anim == "run" then p.run:Play(0.3) else p.run:Stop(0.35) end end
-					if p.idle then if anim == "idle" then p.idle:Play(0.4) else p.idle:Stop(0.3) end end
-				end
-				if anim == "run" then
-					p.run:AdjustSpeed(p.speed / (16 * p.hScale) * 1.3)
-				elseif anim == "walk" and p.walk then
-					p.walk:AdjustSpeed(p.speed * (raining and 1.2 or 1) / (WALK_NATURAL * p.hScale))
-				end
+				local fast = p.role == "jog" or speed > 7.5
+				setAnim(p, moving and (fast and "run" or "walk") or "idle", speed, raining)
 			end
 		end
 	end)
@@ -865,6 +1084,67 @@ local function startRigs()
 			end
 		end
 	end)
+end
+
+-- For the accident scenes (2026-11-19, owner: "the person who was hit should get up and come over to
+-- claim, not warp in"; "a CCTV replay"). A scene borrows the very person who was hit; while borrowed
+-- this script leaves them alone and the scene poses them with Peds.place, then hands them back where
+-- they ended up, and they walk on from there (slowly: they were hurt).
+
+-- People near pos (client/Replay's recording): { { p, pos, look, down } }
+function Peds.near(pos: Vector3, r: number)
+	local out = {}
+	local now = os.clock()
+	for _, p in ipairs(all) do
+		if p.active and p.pos and p.model and not p.scripted then
+			local dx, dz = p.pos.X - pos.X, p.pos.Z - pos.Z
+			if dx * dx + dz * dz < r * r then
+				table.insert(out, { p = p, pos = p.pos, look = p.look, down = p.downUntil ~= nil and now < p.downUntil })
+			end
+		end
+	end
+	return out
+end
+
+-- Take this person over (nil when they are not on the street any more, or are part-built).
+function Peds.borrow(p)
+	if not (p and p.active and p.model and p.model.Parent and p.root and p.hum) then return nil end
+	p.scripted = true
+	p.dodge, p.hopAt = nil, nil
+	return p
+end
+
+-- Pose a borrowed person. mode "lie" | "walk" | "run" | "idle" | "none" (no animation: the scene sets the
+-- joints); pos / look = where they are; speed = how fast they move (for the steps); cf = the root's exact
+-- frame (a scene's own body motion), else standing at pos facing look.
+function Peds.place(p, mode: string, pos: Vector3, look: Vector3, speed: number?, cf: CFrame?)
+	if not (p and p.root) then return end
+	p.pos = pos
+	if look.Magnitude > 0.01 then p.look = Vector3.new(look.X, 0, look.Z).Unit end
+	if mode == "lie" then
+		if animHook then animHook(p, "none", 0) end
+		lying(p, p.root)
+		return
+	end
+	if animHook then animHook(p, mode, speed or 0) end
+	if cf then
+		p.root.CFrame = cf
+	else
+		local at = pos + Vector3.new(0, p.height, 0)
+		p.root.CFrame = CFrame.lookAt(at, at + p.look)
+	end
+end
+
+-- Hand a borrowed person back, standing at pos: they carry on from there, slowly (they were hurt).
+function Peds.giveBack(p, pos: Vector3?, look: Vector3?)
+	if not p then return end
+	p.scripted = nil
+	p.downUntil, p.downPosed, p.started, p.anim, p.dodge = nil, nil, nil, nil, nil
+	if pos then p.pos = pos end
+	if look and look.Magnitude > 0.01 then p.look = Vector3.new(look.X, 0, look.Z).Unit end
+	p.speed = math.min(p.speed or 3, 2.8)
+	p.idleUntil = os.clock() + 1.2
+	if p.role == "walk" and p.edge then pcall(nextGoal, p) end
 end
 
 function Peds.start()
@@ -922,6 +1202,8 @@ function Peds.start()
 			best.pos = Vector3.new(at.X, g and g.Position.Y or best.pos.Y, at.Z)
 			best.look = -look
 			best.idleUntil = os.clock() + 12
+			best.dodge, best.noticeAt = nil, nil
+			best.noDodgeUntil = os.clock() + 12 -- (a test target stays put: it would step out of the way)
 		end)
 	end
 end

@@ -123,10 +123,27 @@ local function update(dt: number)
 	local focus = Vector3.new(chassis.Position.X, focusY, chassis.Position.Z) + ahead
 	local eye = focus + back * dist + Vector3.new(0, height - 0.4, 0)
 
-	-- don't end up inside a building
+	-- don't end up inside a building. 2026-11-19 (owner: roadside trees "block the screen"): a thin thing
+	-- between you and the camera (a tree trunk, a lamp post, a power pole) is looked past instead of
+	-- pulling the camera in against the vehicle; only something wide, a wall, does that
 	local dir = eye - focus
-	local hit = Workspace:Raycast(focus, dir, rayParams)
-	if hit then eye = focus + dir.Unit * math.max(1.5, hit.Distance - 0.8) end
+	local from = focus
+	local unit = dir.Magnitude > 0.01 and dir.Unit or Vector3.zAxis
+	for _ = 1, 3 do
+		local left = dir.Magnitude - (from - focus).Magnitude
+		if left <= 0.1 then break end
+		local hit = Workspace:Raycast(from, unit * left, rayParams)
+		if not hit then break end
+		local inst = hit.Instance
+		local s = inst.Size
+		local b = math.max(math.min(s.X, s.Y), math.min(math.max(s.X, s.Y), s.Z)) -- the middle one of the three sizes
+		if inst:IsA("BasePart") and b < 4.5 then
+			from = hit.Position + unit * 0.05
+		else
+			eye = focus + unit * math.max(1.5, (hit.Position - focus).Magnitude - 0.8)
+			break
+		end
+	end
 
 	local lookAt = focus + flatLook * (5 + math.min(speed, 90) * 0.1) - Vector3.new(0, 0.6, 0)
 	local camCf = CFrame.lookAt(eye + Vector3.new(0, bump * 0.35, 0), lookAt)

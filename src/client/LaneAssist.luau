@@ -25,6 +25,10 @@ local function correction(c, ctx): number?
 	if not enabled() then return nil end
 	local v = ctx.speedF
 	if v < 12 then return nil end
+	-- 2026-11-19 (owner, again: "the vehicle is hard to control"): the pull started the moment you let go of
+	-- the stick, so a lane change or an overtake was dragged straight back: it felt like the bike fought you.
+	-- Now it waits until you have ridden straight for a moment, and leaves you alone in the other lane.
+	if (ctx.sinceSteer or 99) < 1.8 then return nil end
 	local graph = GPS.graph()
 	if not graph then return nil end
 	local pos = c.chassis.Position
@@ -53,6 +57,7 @@ local function correction(c, ctx): number?
 	local px, pz = RoadGraph.project(best, pos.X, pos.Z)
 	local cx, cz = px - rx * half * 0.5, pz - rz * half * 0.5 -- lane centre: half of the half-width to the left
 	local lateral = (pos.X - cx) * rx + (pos.Z - cz) * rz -- + = right of the lane centre
+	if math.abs(lateral) > half * 0.42 then return nil end -- riding the other lane (overtaking) or the very edge on purpose
 	local headingRight = fwd.X * rx + fwd.Z * rz -- + = pointing right of the road
 	local wantHeading = -math.clamp(lateral * 0.05, -0.12, 0.12) -- drift back at a shallow angle
 	local err = headingRight - wantHeading

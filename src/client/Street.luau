@@ -24,6 +24,10 @@ local Perf = require(script.Parent.Perf)
 local Street = {}
 Street.onCrash = nil :: ((Model, number) -> ())? -- client/Accident
 
+-- Keep a crashed AI car standing (hazards on) a while longer: its driver is out talking to you in the
+-- claim scene (client/Cutscene). Defined below, once the car lists exist.
+Street.hold = function(_model: Model, _seconds: number) end
+
 local LAMP = {
 	red = { Color3.fromRGB(255, 50, 40), 1 }, yellow = { Color3.fromRGB(255, 200, 40), 2 }, green = { Color3.fromRGB(60, 230, 110), 3 },
 }
@@ -81,6 +85,19 @@ end
 --   * after a crash it stalls with its hazard lights on, honks, then drives on
 local cars = {} -- route cars: [model] = state
 local locals = {} -- local traffic: list of states
+Street.hold = function(model: Model, seconds: number)
+	local until_ = Workspace:GetServerTimeNow() + seconds
+	local c = cars[model]
+	if not c then
+		for _, l in ipairs(locals) do
+			if l.model == model then c = l break end
+		end
+	end
+	if c then
+		c.stallUntil = math.max(c.stallUntil or 0, until_)
+		c.v = 0
+	end
+end
 local signalsById = nil :: any
 local ACCEL, BRAKE = 9, 34 -- studs/s²
 local player = Players.LocalPlayer
@@ -296,7 +313,8 @@ local function drive(c, target: number, byPlayer: boolean, here: Vector3, dir: V
 	local p = here + Vector3.new(0, c.y, 0)
 	c.vis = c.smooth and c.vis and c.vis:Lerp(p, math.min(1, dt * 12)) or p
 	c.at = p
-	c.model:PivotTo(CFrame.lookAt(c.vis, c.vis + c.look))
+	-- (client/Replay moves a car itself while it shows the CCTV replay of a crash)
+	if not c.model:GetAttribute("ReplayHold") then c.model:PivotTo(CFrame.lookAt(c.vis, c.vis + c.look)) end
 	local braking = c.v < c.base - 1 and (dv < -0.5 or c.v < 1)
 	if braking ~= c.braking then c.braking = braking; setLamps(c.brakes, braking, Color3.fromRGB(255, 40, 30)) end
 	local hazard = stalled and blink

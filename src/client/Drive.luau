@@ -51,7 +51,10 @@ rayParams.RespectCanCollide = true
 -- a tap of A/D swerved the bike across the road. Now the lock is whatever keeps the sideways acceleration
 -- (v² / turn radius) under the tyres' grip: full lock when slow, a calm, stable line when fast.
 -- 1 stud = 0.28 m, so 35 studs/s² ≈ 1 g; LAT_G = 1.7 g for ordinary grip, more for grippy sports tyres.
-local LAT_G = 1.7
+-- 2026-11-19 (owner, again: "hard to control"): 1.7 g left a scooter at 50 km/h needing a 50-stud circle, so a
+-- turn at a junction ran wide unless you braked hard; 2.0 g tightens it by a sixth and is still far from the
+-- old 3-6 g swerve.
+local LAT_G = 2.0
 local function maxSteer(c, speedF: number, gripMult: number?): number
 	local aLat = 35 * LAT_G * (c.stats.grip / 10.5) * (gripMult or 1)
 	local v = math.abs(speedF)
@@ -272,17 +275,22 @@ local function step(dt: number)
 	if Drive.autoGas and t.throttle == 0 and throttle == 0 and not handbrake and Drive.info.auto ~= true then throttle = 1 end
 	-- keys are on/off: ramp the steering in (slower at speed) and let it centre quickly, so a tap is a nudge.
 	-- Analogue input (thumb pad, gamepad stick) already says how hard, so it passes almost straight through.
+	if math.abs(steerIn) > 0.08 then c.lastSteerAt = os.clock() end -- (LaneAssist waits a moment after you steer)
 	local analogue = steerIn ~= 0 and math.abs(steerIn) < 0.999
 	local fracNow = math.clamp(math.abs(speedF) / math.max(c.stats.topSpeed, 1), 0, 1)
 	c.steerCmd = c.steerCmd or 0
 	local towardZero = steerIn == 0 or (c.steerCmd ~= 0 and math.sign(steerIn) ~= math.sign(c.steerCmd))
-	local rate = analogue and 12 or (towardZero and 7 or (4.2 - 2.4 * fracNow))
+	-- (2026-11-19: at speed the key took ~0.55 s to reach full lock, ~0.8 s with the smoothing after it: the
+	-- turn came late, then overshot, and riders zig-zagged correcting it. Now ~0.3 s; the lock itself
+	-- is still limited by the grip at that speed, so a tap is still only a nudge.)
+	local rate = analogue and 12 or (towardZero and 9 or (6 - 2.6 * fracNow))
 	local dCmd = steerIn - c.steerCmd
 	c.steerCmd += math.clamp(dCmd, -rate * dt, rate * dt)
 	steerIn = c.steerCmd
 	-- lane assist: a gentle pull to the middle of your lane while you barely steer (client/LaneAssist)
 	if Drive.laneAssist and math.abs(steerIn) < 0.08 and not handbrake and not Drive.info.auto then
-		local ok, corr = pcall(Drive.laneAssist, c, { cf = cf, fwd = fwd, right = right, speedF = speedF, dt = dt, maxAngle = maxSteer(c, speedF) })
+		local ok, corr = pcall(Drive.laneAssist, c, { cf = cf, fwd = fwd, right = right, speedF = speedF, dt = dt, maxAngle = maxSteer(c, speedF),
+			sinceSteer = os.clock() - (c.lastSteerAt or 0) })
 		if ok and type(corr) == "number" then steerIn = math.clamp(steerIn + corr, -0.6, 0.6) end
 	end
 	local ap = Drive.autopilot
@@ -455,7 +463,7 @@ local function step(dt: number)
 		local wantYaw = -speedF * math.tan(c.steer) / c.wheelbase
 		local av = chassis.AssemblyAngularVelocity
 		local yawNow = av:Dot(up)
-		chassis.AssemblyAngularVelocity = av + up * ((wantYaw - yawNow) * math.min(1, dt * 6))
+		chassis.AssemblyAngularVelocity = av + up * ((wantYaw - yawNow) * math.min(1, dt * 8))
 		if not handbrake then
 			local lv = chassis.AssemblyLinearVelocity
 			chassis.AssemblyLinearVelocity = lv - right * (lv:Dot(right) * math.min(1, dt * 4))

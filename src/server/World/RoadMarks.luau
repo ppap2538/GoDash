@@ -129,7 +129,7 @@ function RoadMarks.plan(ctx)
 						end
 					elseif islandR >= 12 then
 						-- Khon Kaen's own flower: a golden-shower tree (ราชพฤกษ์) in the middle
-						S.tree(m, base * CF(0, 0.9, 0), rng, "koon")
+						S.tree(m, base * CF(0, 0.9, 0), rng, "koon", { maxR = islandR - 1.5 }) -- its canopy stays over the island, not the lanes
 						Kit.cyl(m, 7, 1.2, base * CF(0, 1.5, 0), Color3.fromRGB(214, 206, 190), M.Concrete, { decor = true })
 					else
 						S.tree(m, base * CF(0, 0.9, 0), rng, "bush")

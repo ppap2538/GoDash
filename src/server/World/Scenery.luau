@@ -3,6 +3,7 @@
 local Kit = require(script.Parent.Kit)
 local Assets = require(script.Parent.Assets)
 local Solid = require(script.Parent.Solid)
+local PlantDefs = require(game:GetService("ReplicatedStorage").Shared.Config.Plants)
 local M = Kit.M
 local C = Kit.COLORS
 local V3 = Vector3.new
@@ -209,7 +210,10 @@ end
 S.PLANTS = {
 	rain = { { "rain", 1 }, scale = { 0.6, 0.82 }, trunk = 3.6 },
 	small = { { "shade", 3 }, { "mango", 2 }, { "koon", 3 }, { "frangipani", 1 }, scale = { 0.6, 0.85 }, trunk = 2.4 },
-	street = { { "koon", 4 }, { "shade", 3 }, { "mango", 2 }, { "rain", 1 }, scale = { 0.62, 0.8 }, trunk = 2.6 },
+	-- street trees hang over the road, so their canopy starts above the chase camera (clear, studs; was
+	-- koon / shade at 0.62-0.8 with leaves from ~5 studs up, right in the camera's way): grown big enough
+	-- for that (up to maxScale), and a species that cannot get there (the low koon) is not planted here
+	street = { { "shade", 3 }, { "mango", 3 }, { "rain", 2 }, scale = { 0.85, 1.05 }, trunk = 2.6, clear = 15.5, maxScale = 1.4 },
 	koon = { { "koon", 1 }, scale = { 0.65, 0.9 }, trunk = 2.2 },
 	mango = { { "mango", 1 }, scale = { 0.6, 0.85 }, trunk = 2.6 },
 	frangipani = { { "frangipani", 1 }, scale = { 0.8, 1.1 }, trunk = 1.6 },
@@ -259,7 +263,7 @@ function S.sugarPalm(parent: Instance, base: CFrame, rng: Random)
 	return m
 end
 
-function S.tree(parent: Instance, base: CFrame, rng: Random, kind: string?)
+function S.tree(parent: Instance, base: CFrame, rng: Random, kind: string?, opts: { maxR: number? }?)
 	local k = kind or "small"
 	if k == "sugarpalm" then
 		S.sugarPalm(parent, base, rng)
@@ -280,9 +284,25 @@ function S.tree(parent: Instance, base: CFrame, rng: Random, kind: string?)
 		if roll <= 0 then pickKind = it[1] break end
 	end
 	local names = Assets.plants(pickKind)
+	if plan.clear and #names > 0 then
+		-- only the models whose canopy can clear the camera at this plan's largest size
+		local ok = {}
+		for _, nm in ipairs(names) do
+			local crown = PlantDefs[nm] and PlantDefs[nm].crown
+			if crown and crown * plan.maxScale >= plan.clear then table.insert(ok, nm) end
+		end
+		names = ok
+	end
 	if #names > 0 then
 		local name = names[rng:NextInteger(1, #names)]
 		local scale = rng:NextNumber(plan.scale[1], plan.scale[2])
+		local crown = PlantDefs[name] and PlantDefs[name].crown
+		if plan.clear and crown and crown * scale < plan.clear then scale = math.min(plan.maxScale, plan.clear / crown) end
+		-- (a tree in a small traffic island stays inside it: opts.maxR = the radius its canopy may reach)
+		local size = Assets.template(name) and Assets.template(name):GetAttribute("Size")
+		if opts and opts.maxR and typeof(size) == "Vector3" then
+			scale = math.min(scale, math.max(0.35, opts.maxR * 2 / math.max(size.X, size.Z)))
+		end
 		local flat = CFrame.new(base.Position) * CFrame.Angles(0, rad(rng:NextNumber(0, 360)), 0)
 		local tree = Assets.place(parent, name, flat * CF(0, -0.2, 0), scale)
 		if tree then

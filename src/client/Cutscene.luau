@@ -22,6 +22,8 @@ local Feed = require(script.Parent.Feed)
 local State = require(script.Parent.State)
 local Lang = require(script.Parent.Lang)
 local Feedback = require(script.Parent.Feedback)
+local Peds = require(script.Parent.Peds)
+local Replay = require(script.Parent.Replay)
 
 local Cutscene = {}
 local player = Players.LocalPlayer
@@ -796,7 +798,7 @@ end
 -- info = { reason = "checkpoint" | "redlight", amount }. The vehicle brakes to a stop (State.cutscene
 -- holds it), a police officer walks up to the rider (the kerb side on a two-wheeler, the driver's
 -- window on the right of a car), holds out the ticket, and the ticket card shows the charge and fine.
-local function ticketCard(reason: string, amount: number, n: number?, limit: number?): Frame
+local function ticketCard(reason: string, amount: number, n: number?, limit: number?, waived: boolean?): Frame
 	local card = Instance.new("Frame")
 	card.Name = "Ticket"
 	card.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -809,7 +811,7 @@ local function ticketCard(reason: string, amount: number, n: number?, limit: num
 	local claim = reason:sub(1, 4) == "hit_" -- a damage claim after an accident (client/Accident), not a police ticket
 	local band = Instance.new("Frame")
 	band.Size = UDim2.new(1, 0, 0, 40)
-	band.BackgroundColor3 = claim and Color3.fromRGB(214, 110, 20) or Color3.fromRGB(190, 28, 36)
+	band.BackgroundColor3 = waived and Color3.fromRGB(40, 150, 80) or (claim and Color3.fromRGB(214, 110, 20) or Color3.fromRGB(190, 28, 36))
 	band.ZIndex = 4
 	band.Parent = card
 	local bc = Instance.new("UICorner"); bc.CornerRadius = UDim.new(0, 10); bc.Parent = band
@@ -828,7 +830,7 @@ local function ticketCard(reason: string, amount: number, n: number?, limit: num
 		t.Parent = parent
 		return t
 	end
-	text(band, claim and L("🧾 DAMAGE CLAIM", "🧾 ใบเรียกค่าเสียหาย") or L("🚔 TRAFFIC TICKET", "🚔 ใบสั่ง · TRAFFIC TICKET"), 0, 40, 18, Color3.new(1, 1, 1), Enum.Font.GothamBlack)
+	text(band, waived and L("🤝 THEY LET IT GO", "🤝 คู่กรณีไม่เอาเรื่อง") or (claim and L("🧾 DAMAGE CLAIM", "🧾 ใบเรียกค่าเสียหาย") or L("🚔 TRAFFIC TICKET", "🚔 ใบสั่ง · TRAFFIC TICKET")), 0, 40, 18, Color3.new(1, 1, 1), Enum.Font.GothamBlack)
 	local CHARGE = {
 		redlight = L("Ran a red light", "ฝ่าสัญญาณไฟแดง"), sidewalk = L("Riding on the pavement", "ขับขี่บนทางเท้า"),
 		nolicence = L("No driving licence", "ไม่มีใบอนุญาตขับขี่"),
@@ -839,7 +841,11 @@ local function ticketCard(reason: string, amount: number, n: number?, limit: num
 	text(card, claim and L("What happened", "เหตุ") or L("Charge", "ข้อหา"), 48, 16, 12, Color3.fromRGB(120, 120, 128), Enum.Font.GothamMedium)
 	text(card, charge, 64, 24, 18, Color3.fromRGB(30, 30, 36), Enum.Font.GothamBold)
 	text(card, reason == "hit_ped" and L("Hospital bill", "ค่ารักษา") or (claim and L("Repair bill", "ค่าซ่อม") or L("Fine", "ค่าปรับ")), 96, 16, 12, Color3.fromRGB(120, 120, 128), Enum.Font.GothamMedium)
-	text(card, amount > 0 and ("฿" .. amount) or L("No cash on you", "ไม่มีเงินสดติดตัว"), 110, 34, 30, Color3.fromRGB(190, 28, 36), Enum.Font.GothamBlack)
+	if waived then
+		text(card, L("฿0 · settled, no bill", "฿0 · ยอมความ ไม่ต้องจ่าย"), 110, 34, 24, Color3.fromRGB(28, 120, 60), Enum.Font.GothamBlack)
+	else
+		text(card, amount > 0 and ("฿" .. amount) or L("No cash on you", "ไม่มีเงินสดติดตัว"), 110, 34, 30, Color3.fromRGB(190, 28, 36), Enum.Font.GothamBlack)
+	end
 	local TIP = {
 		redlight = L("Stop at red. Turning left on red is allowed.", "ไฟแดงต้องหยุด (เลี้ยวซ้ายผ่านตลอดได้)"),
 		sidewalk = L("Pavements are for feet. Officers patrol near the markets.", "ทางเท้ามีไว้เดิน แถวตลาดมีเทศกิจนะ"),
@@ -851,7 +857,7 @@ local function ticketCard(reason: string, amount: number, n: number?, limit: num
 	local tip = TIP[reason] or L("Next time, go round the checkpoint.", "ครั้งหน้าลองขับหลบด่านดูนะ")
 	text(card, tip, 146, 22, 12, Color3.fromRGB(90, 90, 98), Enum.Font.GothamMedium)
 	-- (2026-11-19) the daily limit of server/FineService: how many of today's tickets this was
-	if n and limit then
+	if n and limit and not waived then
 		text(card, claim and L(("Claim %d of %d today · after that they let it go"):format(n, limit), ("วันนี้ครั้งที่ %d/%d · เกินนี้คู่กรณีไม่เอาเรื่อง"):format(n, limit))
 			or L(("Ticket %d of %d today · after that, warnings only"):format(n, limit), ("ใบสั่งวันนี้ %d/%d · ครบแล้วตำรวจแค่ตักเตือน"):format(n, limit)),
 			168, 20, 12, Color3.fromRGB(28, 120, 60), Enum.Font.GothamBold)
@@ -864,18 +870,98 @@ local function ticketCard(reason: string, amount: number, n: number?, limit: num
 	stamp.Position = UDim2.fromScale(0.78, 0.66)
 	stamp.Size = UDim2.fromOffset(110, 40)
 	stamp.Rotation = -14
-	stamp.Text = amount > 0 and L("PAID", "ชำระแล้ว") or L("NOTED", "บันทึกแล้ว")
+	stamp.Text = waived and L("SETTLED", "ยอมความ") or (amount > 0 and L("PAID", "ชำระแล้ว") or L("NOTED", "บันทึกแล้ว"))
 	stamp.TextSize = 24
 	stamp.Font = Enum.Font.GothamBlack
-	stamp.TextColor3 = Color3.fromRGB(190, 28, 36)
+	stamp.TextColor3 = waived and Color3.fromRGB(28, 130, 60) or Color3.fromRGB(190, 28, 36)
 	stamp.TextTransparency = 1
 	stamp.ZIndex = 6
-	local sk = Instance.new("UIStroke"); sk.Color = Color3.fromRGB(190, 28, 36); sk.Thickness = 2.5; sk.Transparency = 1
+	local sk = Instance.new("UIStroke"); sk.Color = waived and Color3.fromRGB(28, 130, 60) or Color3.fromRGB(190, 28, 36); sk.Thickness = 2.5; sk.Transparency = 1
 	sk.ApplyStrokeMode = Enum.ApplyStrokeMode.Border; sk.Parent = stamp
 	local sc = Instance.new("UICorner"); sc.CornerRadius = UDim.new(0, 6); sc.Parent = stamp
 	stamp.Parent = card
 	card:SetAttribute("NoTranslate", true)
 	return card
+end
+
+-- (2026-11-19) The police motorbike that pulls up behind you for a red light or the zebra crossing (owner:
+-- "the other scenes too": the officer used to walk up from nowhere). A motorbike from the local traffic kit
+-- with its rider in uniform, a POLICE box on the back and a light bar flashing red and blue.
+local function policeBike(): (Model?, Model?)
+	local kit = ReplicatedStorage:FindFirstChild("GoDashTrafficKit")
+	if not kit then return nil, nil end
+	local bikes = {}
+	for _, m in ipairs(kit:GetChildren()) do
+		local d = m:IsA("Model") and Vehicles.ById[m.Name]
+		if d and d.class == "bike" and not d.pedal and m:GetAttribute("HasRider") then table.insert(bikes, m) end
+	end
+	if #bikes == 0 then return nil, nil end
+	local bike = bikes[math.random(1, #bikes)]:Clone()
+	bike.Name = "GoDashPoliceBike"
+	local rider
+	for _, ch in ipairs(bike:GetChildren()) do
+		if ch:IsA("Model") and (ch:FindFirstChildOfClass("Humanoid") or ch.Name == "Rider") then rider = ch end
+	end
+	if rider then pcall(RiderPose.policeUniform, rider) end
+	for _, d in ipairs(bike:GetDescendants()) do
+		if d:IsA("BasePart") then d.Anchored = true; d.CanCollide = false; d.CanQuery = false; d.CanTouch = false
+		elseif d:IsA("LuaSourceContainer") or d:IsA("Sound") then d:Destroy() end
+	end
+	local pv = bike:GetPivot()
+	local size = bike:GetExtentsSize()
+	local len = math.max(size.X, size.Z)
+	local function part(sz: Vector3, cf: CFrame, col: Color3, mat: Enum.Material?): Part
+		local p = Instance.new("Part")
+		p.Anchored = true; p.CanCollide = false; p.CanQuery = false; p.CanTouch = false; p.CastShadow = false
+		p.Size = sz
+		p.CFrame = pv * cf
+		p.Color = col
+		p.Material = mat or Enum.Material.SmoothPlastic
+		p.Parent = bike
+		return p
+	end
+	local box = part(Vector3.new(1.7, 1.3, 1.3), CFrame.new(0, 1.15, len * 0.36), Color3.fromRGB(244, 244, 240))
+	part(Vector3.new(1.74, 0.28, 1.34), CFrame.new(0, 1.05, len * 0.36), Color3.fromRGB(40, 70, 150))
+	local sg = Instance.new("SurfaceGui")
+	sg.Face = Enum.NormalId.Back
+	sg.CanvasSize = Vector2.new(170, 130)
+	sg.LightInfluence = 0.4
+	local t = Instance.new("TextLabel")
+	t.BackgroundTransparency = 1
+	t.Size = UDim2.fromScale(1, 0.62)
+	t.Text = "ตำรวจ\nPOLICE"
+	t.Font = Enum.Font.GothamBlack
+	t.TextScaled = true
+	t.TextColor3 = Color3.fromRGB(30, 50, 120)
+	t.Parent = sg
+	sg:SetAttribute("NoTranslate", true)
+	sg.Parent = box
+	part(Vector3.new(0.14, 0.9, 0.14), CFrame.new(0, 2.2, len * 0.36 + 0.4), Color3.fromRGB(40, 40, 44), Enum.Material.Metal)
+	local red = part(Vector3.new(0.55, 0.32, 0.36), CFrame.new(-0.32, 2.75, len * 0.36 + 0.4), Color3.fromRGB(255, 40, 40), Enum.Material.Neon)
+	local blue = part(Vector3.new(0.55, 0.32, 0.36), CFrame.new(0.32, 2.75, len * 0.36 + 0.4), Color3.fromRGB(40, 90, 255), Enum.Material.Neon)
+	red.Name, blue.Name = "PoliceRed", "PoliceBlue"
+	for _, p in ipairs({ red, blue }) do
+		local l = Instance.new("PointLight")
+		l.Range = 9 -- (16 / 3 washed the whole street pink)
+		l.Brightness = 1.2
+		l.Color = p.Color
+		l.Parent = p
+	end
+	bike:SetAttribute("LightRed", true)
+	return bike, rider
+end
+
+local function flashBar(bike: Model)
+	local on = (os.clock() % 0.5) < 0.25
+	for _, p in ipairs(bike:GetChildren()) do
+		if p:IsA("BasePart") and (p.Name == "PoliceRed" or p.Name == "PoliceBlue") then
+			local isRed = p.Name == "PoliceRed"
+			local lit = (isRed and on) or (not isRed and not on)
+			p.Transparency = lit and 0 or 0.75
+			local l = p:FindFirstChildOfClass("PointLight")
+			if l then l.Enabled = lit end
+		end
+	end
 end
 
 local function fineScene(info: any)
@@ -886,6 +972,7 @@ local function fineScene(info: any)
 	local chassis = vehicle and (vehicle :: Model).PrimaryPart
 	local store = ReplicatedStorage:FindFirstChild("GoDashModels")
 	local cam = Workspace.CurrentCamera
+	local Y = Vector3.yAxis
 	-- an accident claim also finds you on foot (a hard crash threw you off): the claimant walks up to you
 	local onFoot = false
 	local footRoot = char and char:FindFirstChild("HumanoidRootPart") :: BasePart?
@@ -901,10 +988,17 @@ local function fineScene(info: any)
 	if not gui then buildGui() end
 	playing = true
 	State.cutscene = true -- Drive holds the vehicle: no throttle, handbrake on
+	local sceneAt = os.clock()
 	local reason = info and info.reason or "checkpoint"
 	local amount = tonumber(info and info.amount) or 0
+	local waived = info and info.waived == true
+	local claim = reason:sub(1, 4) == "hit_"
 	local def = vehicle and Vehicles.ById[vehicle:GetAttribute("VehicleId") or ""]
 	local car = def ~= nil and def.class == "car"
+	-- the very person who was hit: borrowed from client/Peds right away, so they stay down where they fell
+	local victim = reason == "hit_ped" and info.ped and Peds.borrow(info.ped) or nil
+	local otherCar = claim and reason == "hit_car" and info.carModel and info.carModel.Parent and info.carModel or nil
+	if otherCar and info.holdCar then pcall(info.holdCar, otherCar, 30) end
 	local ignore: { Instance } = { char }
 	if vehicle then table.insert(ignore, vehicle) end
 	local vehicles = Workspace:FindFirstChild("Vehicles")
@@ -912,8 +1006,10 @@ local function fineScene(info: any)
 	-- on foot: stand still for the talk (OnFoot would let the keys walk you away)
 	local footWasAnchored = onFoot and footRoot and footRoot.Anchored
 	if onFoot and footRoot then footRoot.AssemblyLinearVelocity = Vector3.zero; footRoot.Anchored = true end
-	local npcs = Workspace:FindFirstChild("NPCs")
-	if npcs then table.insert(ignore, npcs) end
+	for _, n in ipairs({ "NPCs", "GoDashPedestrians", "GoDashLocalTraffic", "Traffic" }) do
+		local f = Workspace:FindFirstChild(n)
+		if f then table.insert(ignore, f) end
+	end
 
 	local huds = {}
 	for _, g in ipairs(player.PlayerGui:GetChildren()) do
@@ -927,10 +1023,11 @@ local function fineScene(info: any)
 		local cf = chassis.CFrame
 		local look = Vector3.new(cf.LookVector.X, 0, cf.LookVector.Z)
 		look = look.Magnitude > 0.1 and look.Unit or Vector3.zAxis
-		return seat.Position, look, look:Cross(Vector3.yAxis) -- seat, forward, right
+		return seat.Position, look, look:Cross(Y) -- seat, forward, right
 	end
 	local side = car and 1 or -1 -- +1 = right (a car's driver's window), -1 = left (the kerb)
 	local camCf
+	local fov = 55
 	local function follow()
 		local sp, fwd, right = frame()
 		local focus = sp + Vector3.new(0, 1.2, 0)
@@ -939,6 +1036,17 @@ local function fineScene(info: any)
 			if clear(focus, eye, ignore) then return CFrame.lookAt(eye, focus) end
 		end
 		return CFrame.lookAt(sp + fwd * 9 + Vector3.new(0, 6, 0), focus)
+	end
+	-- a shot of `at` from the open side, `dist` away (the first side with a clear view)
+	local function shotOf(at: Vector3, across: Vector3, dist: number, up: number): CFrame
+		local a = Vector3.new(across.X, 0, across.Z)
+		a = a.Magnitude > 0.1 and a.Unit or Vector3.xAxis
+		local perp = a:Cross(Y)
+		for _, s in ipairs({ 1, -1 }) do
+			local eye = at + perp * s * dist + a * 2 + Y * up
+			if clear(at + Y * 1.5, eye, ignore) then return CFrame.lookAt(eye, at + Y * 1.4) end
+		end
+		return CFrame.lookAt(at + Y * (up + 6) + a * dist * 0.6, at + Y * 1.4)
 	end
 	camCf = follow()
 	local started = os.clock()
@@ -949,20 +1057,26 @@ local function fineScene(info: any)
 		if ty == Enum.UserInputType.Keyboard or ty == Enum.UserInputType.MouseButton1 or ty == Enum.UserInputType.Touch or ty == Enum.UserInputType.Gamepad1 then skip = true end
 	end)
 	local tracking = true
+	local bike: Model? = nil -- the police motorbike, while it is in the scene
 	RunService:BindToRenderStep("GoDashCutscene", Enum.RenderPriority.Last.Value + 2, function()
 		if tracking then camCf = cam.CFrame:Lerp(follow(), 0.18) end
 		cam.CameraType = Enum.CameraType.Scriptable
 		cam.CFrame = camCf
-		cam.FieldOfView = 55
+		cam.FieldOfView = fov
+		if bike then flashBar(bike) end
 	end)
-	local claim = reason:sub(1, 4) == "hit_"
-	caption.Text = (reason == "hit_ped" and L("🚑 You hit someone! They want the hospital bill", "🚑 ชนคนเดินถนน! เขาเดินมาเรียกค่ารักษา"))
-		or (reason == "hit_car" and L("💥 Crash! The other driver wants the repair bill", "💥 ชนรถคันอื่น! คู่กรณีลงมาเรียกค่าซ่อม"))
-		or (reason == "redlight" and L("🚦 Pulled over: you ran a red light", "🚦 ตำรวจเรียกจอด: ฝ่าไฟแดง"))
-		or (reason == "zebra" and L("🚸 Pulled over: you didn't stop at the crossing", "🚸 ตำรวจเรียกจอด: ไม่หยุดให้คนข้ามทางม้าลาย"))
-		or (reason == "sidewalk" and L("📢 Municipal officer: no riding on the pavement!", "📢 เทศกิจเรียก: ห้ามขี่บนทางเท้า!"))
-		or (reason == "nolicence" and L("🚨 Checkpoint: no driving licence!", "🚨 ด่านตรวจ: ไม่มีใบขับขี่!"))
-		or L("🚨 Pulled over at a police checkpoint", "🚨 ตำรวจเรียกจอดที่ด่านตรวจ")
+	local function setCaption()
+		caption.Text = (reason == "hit_ped" and (waived and L("🤝 You hit someone... they say it's OK", "🤝 ชนคนเดินถนน... แต่เขาไม่เอาเรื่อง")
+				or L("🚑 You hit someone! They want the hospital bill", "🚑 ชนคนเดินถนน! เขาเดินมาเรียกค่ารักษา")))
+			or (reason == "hit_car" and (waived and L("🤝 Crash! The other driver lets it go", "🤝 ชนรถคันอื่น! แต่คู่กรณีไม่เอาเรื่อง")
+				or L("💥 Crash! The other driver wants the repair bill", "💥 ชนรถคันอื่น! คู่กรณีลงมาเรียกค่าซ่อม")))
+			or (reason == "redlight" and L("🚦 Pulled over: you ran a red light", "🚦 ตำรวจเรียกจอด: ฝ่าไฟแดง"))
+			or (reason == "zebra" and L("🚸 Pulled over: you didn't stop at the crossing", "🚸 ตำรวจเรียกจอด: ไม่หยุดให้คนข้ามทางม้าลาย"))
+			or (reason == "sidewalk" and L("📢 Municipal officer: no riding on the pavement!", "📢 เทศกิจเรียก: ห้ามขี่บนทางเท้า!"))
+			or (reason == "nolicence" and L("🚨 Checkpoint: no driving licence!", "🚨 ด่านตรวจ: ไม่มีใบขับขี่!"))
+			or L("🚨 Pulled over at a police checkpoint", "🚨 ตำรวจเรียกจอดที่ด่านตรวจ")
+	end
+	setCaption()
 	caption.TextTransparency = 1
 	gui.Enabled = true
 	fade.BackgroundTransparency = 1
@@ -971,104 +1085,332 @@ local function fineScene(info: any)
 	tween(caption, 0.4, { TextTransparency = 0 })
 	Feedback.bad()
 
+	local function waitFor(seconds: number)
+		local t0 = os.clock()
+		while os.clock() - t0 < seconds and not skip do RunService.RenderStepped:Wait() end
+	end
+	-- a short cut to black and back (moving the story on without showing every step)
+	local function cut(fn: () -> ())
+		tween(fade, 0.18, { BackgroundTransparency = 0 })
+		task.wait(0.2)
+		fn()
+		tween(fade, 0.25, { BackgroundTransparency = 1 })
+	end
+
 	local actor, card
+	local ownActor = true -- false: the actor is the borrowed pedestrian (handed back, not destroyed)
+	local riderHidden = {} -- the other bike's rider, hidden while they are "off" it
+	local standAt: Vector3? = nil
 	local ok, err = pcall(function()
 		-- brake to a stop
 		local t0 = os.clock()
 		while os.clock() - t0 < 3 do
 			local v = chassis.AssemblyLinearVelocity
 			if Vector3.new(v.X, 0, v.Z).Magnitude < 1.2 then break end
+			if victim then Peds.place(victim, "lie", victim.pos, victim.look) end
 			RunService.RenderStepped:Wait()
 		end
 		tracking = false
-		-- the officer, or after an accident the person you hit / the other driver (client/Accident)
-		local who = claim and info.claimant and store:FindFirstChild(info.claimant)
-		actor = (who and who:IsA("Model") and who or peds[math.random(1, #peds)]):Clone()
-		actor.Name = claim and "GoDashClaimant" or "GoDashOfficer"
-		if not claim then RiderPose.policeUniform(actor) end
-		RiderPose.relaxArms(actor)
-		local ahum = actor:FindFirstChildOfClass("Humanoid")
-		local root = actor:FindFirstChild("HumanoidRootPart") :: BasePart?
-		if not ahum or not root then return end
-		for _, d in ipairs(actor:GetDescendants()) do
-			if d:IsA("BasePart") then d.CanCollide = false; d.CanTouch = false; d.CanQuery = false
-			elseif d:IsA("LuaSourceContainer") or d:IsA("ProximityPrompt") then d:Destroy() end
+
+		-- 1. the CCTV replay of what happened (client/Replay): accidents, red lights, the crossing
+		if not onFoot and (claim or reason == "redlight" or reason == "zebra") then
+			local hitAt = tonumber(info.hitAt) or (sceneAt - 0.5)
+			local samples = Replay.take(hitAt - 3.3, hitAt + 1.3)
+			if #samples >= 8 and not skip then
+				tween(caption, 0.2, { TextTransparency = 1 })
+				cut(function() end)
+				Replay.play({
+					samples = samples, hitAt = hitAt, chassis = chassis, ped = victim, car = otherCar,
+					setCam = function(cf, f) camCf = cf; fov = f end,
+					skip = function() return skip end,
+				})
+				fov = 55
+				cut(function() camCf = follow() end)
+				setCaption()
+				tween(caption, 0.3, { TextTransparency = 0 })
+			end
 		end
-		ahum.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
-		pcall(function() ahum.EvaluateStateMachine = false end)
-		root.Anchored = true
-		table.insert(ignore, actor)
-		local height = ahum.HipHeight + root.Size.Y / 2
+		if skip then return end
+
 		local sp, fwd, right = frame()
 		local stand = ground(sp + right * side * (car and 4.6 or 2.6) + fwd * 0.6, ignore)
-		local from = ground(stand + fwd * 9 + right * side * 1.5, ignore)
+		standAt = stand
+		local root: BasePart?, ahum: Humanoid?, height
+		local from: Vector3
+		local walkSpeed = 6
+		local limp = false
+		local still = false
+
+		if victim then
+			-- 2a. the person you hit, where they fell: they get up, a bit dazed, and limp over
+			ownActor = false
+			actor, root, ahum, height = victim.model, victim.root, victim.hum, victim.height
+			local lie = victim.pos
+			from = lie
+			camCf = shotOf(lie, (sp - lie), 10, 4)
+			Peds.place(victim, "lie", lie, victim.look)
+			waitFor(0.8)
+			if skip then return end
+			local face = Vector3.new(sp.X - lie.X, 0, sp.Z - lie.Z)
+			face = face.Magnitude > 0.1 and face.Unit or -fwd
+			local lieCf = (root :: BasePart).CFrame
+			local standCf = CFrame.lookAt(lie + Y * height, lie + Y * height + face)
+			local sitCf = CFrame.lookAt(lie + Y * (height * 0.42), lie + Y * (height * 0.42) + face) * CFrame.Angles(rad(-28), 0, 0)
+			dust(lie)
+			Feedback.play("bump", 0.35, 0.8, 0.2)
+			local g = 0
+			while g < 1.5 and not skip do
+				g += RunService.RenderStepped:Wait()
+				local cf
+				if g < 0.65 then
+					local k = math.sin(math.clamp(g / 0.65, 0, 1) * math.pi / 2)
+					cf = lieCf:Lerp(sitCf, k)
+				else
+					local k = math.clamp((g - 0.65) / 0.85, 0, 1)
+					k = 1 - (1 - k) * (1 - k)
+					cf = sitCf:Lerp(standCf, k) * CFrame.Angles(0, 0, math.sin(g * 9) * 0.06 * (1 - k)) -- unsteady
+				end
+				Peds.place(victim, "none", lie, face, 0, cf)
+			end
+			dizzy(actor:FindFirstChild("Head") :: BasePart?, 2.5)
+			limp, walkSpeed = true, 3.3
+		elseif otherCar then
+			-- 2b. the other driver gets out of their own car (the driver's door is on the right here) or
+			-- climbs off their motorbike, hazard lights on
+			local pv = otherCar:GetPivot()
+			local size = otherCar:GetExtentsSize()
+			local isBike = otherCar:GetAttribute("HasRider") == true
+			local door = pv.Position + pv.RightVector * ((isBike and -1 or 1) * (math.min(size.X, size.Z) / 2 + 1.3))
+			if (door - sp).Magnitude < 55 then
+				from = ground(door, ignore)
+				if isBike then
+					for _, d in ipairs(otherCar:GetDescendants()) do
+						if d:IsA("BasePart") and d:FindFirstAncestorWhichIsA("Model") ~= otherCar then
+							table.insert(riderHidden, d)
+							d.LocalTransparencyModifier = 1
+						end
+					end
+				end
+				camCf = shotOf(from, pv.LookVector, 11, 4.5)
+			else
+				otherCar = nil
+			end
+		elseif reason == "redlight" or reason == "zebra" then
+			-- 2c. a police motorbike pulls up behind you, lights flashing
+			local b, rider = policeBike()
+			if b then
+				bike = b
+				local back = sp - fwd * 7 + right * (car and -3.2 or -2.2)
+				local startP = sp - fwd * 40 + right * (car and -3.2 or -2.2)
+				local yOff = (b:GetAttribute("Y") or 2.4) - 0.3
+				local function put(p: Vector3)
+					local gp = ground(p, ignore)
+					b:PivotTo(CFrame.lookAt(gp + Y * yOff, gp + Y * yOff + fwd))
+				end
+				put(startP)
+				b.Parent = Workspace
+				table.insert(ignore, b)
+				local camEye = sp + fwd * 9 + right * (car and 6 or -6) + Y * 3.6
+				if not clear(sp + Y * 1.5, camEye, ignore) then camEye = sp + fwd * 9 - right * (car and 6 or -6) + Y * 3.6 end
+				if not clear(sp + Y * 1.5, camEye, ignore) then camEye = sp + fwd * 7 + Y * 8 end
+				local tt = 0
+				while tt < 2.6 and not skip do
+					tt += RunService.RenderStepped:Wait()
+					local k = 1 - (1 - math.clamp(tt / 2.6, 0, 1)) ^ 2.4
+					local p = startP:Lerp(back, k)
+					put(p)
+					camCf = CFrame.lookAt(camEye, (p + sp) / 2 + Y * 1.4)
+				end
+				waitFor(0.35)
+				-- the officer gets off on the kerb side
+				if rider then
+					for _, d in ipairs(rider:GetDescendants()) do
+						if d:IsA("BasePart") then d.Transparency = 1 elseif d:IsA("Decal") then d.Transparency = 1 end
+					end
+				end
+				from = ground(back + right * (car and -1.6 or -1.4), ignore)
+			end
+		end
+		if skip then return end
+
+		if not actor then
+			-- the officer / a stranger: a figure from the avatar models (the claimant's own look if known)
+			local who = claim and info.claimant and store:FindFirstChild(info.claimant)
+			actor = (who and who:IsA("Model") and who or peds[math.random(1, #peds)]):Clone()
+			actor.Name = claim and "GoDashClaimant" or "GoDashOfficer"
+			if not claim then RiderPose.policeUniform(actor) end
+			RiderPose.relaxArms(actor)
+			ahum = actor:FindFirstChildOfClass("Humanoid")
+			root = actor:FindFirstChild("HumanoidRootPart") :: BasePart?
+			if not ahum or not root then return end
+			for _, d in ipairs(actor:GetDescendants()) do
+				if d:IsA("BasePart") then d.CanCollide = false; d.CanTouch = false; d.CanQuery = false
+				elseif d:IsA("LuaSourceContainer") or d:IsA("ProximityPrompt") then d:Destroy() end
+			end
+			ahum.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
+			pcall(function() ahum.EvaluateStateMachine = false end)
+			root.Anchored = true
+			height = ahum.HipHeight + root.Size.Y / 2
+			if not from then from = ground(stand + fwd * 9 + right * side * 1.5, ignore) end
+		end
+		table.insert(ignore, actor)
+		local rp = root :: BasePart
 		local pos = from
-		local look = (stand - from); look = Vector3.new(look.X, 0, look.Z).Unit
-		local function place()
-			local at = pos + Vector3.new(0, height, 0)
-			root.CFrame = CFrame.lookAt(at, at + look)
+		local look = Vector3.new(stand.X - from.X, 0, stand.Z - from.Z)
+		look = look.Magnitude > 0.1 and look.Unit or -fwd
+		local function place(cf: CFrame?)
+			if victim then
+				-- ("none" once they stand and talk: no idle animation, so the arm can hold out the bill)
+				Peds.place(victim, limp and "walk" or (still and "none" or "idle"), pos, look, walkSpeed, cf)
+			else
+				local at = pos + Vector3.new(0, height, 0)
+				rp.CFrame = cf or CFrame.lookAt(at, at + look)
+			end
 		end
-		place()
-		actor.Parent = Workspace
-		-- frame the officer and the rider together
-		local mid = (stand + sp) / 2 + Vector3.new(0, 2.2, 0)
-		local eyeBest
-		for _, s in ipairs({ side, -side }) do
-			local eye = mid + fwd * 9 + right * s * 6 + Vector3.new(0, 2.5, 0)
-			if clear(mid, eye, ignore) then eyeBest = eye break end
+		if ownActor then
+			if otherCar then
+				-- stepping out: up from the seat, looking round at you
+				local out = Vector3.new(from.X - otherCar:GetPivot().Position.X, 0, from.Z - otherCar:GetPivot().Position.Z)
+				out = out.Magnitude > 0.1 and out.Unit or look
+				local at0 = from + Y * (height - 1.5)
+				rp.CFrame = CFrame.lookAt(at0, at0 + out)
+				actor.Parent = Workspace
+				local g = 0
+				while g < 0.6 and not skip do
+					g += RunService.RenderStepped:Wait()
+					local k = math.clamp(g / 0.6, 0, 1)
+					local at = from + Y * (height - 1.5 * (1 - k))
+					local l = out:Lerp(look, k)
+					rp.CFrame = CFrame.lookAt(at, at + (l.Magnitude > 0.05 and l.Unit or look))
+				end
+				Feedback.play("tick", 0.4, 0.6, 0.1) -- the door
+			else
+				place()
+				actor.Parent = Workspace
+			end
 		end
-		camCf = CFrame.lookAt(eyeBest or (mid + fwd * 8 + Vector3.new(0, 5, 0)), mid)
-		-- walk up
-		local animator = ahum:FindFirstChildOfClass("Animator") or Instance.new("Animator")
-		animator.Parent = ahum
+
+		-- 3. walk (or limp) over; a long way is shortened with a cut
 		local walk
-		pcall(function()
-			local anim = Instance.new("Animation")
-			anim.AnimationId = WALK_ANIM
-			walk = animator:LoadAnimation(anim)
-			walk.Looped = true
-			walk:Play(0.15)
-			walk:AdjustSpeed(walkRate(ahum, 6))
-		end)
+		if ownActor then
+			local animator = (ahum :: Humanoid):FindFirstChildOfClass("Animator") or Instance.new("Animator")
+			animator.Parent = ahum
+			pcall(function()
+				local anim = Instance.new("Animation")
+				anim.AnimationId = WALK_ANIM
+				walk = animator:LoadAnimation(anim)
+				walk.Looped = true
+				walk:Play(0.15)
+				walk:AdjustSpeed(walkRate(ahum :: Humanoid, walkSpeed))
+			end)
+		end
+		-- frame the walker and the rider together, from the side with a clear view
+		local function twoShot()
+			local mid = (pos + sp) / 2 + Vector3.new(0, 2.2, 0)
+			local span = (pos - sp).Magnitude
+			local across = Vector3.new(sp.X - pos.X, 0, sp.Z - pos.Z)
+			across = across.Magnitude > 0.1 and across.Unit or fwd
+			local perp = across:Cross(Y)
+			for _, s in ipairs({ side, -side }) do
+				local eye = mid + perp * s * (7 + span * 0.45) + across * 1.5 + Y * 2.6
+				if clear(mid, eye, ignore) then return CFrame.lookAt(eye, mid) end
+			end
+			return CFrame.lookAt(mid + fwd * 8 + Y * 5, mid)
+		end
+		if not victim and not otherCar and not bike then camCf = twoShot() end
 		local dist = (stand - from).Magnitude
 		local walked = 0
+		local phase = 0
+		local cutDone = false
+		local shotT = 0
 		while walked < dist and not skip do
 			local dt = RunService.RenderStepped:Wait()
-			walked = math.min(dist, walked + 6 * dt)
+			walked = math.min(dist, walked + walkSpeed * dt)
 			pos = from:Lerp(stand, dist > 0 and walked / dist or 1)
-			place()
+			shotT += dt
+			-- a long walk: a few steps, then a cut to them arriving
+			if not cutDone and dist - walked > 9 and shotT > (limp and 2.4 or 1.8) and dist > 18 then
+				cutDone = true
+				cut(function()
+					walked = math.max(walked, dist - 8)
+					pos = from:Lerp(stand, walked / dist)
+					place()
+					camCf = twoShot()
+				end)
+			elseif shotT > 1.2 and (victim or otherCar or bike) and not cutDone and dist <= 18 then
+				camCf = camCf:Lerp(twoShot(), math.min(1, dt * 2))
+			end
+			if limp then
+				-- favouring one leg: a dip and a lean on every other step
+				phase += dt * walkSpeed * 1.15
+				local dip = math.max(0, math.sin(phase)) * 0.22
+				local at = pos + Vector3.new(0, height - dip, 0)
+				place(CFrame.lookAt(at, at + look) * CFrame.Angles(0, 0, math.sin(phase) * 0.09))
+			else
+				place()
+			end
 		end
 		if walk then walk:Stop(0.2) end
 		pos = stand
 		local toRider = Vector3.new(sp.X - stand.X, 0, sp.Z - stand.Z)
 		if toRider.Magnitude > 0.1 then look = toRider.Unit end
+		limp, still = false, true
 		place()
+		camCf = (function()
+			local mid = (stand + sp) / 2 + Vector3.new(0, 2.2, 0)
+			for _, s in ipairs({ side, -side }) do
+				local eye = mid + fwd * 9 + right * s * 6 + Vector3.new(0, 2.5, 0)
+				if clear(mid, eye, ignore) then return CFrame.lookAt(eye, mid) end
+			end
+			return CFrame.lookAt(mid + fwd * 8 + Vector3.new(0, 5, 0), mid)
+		end)()
 		if skip then return end
+
+		-- 4. what they say
 		if claim then
-			local lines = reason == "hit_ped" and {
-				L("Ow, my leg! Can't you see where you're going?!", "โอ๊ย ขาฉัน! ขับยังไงไม่ดูทางเลย!"),
-				L("Pay for the hospital, or we go to the police!", "จ่ายค่ารักษามา ไม่งั้นไปโรงพัก!"),
-				L("I was on the pavement! On the PAVEMENT!", "ฉันเดินอยู่บนทางเท้านะ! ทางเท้า!"),
-			} or {
-				L("Look at my car! Who pays for this?!", "ดูรถฉันสิ! ใครจะจ่ายเนี่ย!"),
-				L("Pay for the repair, or I call my insurance!", "จ่ายค่าซ่อมมา ไม่งั้นเรียกประกัน!"),
-				L("Brand new! Two weeks old!", "รถเพิ่งออกมาสองอาทิตย์เองนะ!"),
-			}
+			local lines
+			if waived then
+				lines = reason == "hit_ped" and {
+					L("It's OK, it's OK. I won't make a fuss. Just ride carefully!", "ไม่เป็นไรๆ ไม่เอาเรื่องหรอก แต่คราวหน้าขับดีๆ นะ"),
+					L("Only a scrape. Never mind, but watch out!", "เจ็บนิดหน่อยเอง ไม่เป็นไร ระวังด้วยล่ะ"),
+					L("I'm in a good mood today. Slow down, OK?", "วันนี้ใจดี ไม่เอาเรื่อง ขับช้าๆ หน่อยนะ"),
+				} or {
+					L("Just a little scratch. Forget it.", "รอยนิดเดียว ไม่เป็นไรหรอก ไม่เอาเรื่อง"),
+					L("No worries, the insurance will cover it. Careful now!", "ไม่เป็นไรครับ ประกันจ่าย ขับระวังด้วยนะ"),
+					L("You riders work hard. I'll let it go this time.", "เห็นว่าขับไรเดอร์เหนื่อยๆ ครั้งนี้ไม่เอาเรื่องนะ"),
+				}
+			else
+				lines = reason == "hit_ped" and {
+					L("Ow, my leg! Can't you see where you're going?!", "โอ๊ย ขาฉัน! ขับยังไงไม่ดูทางเลย!"),
+					L("Pay for the hospital, or we go to the police!", "จ่ายค่ารักษามา ไม่งั้นไปโรงพัก!"),
+					L("I was on the pavement! On the PAVEMENT!", "ฉันเดินอยู่ดีๆ นะ! ดีๆ เลย!"),
+					L("The CCTV saw everything. Pay up!", "กล้องวงจรปิดถ่ายไว้หมดแล้วนะ จ่ายมา!"),
+				} or {
+					L("Look at my car! Who pays for this?!", "ดูรถฉันสิ! ใครจะจ่ายเนี่ย!"),
+					L("Pay for the repair, or I call my insurance!", "จ่ายค่าซ่อมมา ไม่งั้นเรียกประกัน!"),
+					L("Brand new! Two weeks old!", "รถเพิ่งออกมาสองอาทิตย์เองนะ!"),
+					L("The camera got it all. It was you!", "กล้องจับได้หมดแล้ว คุณผิดชัดๆ!"),
+				}
+			end
 			local head = actor:FindFirstChild("Head") :: BasePart?
 			Feedback.bubble((head and head.Position or (pos + Vector3.new(0, 5, 0))) + Vector3.new(0, 1.6, 0), reason == "hit_ped" and L("Pedestrian", "คนเดินถนน") or L("Other driver", "คู่กรณี"),
 				lines[math.random(1, #lines)])
 		end
-		-- hold out the ticket
+		-- 5. hold out the ticket / the bill, or wave it off
 		local rs = joint(actor, "RightUpperArm", "RightShoulder")
 		local re = joint(actor, "RightLowerArm", "RightElbow")
-		local slip = Instance.new("Part")
-		slip.Anchored = true; slip.CanCollide = false; slip.CanQuery = false; slip.CanTouch = false; slip.CastShadow = false
-		slip.Size = Vector3.new(0.7, 0.04, 1.0)
-		slip.Color = Color3.fromRGB(250, 248, 240)
-		slip.Parent = actor
+		local slip
+		if not waived then
+			slip = Instance.new("Part")
+			slip.Anchored = true; slip.CanCollide = false; slip.CanQuery = false; slip.CanTouch = false; slip.CastShadow = false
+			slip.Size = Vector3.new(0.7, 0.04, 1.0)
+			slip.Color = Color3.fromRGB(250, 248, 240)
+			slip.Name = "GoDashSlip"
+			slip.Parent = actor
+		end
 		local hand = actor:FindFirstChild("RightHand") :: BasePart?
 		local t = 0
-		card = ticketCard(reason, amount, tonumber(info and info.n), tonumber(info and info.limit))
+		card = ticketCard(reason, amount, tonumber(info and info.n), tonumber(info and info.limit), waived)
 		card.Position = UDim2.fromScale(0.74, 1.4)
 		card.Parent = gui
 		local hold = (RunService:IsStudio() and Workspace:GetAttribute("QaSceneHold")) and 14 or 4.4 -- QaSceneHold: keep the ticket up for screenshots
@@ -1076,9 +1418,15 @@ local function fineScene(info: any)
 			local dt = RunService.RenderStepped:Wait()
 			t += dt
 			local k = math.clamp(t / 0.45, 0, 1)
-			if rs then rs.Transform = CFrame.Angles(rad(70 * k), 0, 0) end
-			if re then re.Transform = CFrame.Angles(rad(20 * k), 0, 0) end
-			if hand then slip.CFrame = hand.CFrame * CFrame.new(0, -0.45, -0.1) end
+			if waived then
+				-- "never mind": a hand up, waving
+				if rs then rs.Transform = CFrame.Angles(rad(150 * k), 0, rad(-12 * k)) end
+				if re then re.Transform = CFrame.Angles(rad((25 + 20 * math.sin(t * 9)) * k), 0, 0) end
+			else
+				if rs then rs.Transform = CFrame.Angles(rad(70 * k), 0, 0) end
+				if re then re.Transform = CFrame.Angles(rad(20 * k), 0, 0) end
+				if hand and slip then slip.CFrame = hand.CFrame * CFrame.new(0, -0.45, -0.1) end
+			end
 			if t > 0.5 and card.Position.Y.Scale > 1 then
 				TweenService:Create(card, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Position = UDim2.fromScale(0.74, 0.46) }):Play()
 				Feedback.play("tick", 0.6, 0.8, 0.1)
@@ -1088,9 +1436,12 @@ local function fineScene(info: any)
 				TweenService:Create(stamp, TweenInfo.new(0.15), { TextTransparency = 0 }):Play()
 				local sk = stamp:FindFirstChildOfClass("UIStroke")
 				if sk then TweenService:Create(sk, TweenInfo.new(0.15), { Transparency = 0 }):Play() end
-				Feedback.coins()
+				if waived then Feedback.good() else Feedback.coins() end
 			end
 		end
+		if rs then rs.Transform = CFrame.identity end
+		if re then re.Transform = CFrame.identity end
+		if slip then slip:Destroy() end
 	end)
 	if not ok then warn("[Cutscene] fine: " .. tostring(err)) end
 
@@ -1098,7 +1449,18 @@ local function fineScene(info: any)
 	tween(fade, 0.18, { BackgroundTransparency = 0 })
 	task.wait(0.2)
 	RunService:UnbindFromRenderStep("GoDashCutscene")
-	if actor then actor:Destroy() end
+	if victim then
+		-- back to their own life, from where they stand now (or where they fell, after a skip)
+		local p = victim.pos
+		local away = standAt and Vector3.new(p.X - (standAt.X + 0), 0, p.Z - standAt.Z) or Vector3.zero
+		Peds.giveBack(victim, p, away.Magnitude > 0.1 and away or nil)
+	elseif actor and ownActor then
+		actor:Destroy()
+	end
+	for _, d in ipairs(riderHidden) do
+		if d.Parent then d.LocalTransparencyModifier = 0 end
+	end
+	if bike then bike:Destroy() end
 	if card then card:Destroy() end
 	if onFoot then
 		if footRoot and footRoot.Parent then footRoot.Anchored = footWasAnchored == true end

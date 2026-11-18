@@ -38,8 +38,13 @@ function Service.start()
 		-- a bad ride also costs a little happiness
 		d.happiness = math.max(0, (d.happiness or 50) - (kind == "ped" and 6 or 3))
 		Data.touch(player, "happiness")
+		-- (2026-11-19, owner: "a cutscene for when they let it go") a light bump at little more than walking
+		-- pace: about one in three people let it go. The client plays the scene with "it's fine" instead.
+		if speed < 10 and math.random() < 0.3 then
+			return true, "", { amount = 0, waived = true }
+		end
 		-- (2026-11-19) the daily limit (server/FineService): past it the other side lets it go, and the
-		-- client shows a toast instead of the claim scene
+		-- client plays the same "let it go" scene
 		local ok, took, _, n, limit = Fines.charge(player, "bill", amount, kind == "ped" and "accident:ped" or "accident:car")
 		if not ok then
 			Fines.warn(player, "bill", nil, "", "")
