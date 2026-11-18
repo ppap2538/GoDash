@@ -27,6 +27,12 @@ local function keysNow(): { { string } }
 		table.insert(list, { "W / S", L("Go · brake / reverse", "เร่ง · เบรก / ถอย") })
 		table.insert(list, { "A / D", L("Steer", "เลี้ยวซ้าย / ขวา") })
 		table.insert(list, { "Space", L("Handbrake", "เบรกมือ") })
+		-- 2026-11-19 stunts (client/Stunts): on two wheels
+		if Drive.info.class == "bike" then
+			table.insert(list, { "R", L("Wheelie (hold)", "ยกล้อ (กดค้าง)") })
+			if not Drive.info.pedal then table.insert(list, { "Space+W", L("Burnout (standing still)", "เบิร์นเอาท์ (ตอนจอด)") }) end
+		end
+		table.insert(list, { "B", L("Clip mode 9:16", "โหมดถ่ายคลิป 9:16") })
 		if job then table.insert(list, { "G", L("Pick up / deliver", "รับ / ส่งอาหาร") }) end
 		table.insert(list, { "Q", Drive.info.auto and L("Auto drive off", "ปิดขับอัตโนมัติ") or L("Auto drive (follows the route)", "ขับอัตโนมัติตามเส้นทาง") })
 		table.insert(list, { "V", L("First-person view", "มุมมองคนขี่") })
@@ -37,6 +43,8 @@ local function keysNow(): { { string } }
 		table.insert(list, { "F", L("Get on your vehicle", "ขึ้นรถ") })
 		table.insert(list, { "E", L("Talk · use · shop", "คุย · ใช้งาน · ซื้อของ") })
 		table.insert(list, { "Space", L("Jump", "กระโดด") })
+		table.insert(list, { "G", L("Emotes: wai, dance...", "ท่าทาง: ไหว้ เต้น…") })
+		table.insert(list, { "B", L("Clip mode 9:16", "โหมดถ่ายคลิป 9:16") })
 	end
 	table.insert(list, { "J", (State.job and State.job.online) and L("Stop taking orders", "ปิดรับงาน") or L("Start taking orders", "เริ่มรับงาน") })
 	table.insert(list, { "M", L("Phone (map, garage…)", "มือถือ (แผนที่ โรงรถ…)") })

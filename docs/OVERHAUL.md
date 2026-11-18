@@ -505,6 +505,8 @@ ghost scene are still to take.
 | 24 | Two more horns in Styling: ตุ๊กตุ๊ก (three quick beeps) and แตรเพลง (our own 4-note tune) | NOT TESTED by ear |
 | 25 | Night car meet (`server/CarMeetService`): 20:30-02:00 game time, 11 tuned display cars and bikes with underglow, stickers and lucky plates in the KK Plaza car park, a lit banner "มีตติ้งรถซิ่ง ทุกคืน" and a speaker stack; one toast a night to everyone | PASS: 11 cars, banner lit at 21:00. The banner then moved behind the cars (it stood in a bus stop): NOT TESTED there |
 
+| 26 | Telling people about stunts (owner: "ยกล้อทำไงนะ ควรมีฟังชั่นบอกด้วย"): once a session, riding a bike fast for 3 s -> "hold R / the 🔥 button" toast (the touch button flashes), standing still on a motorbike 4 s -> the burnout keys; skipped for riders who already have a record. The key help (K) lists R, Space+W and B on a bike, G and B on foot. G no longer opens the emotes at a customer's door (G = deliver there) or in build mode | compiles; NOT TESTED in play (RAM 1.0 GB free) |
+
 **Still to do:** the first 10 minutes with gradual unlocks (needs a design pass with the owner: it changes what new riders
 see first); random city events.
 

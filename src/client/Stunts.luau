@@ -127,8 +127,51 @@ function Stunts.start()
 			if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then Drive.touch.wheelie = false end
 		end)
 	end
+	-- tips (2026-11-19, owner: "ยกล้อทำไงนะ ควรมีฟังชั่นบอกด้วย"): once a session, when it fits what you are doing:
+	-- riding a bike fast for a few seconds -> how to wheelie; standing still on a motorbike -> how to burnout.
+	-- Riders who already have a record for it are not told again. On a phone the 🔥 button flashes too.
+	local told = { wheelie = false, burnout = false }
+	local fastT, stillT = 0, 0
+	local function flash()
+		if not btn then return end
+		task.spawn(function()
+			for _ = 1, 6 do
+				btn.BackgroundTransparency = 0
+				task.wait(0.25)
+				btn.BackgroundTransparency = 0.3
+				task.wait(0.25)
+			end
+		end)
+	end
+	local function tips(c, dt: number)
+		if State.cutscene or not c or c.def.class ~= "bike" or (Drive.info.stunt or 0) ~= 0 then
+			fastT, stillT = 0, 0
+			return
+		end
+		local v = c.chassis.AssemblyLinearVelocity
+		local sp = Vector3.new(v.X, 0, v.Z).Magnitude
+		fastT = sp > 15 and fastT + dt or 0
+		stillT = sp < 1 and stillT + dt or 0
+		local stats = State.data and State.data.stats or {}
+		if not told.wheelie and fastT > 3 then
+			told.wheelie = true
+			if (stats.bestWheelie or 0) == 0 then
+				Feedback.toast(TOUCH and L("🔥 Try a wheelie: hold the 🔥 button on the right", "🔥 ลองยกล้อดู: กดปุ่ม 🔥 ทางขวาค้างไว้")
+					or L("🔥 Try a wheelie: hold R while you ride", "🔥 ลองยกล้อดู: กด R ค้างไว้ตอนขี่"), "good")
+				flash()
+			end
+		elseif not told.burnout and told.wheelie and not c.def.pedal and stillT > 4 then
+			told.burnout = true
+			if (stats.bestBurnout or 0) == 0 then
+				Feedback.toast(TOUCH and L("💨 Burnout: hold HANDBRAKE and GAS while standing still", "💨 เบิร์นเอาท์: กดเบรกมือกับปุ่มเร่งค้างไว้ตอนจอด")
+					or L("💨 Burnout: hold Space + W while standing still", "💨 เบิร์นเอาท์: กด Space + W ค้างไว้ตอนจอด"), "good")
+			end
+		end
+	end
+
 	RunService.Heartbeat:Connect(function(dt)
 		local c = Drive.current()
+		pcall(tips, c, dt)
 		local s = (c and Drive.info.stunt) or 0
 		if btn then
 			local onBike = c ~= nil and c.def.class == "bike" and not State.cutscene

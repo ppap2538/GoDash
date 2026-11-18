@@ -16,6 +16,8 @@ local Layers = require(script.Parent.UI.Core.Layers)
 local Lang = require(script.Parent.Lang)
 local State = require(script.Parent.State)
 local Drive = require(script.Parent.Drive)
+local UIState = require(script.Parent.UI.Core.UIState)
+local JobCard = require(script.Parent.UI.HUD.JobCard)
 
 local Emotes = {}
 local C, F = UI.C, UI.F
@@ -254,7 +256,11 @@ function Emotes.start()
 	RunService.PreSimulation:Connect(stepPoses)
 	UserInputService.InputBegan:Connect(function(input, processed)
 		if processed then return end
-		if input.KeyCode == Enum.KeyCode.G and not Drive.current() then setOpen(not panel.Visible) end
+		-- (G is also "pick up / deliver" at the door during a job, and the grid in build mode: those win)
+		if input.KeyCode == Enum.KeyCode.G and not Drive.current() and not UIState.get("build")
+			and not (State.job and State.job.job and JobCard.actionAvailable) then
+			setOpen(not panel.Visible)
+		end
 	end)
 	-- stop when walking, jumping or sitting; hide the button while driving
 	RunService.Heartbeat:Connect(function()
