@@ -446,6 +446,37 @@ Server ready 16.5-18.8 s (world planned 12.6-14.3 s), 71k infill cells with the 
 
 Test hook: `QaFineGap = seconds` (Workspace attribute, Studio only) replaces the 3-minute / 90-second gap.
 
+## 19. Fun + TikTok + 250 players plan (2026-11-18, owner: "ทำทั้งหมดที่เสนอมาได้เลย")
+
+Goals (owner): the game is genuinely fun; plenty to play and post on TikTok to build hype; 250 highly engaged players
+(Roblox's bar for under-16), then all ages. Loy Krathong is **Tue 24 Nov 2026**, so batch 1 aims to be ready ~21-22 Nov.
+
+**Batch 1 (for Loy Krathong)**
+
+| # | What | State |
+|---|---|---|
+| 1 | Controls: steering limited by sideways grip (`Drive.maxSteer`, 1.7 g × grip; was ~3 g at 40 km/h, ~6 g at top speed), keys ramp in (slower at speed) and centre fast, chase camera 15 studs back / 7 up and looking further ahead (Phone > Settings: Near/Normal/Far), phone: steer anywhere on the lower-left (floating pad), "auto gas" (tap GAS to cruise, BRAKE stops), lane assist `client/LaneAssist` (on for touch by default) | PASS: at 42 km/h full lock for 1 s turned 52° (was ~170°/s); camera measured 15.0 back / 7.0 up. NOT TESTED: phones (floating pad, auto gas), lane assist on a long drive |
+| 2 | Traffic lights rebuilt (`shared/Traffic`): only junctions with a real OSM signal (`tools/osm_signals.py` -> `KhonKaenData/Signals.luau`, 86 points) -> 30 junctions (was 312 lit nodes); nodes of one junction merged into one controller; lights only on roads coming in (the exit carriageway of a divided road is dropped: keep-left rule); 3 phases at 5-way junctions (8 of 30); new head: pole on the left kerb, arm over the inbound lanes, flat lamps with hoods and a closed black back, a small pole head, LED countdown (`Count` SurfaceGui, client/Street); stop line across the inbound lanes only; red-light fine decided per junction (TrafficService); AutoDrive / Street / SignalAssist skip roads with no light | PASS in Studio: 30 junctions, heads read well at 21 m, countdown "5", panel "ไฟของคุณ 4 ไฟแดง หยุดรอ", AI car waited at red. Map note: `osm_to_map.py` keeps the one-way flag but not its direction |
+| 3 | Store page: name EN "GoDash 🛵 Thai Rider Life" (Open Cloud), Thai-only description (no flag emoji), new icon (97841633896740) + previews loy 105822105345048, ride 78906189388680, styling 76079295322715, night radio 135989347837853, old rewards 118277502747835. New images must be granted open use first (`PATCH /asset-permissions-api/v1/assets/permissions`, subjectType All, action Use) or the icon/preview PATCH fails "must be open use" | done 2026-11-18. Owner: type the Thai name "GoDash 🛵 ไรเดอร์เมืองไทย" in Localization. Art in the owner's promo folder `GoDash_หน้าร้าน_2026-11-18` |
+| 4 | Loy Krathong (`Config/Festival`, `server/FestivalService`, `client/Festival`): 20-30 Nov (QaFestival in Studio); lantern posts and bulb strings along ~700 studs of promenade each way from the pier, arch "ลอยกระทง บึงแก่นนคร", krathong stall, prompt at the pier end -> preset wish card -> krathong (first each day free + season XP + happiness, then ฿20) floats out along lanes that stay over water (the lake is several water parts: a test krathong once landed on the bank), clients drift them; quiet krathongs keep the lake lit; fireworks over the water every 150 s for 30 s at night (`FestivalSky`); chip only on foot | PASS: free first krathong, 15 s cooldown, krathongs drift over water, lantern line and arch seen at night, 4 fireworks bursts spawned. NOT TESTED: a fireworks screenshot (Studio stopped drawing, see below) |
+| 5 | Invite friends (`client/Invite` phone app, `server/ReferralService`): Roblox invite card; a NEW friend (first join < 15 min, no job yet) joining through it gets ฿500, the inviter ฿1,000 (max 5 a day; offline inviters paid on next join from a DataStore queue) | built; NOT TESTED (needs two accounts) |
+| 6 | Event alerts: Roblox opt-in card once after the 3rd job or a krathong (`alerts_asked`), and a button in the Invite app | built; NOT TESTED; sending needs the owner's notification template |
+| 7 | Ghosts (`server/GhostService`, `client/Ghosts`): late (21:00-04:30) food deliveries to suburb/rural addresses may play the ghost-customer scene (money turns into leaves, she is gone, a short fright; +฿60); a figure under a big tree on dark roads (engine dies, she vanishes; +฿30); then "call the Haunted Night Radio 13.13?" -> on-air chat with DJ Pong built from the street name, a feeling choice, +฿100 + XP, City Feed post. Once per in-game night, 6 min apart. Phone > Settings turns ghost scenes off. Figure: `GoDashModels.GhostLady` (free Creator Store model, docs/ASSETS 5b) | PASS: roadside scene 6.4 s, +฿30, radio card with "แถวถนนรื่นจิตร", +฿100. NOT TESTED: the ghost-customer scene on a real late delivery; the GhostLady figure seen in a scene (only seen standing in Edit) |
+
+Studio note (2026-11-18): after long Play sessions the Studio viewport turned white (also in Edit, also after a restart);
+screen_capture returns white then. Probably the Studio window was minimised or covered. Store shots of fireworks and the
+ghost scene are still to take.
+
+**Batch 2 (TikTok toys):** wheelie / burnout / stunt spot; night car meet + more exhausts and horns; time trial round
+the lake with a board; vertical 9:16 clip mode with drone camera; funny orders and random events; turn-by-turn
+"อีก 50 ม. เลี้ยวซ้าย"; first 10 minutes with gradual unlocks; a code per TikTok clip to see which clip brings players.
+
+**Batch 3 (all ages):** plates from presets instead of typed text, content check (crash and injury = mild, ghosts =
+mild fear), the maturity questionnaire, the refundable 1,000 R$ fee (ask the owner first), a full phone test.
+
+**Owner steps:** type the Thai name and description in Localization; create the game's Roblox Community (free) and
+send its id (turns on `Store.GROUP_ID`); add "ลอยกระทงบึงแก่นนคร 24 พ.ย." under Events; create a notification template.
+
 ## 4. Tools and test hooks
 
 - `python -I tools/plan_streets.py [preview.png]` — regenerate the street graph with lanes and `KhonKaenData/Plan.luau`.

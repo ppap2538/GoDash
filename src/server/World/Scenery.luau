@@ -408,21 +408,59 @@ function S.bench(parent: Instance, base: CFrame)
 	seat.Parent = parent
 end
 
-function S.trafficLight(parent: Instance, base: CFrame)
-	Kit.cyl(parent, 0.8, 16, base * CF(0, 8, 0), C.metalDark, M.Metal, { decor = true })
-	Kit.part(parent, V3(0.5, 0.5, 9), base * CF(0, 15.6, -4.4), C.metalDark, M.Metal, { decor = true })
-	-- (2026-11-19, owner: the lights were hard to read) a bigger head on a black backboard with a yellow
-	-- rim, and a hood over each lamp, as on real Thai signals. The lamps face local -X (the drivers).
-	Kit.part(parent, V3(0.2, 7.6, 3.2), base * CF(0.55, 14.4, -8.6), Color3.fromRGB(240, 190, 40), M.SmoothPlastic, { decor = true })
-	Kit.part(parent, V3(0.3, 7.0, 2.6), base * CF(0.45, 14.4, -8.6), Color3.fromRGB(16, 16, 18), M.SmoothPlastic, { decor = true })
-	Kit.part(parent, V3(1.2, 6.2, 2.0), base * CF(-0.3, 14.4, -8.6), Color3.fromRGB(28, 28, 30), M.SmoothPlastic, { decor = true })
-	local cols = { Color3.fromRGB(220, 50, 40), Color3.fromRGB(240, 190, 40), Color3.fromRGB(60, 200, 90) }
-	for i, c in ipairs(cols) do
-		local y = 14.4 + (2 - i) * 1.95
-		local l = Kit.ball(parent, 1.55, base * CF(-0.9, y, -8.6), c, i == 3 and M.Neon or M.SmoothPlastic, { decor = true })
-		l.Name = "Lamp" .. i
-		Kit.part(parent, V3(1.0, 0.12, 1.75), base * CF(-1.3, y + 0.86, -8.6), Color3.fromRGB(28, 28, 30), M.SmoothPlastic, { decor = true })
+-- One signal for one approach into a junction (2026-11-18 rebuild, owner: stacked lights were confusing and hard to
+-- read). base: the foot of the pole on the kerb to the driver's LEFT (Thailand keeps left), its front (-Z) facing the
+-- drivers coming in. reach: how far the arm sticks out over their lanes (local -X is toward the road).
+--   * main head on the arm over the middle of the inbound lanes, a smaller one on the pole at eye height
+--   * flat lamps with hoods on a black backboard with a yellow rim; the back of every head is closed, so drivers on
+--     the other roads see a black box, never this road's colour (the old lamps were balls, lit for everyone)
+--   * a countdown box under the main head (client/Street writes the seconds into "Count")
+-- Lamps are named Lamp1 (red), Lamp2 (yellow), Lamp3 (green); client/Street paints every one of them.
+function S.trafficLight(parent: Instance, base: CFrame, reach: number?)
+	local arm = math.max(reach or 6, 3)
+	local dark, body = Color3.fromRGB(14, 14, 16), Color3.fromRGB(26, 26, 28)
+	local rim = Color3.fromRGB(240, 190, 40)
+	Kit.cyl(parent, 0.9, 17.6, base * CF(0, 8.8, 0), C.metalDark, M.Metal, { decor = true })
+	Kit.part(parent, V3(arm + 0.6, 0.55, 0.55), base * CF(-(arm + 0.6) / 2, 17.2, 0), C.metalDark, M.Metal, { decor = true })
+	Kit.part(parent, V3(arm * 0.55, 0.3, 0.3), base * CF(-arm * 0.28, 15.9, 0) * CFrame.Angles(0, 0, math.rad(-24)), C.metalDark, M.Metal, { decor = true })
+	local cols = { Color3.fromRGB(40, 14, 12), Color3.fromRGB(44, 36, 12), Color3.fromRGB(12, 36, 18) } -- unlit
+	local function head(at: CFrame, scale: number)
+		local h = 7.4 * scale
+		-- black board behind (its back is all anyone on the other roads sees), the yellow rim showing round the housing
+		Kit.part(parent, V3(3.6 * scale, h + 0.9 * scale, 0.2), at * CF(0, 0, 0.78 * scale), dark, M.SmoothPlastic, { decor = true })
+		Kit.part(parent, V3(3.3 * scale, h + 0.6 * scale, 0.12), at * CF(0, 0, 0.64 * scale), rim, M.SmoothPlastic, { decor = true })
+		Kit.part(parent, V3(2.4 * scale, h, 1.25 * scale), at, body, M.SmoothPlastic, { decor = true })
+		for i = 1, 3 do
+			local y = (2 - i) * 2.35 * scale
+			local lamp = Kit.part(parent, V3(0.22, 1.95 * scale, 1.95 * scale), at * CF(0, y, -0.66 * scale) * CFrame.Angles(0, math.rad(90), 0),
+				cols[i], M.SmoothPlastic, { decor = true, shape = Enum.PartType.Cylinder })
+			lamp.Name = "Lamp" .. i
+			Kit.part(parent, V3(2.2 * scale, 0.14, 1.15 * scale), at * CF(0, y + 1.05 * scale, -1.2 * scale), body, M.SmoothPlastic, { decor = true })
+		end
 	end
+	head(base * CF(-arm, 13.0, 0), 1)
+	head(base * CF(0, 7.6, -0.9), 0.62)
+	-- countdown seconds under the main head, like the LED timers at Thai junctions
+	local box = Kit.part(parent, V3(2.6, 1.9, 1.0), base * CF(-arm, 7.9, -0.1), dark, M.SmoothPlastic, { decor = true })
+	box.Name = "CountBox"
+	local g = Instance.new("SurfaceGui")
+	g.Name = "Count"
+	g.Face = Enum.NormalId.Front
+	g.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+	g.PixelsPerStud = 40
+	g.LightInfluence = 0
+	g.Brightness = 2
+	g.MaxDistance = 260
+	g.Parent = box
+	local t = Instance.new("TextLabel")
+	t.Name = "Text"
+	t.BackgroundTransparency = 1
+	t.Size = UDim2.fromScale(1, 1)
+	t.Font = Enum.Font.Arcade
+	t.TextScaled = true
+	t.Text = ""
+	t.TextColor3 = Color3.fromRGB(255, 60, 50)
+	t.Parent = g
 end
 
 -- Sign gantry over a big road where one district ends and the next begins. cf looks along the

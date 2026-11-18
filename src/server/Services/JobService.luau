@@ -25,6 +25,7 @@ local Passenger = require(script.Parent.PassengerService)
 local Civic = require(script.Parent.CivicJobs) -- 2026-11-18: jobs at the real landmarks, with opening hours
 
 local Service = {}
+Service.deliverScene = nil :: ((Player, any) -> any?)? -- server/GhostService: a ghost scene instead of the hand-over
 local state = {} -- [player] = { online, mode, offer, job, nextAt, declined }
 local ctx
 local MODES = { food = Delivery, ride = Passenger }
@@ -354,7 +355,11 @@ local function action(player: Player)
 		local ok, why = job.module.canDropoff(player, job, ctx)
 		if not ok then return toast(player, why or "Can't finish yet", true) end
 		if Twists.beforeDropoff(player, job) then return end
-		if job.mode == "food" then Net.fire(player, "Notify", "scene", { kind = "deliver", pos = job.dropoff.pos, name = job.customer }) end
+		if job.mode == "food" then
+			-- (2026-11-18) late at night in a lonely place the customer may be... not a customer (server/GhostService)
+			local ghost = Service.deliverScene and Service.deliverScene(player, job)
+			Net.fire(player, "Notify", "scene", ghost or { kind = "deliver", pos = job.dropoff.pos, name = job.customer })
+		end
 		if job.module.alight then job.module.alight(player, job, ctx) end
 		complete(player, st)
 	end

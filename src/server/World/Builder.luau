@@ -1072,26 +1072,32 @@ function Builder.build(map, opts)
 			end
 			if ei % 600 == 0 then task.wait() end
 		end
-		-- traffic lights where big roads meet
+		-- traffic lights (2026-11-18 rebuild): only at real signalled junctions, one signal per road coming INTO the
+		-- junction (shared/Traffic: signal.groups holds exactly those), none on the short pieces inside it
 		for _, n in ipairs(graph.nodes) do
 			local signal = signalsById[n.id]
-			if signal then
+			if signal and next(signal.groups) then
 				emit(n.x, n.z, function(parent)
-					-- one working signal per approach: on the kerb to the driver's right, arm over the road, lamps facing the driver
 					for _, l in ipairs(n.links) do
-						if not l.edge.minor then
+						local group = signal.groups[l.edge]
+						if group ~= nil then
 							local e = l.edge
 							local sgn = e.a == n and 1 or -1
-							local dx, dz = e.dx * sgn, e.dz * sgn
-							local p = V3(n.x + dx * (n.r + 4) + dz * (e.def.width / 2 + 2), 0.5, n.z + dz * (n.r + 4) - dx * (e.def.width / 2 + 2))
+							local dx, dz = e.dx * sgn, e.dz * sgn -- from the junction out along this road, toward the drivers
+							local half = e.def.width / 2
+							-- drivers keep left: the inbound lanes are the left half of a two-way road, all of a one-way one
+							local span = e.oneway and e.def.width or half
+							local lx, lz = -dz, dx -- the driver's left
+							local p = V3(n.x + dx * (n.r + 7) + lx * (half + 2), 0.5, n.z + dz * (n.r + 7) + lz * (half + 2))
 							local sm = Kit.model(parent, "Signal")
 							sm:SetAttribute("Node", n.id)
-							sm:SetAttribute("Group", signal.groups[e])
+							sm:SetAttribute("Group", group)
 							sm:AddTag("TrafficSignal")
-							S.trafficLight(sm, CFrame.lookAt(p, p + V3(-dz, 0, dx)))
-							-- stop line, and the zebra crossing between it and the junction (2026-11-18)
-							local stopAt = V3(n.x + dx * (n.r + 9), 0, n.z + dz * (n.r + 9))
-							Kit.part(sm, V3(e.def.width - 2, 0.05, 1), CFrame.lookAt(stopAt, stopAt + V3(dx, 0, dz)) * CF(0, e.def.y + 0.03, 0), C.line, M.SmoothPlastic, { decor = true, name = "StopLine" })
+							-- pole on the left kerb, the arm reaching over the middle of the inbound lanes
+							S.trafficLight(sm, CFrame.lookAt(p, p + V3(dx, 0, dz)), 2 + span / 2)
+							-- stop line across the inbound lanes only, and the zebra crossing between it and the junction
+							local stopAt = V3(n.x + dx * (n.r + 9) + lx * (half - span / 2), 0, n.z + dz * (n.r + 9) + lz * (half - span / 2))
+							Kit.part(sm, V3(span - 1, 0.05, 1), CFrame.lookAt(stopAt, stopAt + V3(dx, 0, dz)) * CF(0, e.def.y + 0.03, 0), C.line, M.SmoothPlastic, { decor = true, name = "StopLine" })
 							local zAt = V3(n.x + dx * (n.r + 4.6), 0, n.z + dz * (n.r + 4.6))
 							RoadMarks.zebra(sm, CFrame.lookAt(zAt, zAt + V3(dx, 0, dz)) * CF(0, e.def.y, 0), e.def.width - 1.5, 4.6)
 						end

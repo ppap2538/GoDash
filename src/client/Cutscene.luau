@@ -1919,7 +1919,7 @@ end
 function Cutscene.start()
 	Drive.onCrash = function(info) task.spawn(Cutscene.play, "crash", info) end
 	Net.listen("Notify", function(kind, p)
-		if kind == "scene" and type(p) == "table" then
+		if kind == "scene" and type(p) == "table" and p.kind ~= "ghost" then -- (ghost scenes: client/Ghosts)
 			task.spawn(Cutscene.play, p.kind, p)
 		end
 	end)

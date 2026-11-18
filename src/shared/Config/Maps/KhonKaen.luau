@@ -49,6 +49,8 @@ end
 Map.features = F -- water, parks, rails, pois (real positions)
 -- real roundabouts (tools/osm_roundabouts.py): World/RoadMarks builds their centre islands
 Map.roundabouts = Data:FindFirstChild("Roundabouts") and require(Data:FindFirstChild("Roundabouts") :: ModuleScript) or {}
+-- real traffic signals (tools/osm_signals.py): shared/Traffic lights only the junctions they stand at (2026-11-18)
+Map.signals = Data:FindFirstChild("Signals") and require(Data:FindFirstChild("Signals") :: ModuleScript) or {}
 -- Thai names of the lakes (OSM gives Features.water the English name)
 Map.lakeNames = {
 	["Bueng Kaen Nakhon"] = "บึงแก่นนคร", ["Bueng Thung Sang"] = "บึงทุ่งสร้าง", ["Bueng Nong Khot"] = "บึงหนองโคตร",

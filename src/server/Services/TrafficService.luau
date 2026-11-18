@@ -67,7 +67,10 @@ function Service.start(world, deps)
 		Net.fire(player, "Notify", "scene", { kind = "fine", reason = "redlight", amount = amount, n = n, limit = limit }) -- client/Cutscene: pulled over, a ticket
 		Net.fire(player, "Notify", "feed", { key = "fine_redlight", vars = { amount = amount } })
 	end
-	local watch = {} -- [player] = { outside = Vector3, inside = nodeId?, fined = { [nodeId] = clock }, pending = { node, heading }? }
+	-- (2026-11-18 rebuild) A junction is now one controller over several nodes (shared/Traffic). Entering it on red
+	-- along a road that has a light marks the crossing; the pieces inside the junction never do. The decision (left
+	-- turn = allowed, anything else = fine) comes once the vehicle is out of the whole junction, judged from its centre.
+	local watch = {} -- [player] = { outside = Vector3, inside = nodeId?, fined = { [junctionId] = clock }, pending = { j, heading }? }
 	Players.PlayerRemoving:Connect(function(p) watch[p] = nil end)
 	task.spawn(function()
 		while true do
@@ -82,11 +85,12 @@ function Service.start(world, deps)
 					if s and dist < s.node.r + 3 then
 						if st.inside ~= s.node.id then
 							st.inside = s.node.id
-							st.pending = nil
+							local j = s.junction
+							if st.pending and st.pending.j ~= j then st.pending = nil end
 							local from = st.outside or pos
 							local dir = Vector3.new(from.X - s.node.x, 0, from.Z - s.node.z)
 							local speed = vehicles.speed(player)
-							if dir.Magnitude > 1 and speed > 9 then
+							if dir.Magnitude > 1 and speed > 9 and not st.pending then
 								dir = dir.Unit
 								-- which road did they arrive on?
 								local bestLink, bestDot = nil, -2
@@ -94,28 +98,27 @@ function Service.start(world, deps)
 									local dot = ((l.to.x - s.node.x) * dir.X + (l.to.z - s.node.z) * dir.Z) / l.len
 									if dot > bestDot then bestLink, bestDot = l, dot end
 								end
-								-- (2026-11-19) a moment's grace when the light has only just gone red: that is a
-								-- yellow you were already committed to, not running a red
+								-- only roads with a light (not sois, not the pieces inside the junction); a moment's grace
+								-- when the light has only just gone red (2026-11-19): that was a yellow you were committed to
 								local col, since
 								if bestLink and not bestLink.edge.minor then
 									col, since = Traffic.timing(s.node.id, s.groups[bestLink.edge], Workspace:GetServerTimeNow())
 								end
-								if col == "red" and since > RED_GRACE
-									and os.clock() - (st.fined[s.node.id] or 0) > 8 then
-									st.pending = { node = s.node, heading = -dir } -- decided on the way out
+								if col == "red" and since > RED_GRACE and os.clock() - (st.fined[j.id] or 0) > 8 then
+									st.pending = { j = j, heading = -dir } -- decided on the way out of the junction
 								end
 							end
 						end
 					else
 						local p = st.pending
-						if p and ((pos.X - p.node.x) ^ 2 + (pos.Z - p.node.z) ^ 2) > (p.node.r + 3) ^ 2 then
+						if p and ((pos.X - p.j.x) ^ 2 + (pos.Z - p.j.z) ^ 2) > (p.j.radius + 3) ^ 2 then
 							st.pending = nil
-							local out = Vector3.new(pos.X - p.node.x, 0, pos.Z - p.node.z)
+							local out = Vector3.new(pos.X - p.j.x, 0, pos.Z - p.j.z)
 							local right = p.heading:Cross(Vector3.yAxis)
 							if out.Magnitude > 1 and out.Unit:Dot(right) < -0.45 then
 								Net.fire(player, "Notify", "toast", { text = "⬅️ Left turn on red is allowed", th = "⬅️ ซ้ายผ่านตลอด ไม่โดนปรับ", good = true })
 							else
-								fine(player, st, p.node.id)
+								fine(player, st, p.j.id)
 							end
 						end
 						if s == nil or dist > s.node.r + 12 then st.inside = nil end

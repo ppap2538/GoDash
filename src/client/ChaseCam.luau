@@ -16,6 +16,7 @@ local State = require(script.Parent.State)
 local UIState = require(script.Parent.UI.Core.UIState)
 
 local ChaseCam = {}
+ChaseCam.PRESETS = { near = 0.72, normal = 1, far = 1.4 } -- settings.camera
 local player = Players.LocalPlayer
 local TAU = math.pi * 2
 
@@ -104,10 +105,13 @@ local function update(dt: number)
 	bumpV += (-bump * 120 - bumpV * 14) * dt
 	bump += bumpV * dt
 
-	-- distance and height grow with speed
-	local size = bike and 9.2 or (8.5 + (def.len or 14) * 0.42)
-	local dist = (size + math.min(speed, 140) * 0.05) * zoom
-	local height = (bike and 3.2 or ((def.height or 5) * 0.62 + 1.4)) + math.min(speed, 140) * 0.012 + orbitPitch
+	-- distance and height grow with speed. 2026-11-18 (owner: "hard to control"): the camera sat ~2.6 m behind and
+	-- ~1.5 m above a motorbike, so the screen was mostly the rider and the junction ahead came too late. Now ~4.5 m
+	-- back and ~2 m up, looking further down the road; Phone > Settings > Camera picks near / normal / far.
+	local preset = ChaseCam.PRESETS[(State.data and State.data.settings and State.data.settings.camera) or "normal"] or 1
+	local size = bike and 15 or (12 + (def.len or 14) * 0.55)
+	local dist = (size + math.min(speed, 140) * 0.06) * zoom * preset
+	local height = ((bike and 4.8 or ((def.height or 5) * 0.75 + 2.2)) + math.min(speed, 140) * 0.016) * (0.55 + 0.45 * preset) + orbitPitch
 	local camYaw = yaw + orbitYaw
 	local back = Vector3.new(math.sin(camYaw), 0, math.cos(camYaw))
 
@@ -124,7 +128,7 @@ local function update(dt: number)
 	local hit = Workspace:Raycast(focus, dir, rayParams)
 	if hit then eye = focus + dir.Unit * math.max(1.5, hit.Distance - 0.8) end
 
-	local lookAt = focus + flatLook * (3 + math.min(speed, 80) * 0.06) - Vector3.new(0, 0.6, 0)
+	local lookAt = focus + flatLook * (5 + math.min(speed, 90) * 0.1) - Vector3.new(0, 0.6, 0)
 	local camCf = CFrame.lookAt(eye + Vector3.new(0, bump * 0.35, 0), lookAt)
 	-- lean with a motorbike, a little
 	if bike and c.lean then camCf *= CFrame.Angles(0, 0, c.lean * 0.28) end

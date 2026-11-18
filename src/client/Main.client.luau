@@ -9,7 +9,8 @@ ReplicatedStorage:WaitForChild("Remotes")
 -- Street and Cutscene, so it comes after them
 -- 2026-11-18 whole-tambon pass: Backdrop = the far city outline, Ambience = places that sound like themselves
 -- 2026-11-19 SignalAssist = "your light" panel, lane stop-line glow and red-light warning at junctions
-local order = { "Perf", "State", "Lang", "Feedback", "Crash", "Drive", "ChaseCam", "DriveFx", "OnFoot", "Rider", "HUD", "GPS", "AutoDrive", "Phone", "Choice", "Feed", "Board", "Reviews", "Styling", "PhotoMode", "ShopApp", "SeasonApp", "CompanyApp", "LiveOps", "Env", "Backdrop", "Ambience", "Build", "Peds", "Street", "SignalAssist", "Dogs", "Radio", "Guide", "Welcome", "Cutscene", "Accident", "SpeedBumps", "StreetLife", "Finance", "License", "Tired", "Qa" }
+-- 2026-11-18 LaneAssist = gentle pull to the middle of your lane while you barely steer (needs GPS's road graph)
+local order = { "Perf", "State", "Lang", "Feedback", "Crash", "Drive", "ChaseCam", "DriveFx", "OnFoot", "Rider", "HUD", "GPS", "LaneAssist", "AutoDrive", "Phone", "Choice", "Feed", "Board", "Reviews", "Invite", "Styling", "PhotoMode", "ShopApp", "SeasonApp", "CompanyApp", "LiveOps", "Festival", "Env", "Backdrop", "Ambience", "Build", "Peds", "Street", "SignalAssist", "Dogs", "Radio", "Guide", "Welcome", "Cutscene", "Ghosts", "Accident", "SpeedBumps", "StreetLife", "Finance", "License", "Tired", "Qa" }
 local started = {}
 for _, name in ipairs(order) do
 	local ok, err = xpcall(function()

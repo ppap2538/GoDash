@@ -102,8 +102,12 @@ local E = {
 	["🤖 Auto drive · Q"] = "🤖 ขับอัตโนมัติ · Q", ["🤖 AUTO ON · Q"] = "🤖 ขับอัตโนมัติอยู่ · Q", ["⬅️ Left turn on red is allowed"] = "⬅️ ซ้ายผ่านตลอด ไม่โดนปรับ",
 	["Auto drive (follows the GPS route)"] = "ขับอัตโนมัติ (ตามเส้นทาง GPS)",
 	["Police checkpoint"] = "ด่านตรวจ",
+	-- Loy Krathong (2026-11-18)
+	["Float a krathong"] = "ลอยกระทง", ["Loy Krathong"] = "ลอยกระทง บึงแก่นนคร",
+	["No festival now"] = "ตอนนี้ไม่มีงานเทศกาล", ["Go to the end of the pier at Bueng Kaen Nakhon"] = "ไปที่ปลายท่าน้ำบึงแก่นนครก่อน",
+	["Wait a moment before the next one"] = "รอสักครู่ค่อยลอยอันต่อไป", ["Pick a wish"] = "เลือกคำอธิษฐานก่อน",
 	["City Feed"] = "ฟีดเมือง", ["Finance"] = "ไฟแนนซ์", ["💦 Songkran +30%"] = "💦 สงกรานต์ +30%",
-	["Top Riders"] = "อันดับไรเดอร์", ["Reviews"] = "รีวิว", ["Photo"] = "ถ่ายรูป", ["Styling"] = "แต่งซิ่ง", ["Photo mode"] = "โหมดถ่ายรูป", ["Ride along"] = "ขึ้นรถด้วย",
+	["Top Riders"] = "อันดับไรเดอร์", ["Reviews"] = "รีวิว", ["Invite"] = "ชวนเพื่อน", ["Photo"] = "ถ่ายรูป", ["Styling"] = "แต่งซิ่ง", ["Photo mode"] = "โหมดถ่ายรูป", ["Ride along"] = "ขึ้นรถด้วย",
 	["A friend is in the passenger seat"] = "มีเพื่อนนั่งที่ผู้โดยสารอยู่", ["That plate isn't allowed"] = "ป้ายนี้ใช้ไม่ได้", ["That's already your plate"] = "ป้ายนี้ติดอยู่แล้ว",
 	["Already fitted"] = "ติดอยู่แล้ว", ["Changed"] = "เปลี่ยนแล้ว", ["Unknown choice"] = "ไม่มีตัวเลือกนี้", ["The plate check is busy, try again"] = "ระบบตรวจป้ายไม่ว่าง ลองใหม่",
 	["Only Thai letters, A-Z, numbers and -"] = "ใช้ได้เฉพาะตัวอักษรไทย A-Z ตัวเลข และ -", ["A bicycle can only change its bell"] = "จักรยานเปลี่ยนได้แค่กระดิ่ง",

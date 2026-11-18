@@ -15,6 +15,7 @@ local UIRoot = script.Parent.Parent
 local UI = require(UIRoot.Kit)
 local UIState = require(UIRoot.Core.UIState)
 local Drive = require(UIRoot.Parent.Drive)
+local State = require(UIRoot.Parent.State)
 
 local Touch = {}
 local C, F = UI.C, UI.F
@@ -52,11 +53,17 @@ function Touch.build(stage: Frame)
 		return b
 	end
 
+	-- 2026-11-18 (owner: still hard on the phone): the pad no longer has to be hit exactly. Put a thumb anywhere on the
+	-- lower-left part of the screen and the pad jumps under it; sliding from where you touched steers. The pad shows
+	-- where the zone is while idle. Buttons drawn above the zone (EXIT, lights, signals) still take their own taps.
+	local zone = UI.new("TextButton", { Name = "SteerZone", Text = "", AutoButtonColor = false, BackgroundTransparency = 1, AnchorPoint = Vector2.new(0, 1),
+		Position = UDim2.fromScale(0, 1), Size = UDim2.fromScale(0.42, 0.6), Parent = root })
 	-- left corner: the steering pad, with the small buttons in a row above
 	local left = UI.new("Frame", { Name = "Left", BackgroundTransparency = 1, AnchorPoint = Vector2.new(0, 1), Position = UDim2.fromScale(0, 1),
 		Size = UDim2.fromOffset(math.max(PAD_W, SMALL * 4 + 8 * 3 + 8), PAD_H + GAP + SMALL), Parent = root })
-	local pad = UI.new("TextButton", { Name = "SteerPad", Text = "", AutoButtonColor = false, BackgroundColor3 = C.dark, BackgroundTransparency = IDLE_ALPHA,
-		Position = UDim2.new(0, 0, 1, -PAD_H), Size = UDim2.fromOffset(PAD_W, PAD_H), Parent = left })
+	local PAD_HOME = UDim2.new(0, 0, 1, -PAD_H)
+	local pad = UI.new("Frame", { Name = "SteerPad", BackgroundColor3 = C.dark, BackgroundTransparency = IDLE_ALPHA,
+		Position = PAD_HOME, Size = UDim2.fromOffset(PAD_W, PAD_H), Parent = left })
 	UI.corner(pad, PAD_H // 2)
 	UI.stroke(pad, C.white, 1, 0.6)
 	for _, s in ipairs({ { "◀", 0 }, { "▶", 1 } }) do
@@ -69,23 +76,31 @@ function Touch.build(stage: Frame)
 		Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(PAD_H - 26, PAD_H - 26), Parent = pad })
 	UI.corner(knob, (PAD_H - 26) // 2)
 	local steerInput: InputObject? = nil
+	local originX = 0
 	local function steerAt(x: number)
 		local half = pad.AbsoluteSize.X / 2
-		local k = math.clamp((x - (pad.AbsolutePosition.X + half)) / (half * 0.86), -1, 1)
+		local k = math.clamp((x - originX) / (half * 0.86), -1, 1)
 		if math.abs(k) < DEAD then k = 0 else k = (k - DEAD * math.sign(k)) / (1 - DEAD) end
 		-- a little curve: fine control near the middle, full lock still at the end
 		t.steer = math.sign(k) * math.abs(k) ^ 1.35
-		knob.Position = UDim2.new(0.5, k * (half - (PAD_H - 26) / 2 - 4), 0.5, 0)
+		local s = math.max(0.1, pad.AbsoluteSize.X / PAD_W) -- screen px per layout px
+		knob.Position = UDim2.new(0.5, k * (half / s - (PAD_H - 26) / 2 - 4), 0.5, 0)
 	end
 	local function steerRelease()
 		steerInput = nil
 		t.steer = 0
 		pad.BackgroundTransparency = IDLE_ALPHA
+		pad.Position = PAD_HOME
 		knob.Position = UDim2.fromScale(0.5, 0.5)
 	end
-	pad.InputBegan:Connect(function(i)
+	zone.InputBegan:Connect(function(i)
+		if steerInput then return end
 		if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then
 			steerInput = i
+			originX = i.Position.X
+			-- the pad jumps under the thumb (layout px inside the Left frame)
+			local s = math.max(0.1, pad.AbsoluteSize.X / PAD_W)
+			pad.Position = UDim2.fromOffset((i.Position.X - left.AbsolutePosition.X) / s - PAD_W / 2, (i.Position.Y - left.AbsolutePosition.Y) / s - PAD_H / 2)
 			pad.BackgroundTransparency = 0.1
 			steerAt(i.Position.X)
 		end
@@ -115,8 +130,37 @@ function Touch.build(stage: Frame)
 		Size = UDim2.fromOffset(GAS * 2 + GAP, BRAKE_H + GAP + HAND), Parent = root })
 	local gas, brk = false, false
 	local function throttleSync() t.throttle = (gas and 1 or 0) - (brk and 1 or 0) end
-	hold(right, "GAS", UDim2.new(1, -GAS, 1, -GAS), UDim2.fromOffset(GAS, GAS), C.green, 18, function() gas = true; throttleSync() end, function() gas = false; throttleSync() end)
-	hold(right, "BRAKE", UDim2.new(0, 0, 1, -BRAKE_H), UDim2.fromOffset(GAS, BRAKE_H), C.red, 15, function() brk = true; throttleSync() end, function() brk = false; throttleSync() end)
+	-- "auto gas" (Phone > Settings, 2026-11-18): a tap on GAS starts cruising, BRAKE stops it; the button stays lit
+	local function autoGasOn(): boolean
+		local d = State.data
+		return d ~= nil and d.settings ~= nil and d.settings.autoGas == true
+	end
+	local gasBtn
+	gasBtn = hold(right, "GAS", UDim2.new(1, -GAS, 1, -GAS), UDim2.fromOffset(GAS, GAS), C.green, 18, function()
+		gas = true
+		if autoGasOn() then Drive.autoGas = true end
+		throttleSync()
+	end, function()
+		gas = false
+		throttleSync()
+	end)
+	hold(right, "BRAKE", UDim2.new(0, 0, 1, -BRAKE_H), UDim2.fromOffset(GAS, BRAKE_H), C.red, 15, function()
+		brk = true
+		Drive.autoGas = false
+		throttleSync()
+	end, function() brk = false; throttleSync() end)
+	task.spawn(function()
+		while root.Parent do
+			task.wait(0.2)
+			if Drive.autoGas and not gas then
+				gasBtn.Text = "AUTO"
+				gasBtn.BackgroundTransparency = 0.05
+			elseif gasBtn.Text ~= "GAS" then
+				gasBtn.Text = "GAS"
+				if not gas then gasBtn.BackgroundTransparency = IDLE_ALPHA end
+			end
+		end
+	end)
 	hold(right, "P", UDim2.new(0, 0, 0, 0), UDim2.fromOffset(HAND, HAND), C.orange, 24, function() t.handbrake = true end, function() t.handbrake = false end)
 
 	local function releaseAll()
@@ -127,6 +171,7 @@ function Touch.build(stage: Frame)
 		t.throttle = 0
 		t.steer = 0
 		t.handbrake = false
+		Drive.autoGas = false
 	end
 	UIState.bind("touch", root, nil, releaseAll)
 	-- Roblox's own thumbstick and jump button only on foot: in a vehicle these pedals are the controls

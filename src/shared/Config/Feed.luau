@@ -22,6 +22,12 @@ Feed.authors = {
 }
 
 Feed.posts = {
+	-- server/GhostService: a rider called in to the made-up ghost radio show after a night delivery (2026-11-18)
+	ghost_radio = {
+		t("🎙️ เมื่อคืน {name} โทรเข้ารายการ วิทยุคืนหลอน 13.13 เล่าว่าไปส่งของแถว{place} แล้วเจอดี! ใครอยู่แถวนั้นบ้าง 😱", "🎙️ Last night {name} called the Haunted Night Radio 13.13 show: a delivery near {place} and... something was there 😱"),
+		t("ฟังรายการคืนหลอนเมื่อคืนยัง? ไรเดอร์ {name} เล่าเรื่อง{place} ขนลุกทั้งตัว ต่อไปไม่สั่งข้าวดึกแล้ว", "Did you hear the Haunted Night show? Rider {name}'s story about {place} gave me chills. No more late-night orders."),
+		t("แอดมินขอเตือน: ส่งของดึก ๆ แถว{place} ระวังลูกค้าที่จ่ายเป็นใบไม้นะ (อ้างอิงจากคุณ {name})", "Admin's warning: late deliveries near {place}, watch out for customers who pay in leaves. (Source: {name})"),
+	},
 	crash = {
 		t("เมื่อกี้เห็นไรเดอร์ {name} บินข้ามแฮนด์แถว{place} ลุกขึ้นมาปัดฝุ่นแล้วไปต่อ อดทนมากกก", "Just saw rider {name} fly over the handlebars near {place}, dust off and carry on. Respect."),
 		t("ใครทำหมวกกันน็อกหล่นแถว{place} ไรเดอร์ {name} ฝากบอกว่าไม่ใช่ของเขา (แต่ของเขาจริงๆ)", "Someone dropped a helmet near {place}. Rider {name} says it isn't theirs. (It is.)"),

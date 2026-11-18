@@ -100,6 +100,12 @@ Made inside Studio with the Assistant's mesh and avatar generators, on the game 
 A place built from `src/` alone (`tools/build_place.py`) has no `GoDashModels` folder, so pedestrians and dogs fall
 back to simple part-built figures there.
 
+### 5b. Creator Store models
+
+| What | Name in the place | Source | Licence | Used by |
+|---|---|---|---|---|
+| The lady in white (night ghost scenes, 2026-11-18) | `ReplicatedStorage.GoDashModels.GhostLady` (**cloud place only**) | Roblox Creator Store, "Kuntilanak/Pontianak" by KianataAzka_321, asset 9823957896 (free) | Creator Store terms (free asset, use in experiences allowed) | `client/Ghosts.luau`; it falls back to a part-built figure without it. The model came with no scripts; it was checked again and anchored before saving. Folklore figure, no blood or gore |
+
 ## 6. Radio music and animation
 
 - Radio (`Config/Radio.luau`): 11 tracks from the Roblox Creator Store music library published by

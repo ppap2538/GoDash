@@ -57,25 +57,32 @@ local function signalsAround(p: Vector3): { any }
 end
 
 -- The junction ahead and the road you are coming in on (nil when there is none or it is a soi).
+-- (2026-11-18: a junction is now several nodes with lights only on the roads coming in, so take the nearest node
+-- ahead whose road toward you actually has a light; inside the junction there is none and the panel goes away)
 local function ahead(pos: Vector3, fwd: Vector3)
-	local best, bestD
+	local cands = {}
 	for _, s in ipairs(signalsAround(pos)) do
 		local dx, dz = s.node.x - pos.X, s.node.z - pos.Z
 		local d = math.sqrt(dx * dx + dz * dz)
-		if d < REACH and d > s.node.r + 2 and (dx * fwd.X + dz * fwd.Z) / d > 0.5 and (not best or d < bestD) then
-			best, bestD = s, d
+		if d < REACH and d > s.node.r + 2 and (dx * fwd.X + dz * fwd.Z) / d > 0.5 then
+			table.insert(cands, { s = s, d = d })
 		end
 	end
-	if not best then return nil end
-	local n = best.node
-	local ax, az = (pos.X - n.x) / bestD, (pos.Z - n.z) / bestD
-	local link, dot = nil, -2
-	for _, l in ipairs(n.links) do
-		local dd = ((l.to.x - n.x) * ax + (l.to.z - n.z) * az) / l.len
-		if dd > dot then link, dot = l, dd end
+	table.sort(cands, function(a, b) return a.d < b.d end)
+	for _, c in ipairs(cands) do
+		local n = c.s.node
+		local ax, az = (pos.X - n.x) / c.d, (pos.Z - n.z) / c.d
+		local link, dot = nil, -2
+		for _, l in ipairs(n.links) do
+			local dd = ((l.to.x - n.x) * ax + (l.to.z - n.z) * az) / l.len
+			if dd > dot then link, dot = l, dd end
+		end
+		if link and dot >= 0.8 and not link.edge.minor then
+			if c.s.groups[link.edge] ~= nil then return c.s, link, c.d end
+			return nil -- the nearest junction node ahead, but this road has no light there (or you are inside the junction)
+		end
 	end
-	if not link or dot < 0.8 or link.edge.minor then return nil end
-	return best, link, bestD
+	return nil
 end
 
 -- the signal model of this approach: the one whose stop line lies out along the road you came in on
@@ -202,6 +209,7 @@ local function run()
 		local n = sig.node
 		local group = sig.groups[link.edge]
 		local col, _, left = Traffic.timing(n.id, group, Workspace:GetServerTimeNow())
+		if not col then return end
 		if current.node ~= n.id then
 			current.node = n.id
 			current.warned = false
@@ -255,10 +263,9 @@ local function run()
 		if not head then current.head = headFor(n.id, n, (pos.X - n.x) / d, (pos.Z - n.z) / d); head = current.head end
 		local line = head and head:FindFirstChild("StopLine")
 		if glow and line and line:IsA("BasePart") then
-			local w = line.Size.X + 2
-			glow.Size = Vector3.new(math.max(2, w / 2 - 1.2), 0.08, 1.8)
-			-- the line's look points away from the junction: arriving, your (left) lane is its +X half
-			glow.CFrame = line.CFrame * CFrame.new(w / 4, 0.05, 0)
+			-- (2026-11-18) the stop line now spans only the lanes coming in: light all of it
+			glow.Size = Vector3.new(math.max(2, line.Size.X), 0.08, 1.8)
+			glow.CFrame = line.CFrame * CFrame.new(0, 0.05, 0)
 			glow.Color = colour
 			if glow.Parent ~= Workspace then glow.Parent = Workspace end
 		elseif glow then

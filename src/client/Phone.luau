@@ -3,6 +3,7 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
+local UserInputService = game:GetService("UserInputService")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Game = require(Shared.Config.Game)
 local Vehicles = require(Shared.Config.Vehicles)
@@ -1025,6 +1026,28 @@ screens.settings = function()
 		local sel = (s.rideAlong or "friends") == o[1]
 		local b = UI.button(rideRow, o[2], { Size = UDim2.new(1 / 3, -4, 1, 0), TextSize = 13, BackgroundColor3 = sel and C.green or C.bg, TextColor3 = sel and C.white or C.text }, function() set("rideAlong", o[1]) end)
 		b:SetAttribute("NoTranslate", true)
+	end
+	-- 2026-11-18 easier driving: camera distance, lane assist, auto gas (phones)
+	local camCard = bigCard(76)
+	local cl = UI.label(camCard, L("🎥 Camera distance", "🎥 ระยะกล้องตอนขับ"), 14, C.text, F.bold, { Position = UDim2.fromOffset(12, 6), Size = UDim2.new(1, -24, 0, 20) })
+	cl:SetAttribute("NoTranslate", true)
+	local camRow = UI.new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(10, 32), Size = UDim2.new(1, -20, 0, 36), Parent = camCard })
+	UI.list(camRow, 6, true)
+	for _, o in ipairs({ { "near", L("Near", "ใกล้") }, { "normal", L("Normal", "ปกติ") }, { "far", L("Far", "ไกล") } }) do
+		local sel = (s.camera or "normal") == o[1]
+		local b = UI.button(camRow, o[2], { Size = UDim2.new(1 / 3, -4, 1, 0), TextSize = 13, BackgroundColor3 = sel and C.green or C.bg, TextColor3 = sel and C.white or C.text }, function() set("camera", o[1]) end)
+		b:SetAttribute("NoTranslate", true)
+	end
+	local LaneAssist = require(script.Parent.LaneAssist)
+	local laneOn = LaneAssist.enabled()
+	row("🛣️", L("Lane assist", "ช่วยประคองเลน"), L("Keeps you in your lane while you barely steer", "ไม่ได้บังคับ รถจะค่อย ๆ อยู่กลางเลนซ้ายเอง"),
+		laneOn and "ON" or "OFF", function() set("lane", not laneOn) end, { btnWidth = 60, btnColor = laneOn and C.green or Color3.fromRGB(150, 158, 170) })
+	local ghostsOn = s.ghosts ~= false
+	row("👻", L("Ghost scenes at night", "ฉากผีตอนดึก"), L("Late deliveries to lonely places may get... spooky", "ส่งของดึก ๆ ในที่เปลี่ยว อาจเจอดี"),
+		ghostsOn and "ON" or "OFF", function() set("ghosts", not ghostsOn) end, { btnWidth = 60, btnColor = ghostsOn and C.green or Color3.fromRGB(150, 158, 170) })
+	if UserInputService.TouchEnabled then
+		row("🚀", L("Auto gas", "เร่งอัตโนมัติ"), L("Tap GAS once to cruise; BRAKE stops it", "แตะ GAS ครั้งเดียววิ่งเอง กด BRAKE เพื่อหยุด"),
+			s.autoGas and "ON" or "OFF", function() set("autoGas", not s.autoGas) end, { btnWidth = 60, btnColor = s.autoGas and C.green or Color3.fromRGB(150, 158, 170) })
 	end
 	-- graphics detail (client/Perf): auto follows the frame rate; phones start at medium
 	section("GRAPHICS")

@@ -80,6 +80,9 @@ safe("Store", require(Services.StoreService).start)
 safe("Season", require(Services.SeasonService).start)
 safe("Company", require(Services.CompanyService).start)
 safe("Events", require(Services.EventService).start)
+safe("Festival", require(Services.FestivalService).start, world) -- 2026-11-18: Loy Krathong at Bueng Kaen Nakhon, 20-30 Nov
+safe("Referral", require(Services.ReferralService).start) -- 2026-11-18: invite friends, both get a reward
+safe("Ghosts", require(Services.GhostService).start, world) -- 2026-11-18: ghosts on late deliveries + the radio call-in
 safe("Accidents", require(Services.AccidentService).start) -- 2026-11-18: hitting people or cars costs money
 safe("Health", require(Services.HealthService).start) -- 2026-11-18: falls add up to injuries; the hospital treats them
 safe("Street", StreetService.start, world, deps)
@@ -133,8 +136,10 @@ Net.fn("Settings", { "string", "any" }, function(player, key, value)
 	local s = d.settings
 	if key == "steer" and type(value) == "number" and value == value then
 		s.steer = math.clamp(value, 0.5, 2)
-	elseif (key == "assist" or key == "music" or key == "sfx" or key == "bgm") and type(value) == "boolean" then
-		s[key] = value
+	elseif (key == "assist" or key == "music" or key == "sfx" or key == "bgm" or key == "lane" or key == "autoGas" or key == "ghosts") and type(value) == "boolean" then
+		s[key] = value -- lane = lane assist, autoGas = phone cruise (2026-11-18), ghosts = night ghost scenes
+	elseif key == "camera" and (value == "near" or value == "normal" or value == "far") then
+		s.camera = value -- client/ChaseCam distance (2026-11-18)
 	elseif key == "rideAlong" and (value == "friends" or value == "all" or value == "off") then
 		s.rideAlong = value
 	elseif key == "quality" and (value == "auto" or value == "low" or value == "medium" or value == "high") then

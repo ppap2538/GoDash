@@ -23,6 +23,7 @@ local Drive = {}
 local player = Players.LocalPlayer
 local cur = nil -- the vehicle being driven
 Drive.touch = { throttle = 0, steer = 0, handbrake = false } -- written by the HUD pedals
+Drive.autoGas = false -- phones with "auto gas": cruising after a tap on GAS, until BRAKE (UI/HUD/TouchControls)
 -- client/AutoDrive sets this: (c, ctx) -> throttle, steer, handbrake (or nil when it lets go)
 Drive.autopilot = nil :: ((any, any) -> (number?, number?, boolean?))?
 -- client/Cutscene sets this: called once when a hard crash throws the rider off (see the hard-hit check)
@@ -31,6 +32,8 @@ Drive.onHorn = nil :: (() -> ())? -- client/StreetLife
 Drive.fx = nil :: ((any, number, any) -> ())? -- client/DriveFx: per-step effects
 Drive.onHit = nil :: ((any) -> ())? -- client/Accident: { instance, dv, at, model } for every hard hit
 Drive.onExit = nil :: ((any) -> ())? -- client/DriveFx: clean up when you get off
+-- client/LaneAssist sets this: (c, ctx) -> a small steering correction (-1..1) while the rider barely steers
+Drive.laneAssist = nil :: ((any, any) -> number?)?
 Drive.stallUntil = 0 -- client/StreetLife: the engine is dead until then (water in the exhaust)
 Drive.info = { driving = false, speed = 0, fuel = 0, fuelCap = 0, condition = 100, lights = false, signal = 0, pedal = false, name = "" }
 
@@ -41,6 +44,19 @@ local DAMP = 4.4
 local rayParams = RaycastParams.new()
 rayParams.FilterType = Enum.RaycastFilterType.Exclude
 rayParams.RespectCanCollide = true
+
+-- Steering lock at speed (2026-11-18, owner: "hard to control on PC and phone"). It used to shrink linearly from
+-- the vehicle's lock to 6.5° at top speed, which still asked ~3 g of the tyres at 40 km/h and ~6 g at top speed:
+-- a tap of A/D swerved the bike across the road. Now the lock is whatever keeps the sideways acceleration
+-- (v² / turn radius) under the tyres' grip: full lock when slow, a calm, stable line when fast.
+-- 1 stud = 0.28 m, so 35 studs/s² ≈ 1 g; LAT_G = 1.7 g for ordinary grip, more for grippy sports tyres.
+local LAT_G = 1.7
+local function maxSteer(c, speedF: number, gripMult: number?): number
+	local aLat = 35 * LAT_G * (c.stats.grip / 10.5) * (gripMult or 1)
+	local v = math.abs(speedF)
+	return math.min(math.rad(c.def.steer), math.atan(c.wheelbase * aLat / math.max(v * v, 1)))
+end
+Drive.maxSteer = maxSteer
 
 local function attr(model: Instance, name: string, default: number): number
 	local v = model:GetAttribute(name)
@@ -106,6 +122,7 @@ local function exit()
 	cur = nil
 	Drive.info.driving = false
 	Drive.info.auto = false
+	Drive.autoGas = false
 	if Drive.onExit then pcall(Drive.onExit, c) end
 	if c.audio then c.audio:stop() end
 	if c.skid then c.skid:Destroy() end
@@ -245,12 +262,28 @@ local function step(dt: number)
 	if type(qaT) == "number" then throttle = qaT end
 	if type(qaS) == "number" then steerIn = qaS end
 	local handbrake = t.handbrake or UserInputService:IsKeyDown(Enum.KeyCode.Space)
+	-- phones: "auto gas" holds the throttle while you only steer and brake (Phone > Settings)
+	if Drive.autoGas and t.throttle == 0 and throttle == 0 and not handbrake and Drive.info.auto ~= true then throttle = 1 end
+	-- keys are on/off: ramp the steering in (slower at speed) and let it centre quickly, so a tap is a nudge.
+	-- Analogue input (thumb pad, gamepad stick) already says how hard, so it passes almost straight through.
+	local analogue = steerIn ~= 0 and math.abs(steerIn) < 0.999
+	local fracNow = math.clamp(math.abs(speedF) / math.max(c.stats.topSpeed, 1), 0, 1)
+	c.steerCmd = c.steerCmd or 0
+	local towardZero = steerIn == 0 or (c.steerCmd ~= 0 and math.sign(steerIn) ~= math.sign(c.steerCmd))
+	local rate = analogue and 12 or (towardZero and 7 or (4.2 - 2.4 * fracNow))
+	local dCmd = steerIn - c.steerCmd
+	c.steerCmd += math.clamp(dCmd, -rate * dt, rate * dt)
+	steerIn = c.steerCmd
+	-- lane assist: a gentle pull to the middle of your lane while you barely steer (client/LaneAssist)
+	if Drive.laneAssist and math.abs(steerIn) < 0.08 and not handbrake and not Drive.info.auto then
+		local ok, corr = pcall(Drive.laneAssist, c, { cf = cf, fwd = fwd, right = right, speedF = speedF, dt = dt, maxAngle = maxSteer(c, speedF) })
+		if ok and type(corr) == "number" then steerIn = math.clamp(steerIn + corr, -0.6, 0.6) end
+	end
 	local ap = Drive.autopilot
 	if ap and Drive.info.auto then
-		local fr = math.clamp(math.abs(speedF) / math.max(c.stats.topSpeed, 1), 0, 1)
 		local aT, aS, aH = ap(c, {
 			cf = cf, fwd = fwd, right = right, speedF = speedF, dt = dt, manualT = throttle, manualS = steerIn, manualH = handbrake,
-			maxAngle = math.rad(c.def.steer + (6.5 - c.def.steer) * fr ^ 0.65),
+			maxAngle = maxSteer(c, speedF),
 		})
 		if aT then throttle, steerIn, handbrake = aT, aS or 0, aH == true end
 	end
@@ -274,6 +307,7 @@ local function step(dt: number)
 			local hard = c.def.class == "car" and 38 or 24
 			if dv > hard and not State.cutscene and Drive.onCrash and os.clock() - (c.thrownAt or 0) > 4 then
 				c.thrownAt = os.clock()
+				Drive.autoGas = false
 				local hv = Vector3.new(c.lastVel.X, 0, c.lastVel.Z)
 				Net.send("VehicleFall", hv.Magnitude) -- (the speed sets how badly the rider is hurt: server/HealthService)
 				Drive.onCrash({ dir = dir, speed = hv.Magnitude, at = at, model = c.model, car = c.def.class == "car" })
@@ -297,17 +331,17 @@ local function step(dt: number)
 	local energy = State.data and State.data.energy or 100
 	local pedalPower = c.def.pedal and (energy > 5 and 1 or 0.55) or 1
 
-	-- steering: less lock at speed, smoothed by the handling upgrade and the sensitivity setting
+	-- steering: the lock the tyres can hold at this speed (maxSteer), smoothed by the handling upgrade and the
+	-- sensitivity setting; the handbrake lets you swing the tail round anyway
 	local top = stats.topSpeed
-	local frac = math.clamp(math.abs(speedF) / math.max(top, 1), 0, 1)
-	local maxAngle = math.rad(c.def.steer + (6.5 - c.def.steer) * frac ^ 0.65)
+	local wet = Workspace:GetAttribute("Wet") or 0
+	local gripMult = 1 + (stats.wetGrip - 1) * wet
+	local maxAngle = maxSteer(c, speedF, gripMult)
+	if handbrake then maxAngle = math.min(math.rad(c.def.steer), maxAngle * 1.8) end
 	local sens = math.clamp(settings.steer or 1, 0.5, 2)
 	local target = steerIn * maxAngle
 	c.steer += (target - c.steer) * math.min(1, stats.steerRate * sens * dt * 2.2)
 	local sinS, cosS = math.sin(c.steer), math.cos(c.steer)
-
-	local wet = Workspace:GetAttribute("Wet") or 0
-	local gripMult = 1 + (stats.wetGrip - 1) * wet
 	local assist = settings.assist ~= false
 
 	local n = #c.wheels

@@ -325,7 +325,7 @@ local function control(c, ctx): (number?, number?, boolean?)
 				local exitPt = at(samples, toNode + node.r + 6)
 				local outDir = flat(exitPt - npos)
 				local left = outDir.Magnitude > 1 and outDir.Unit:Dot(inDir:Cross(Y)) < -0.45
-				if edge and not edge.minor and not left then
+				if edge and not edge.minor and not left and sig.groups[edge] ~= nil then -- (no light on pieces inside a junction)
 					-- (2026-11-19) go on only when the junction (the r + 3 line server/TrafficService checks)
 					-- is reached before the light turns red; it used to go on any yellow it could not stop
 					-- for, and a long yellow-to-red approach got the rider a red-light ticket

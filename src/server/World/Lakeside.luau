@@ -287,7 +287,7 @@ function Lakeside.plan(ctx)
 						-- the deck runs from the path out over open water: nothing there but the lake
 						local deck = obb(shore.X - pc.out.X * 15, shore.Z - pc.out.Z * 15, pc.out.X, pc.out.Z, 17, 9, "pier")
 						if not blocked(deck) then
-							entry.pier = { x = shore.X, z = shore.Z }
+							entry.pier = { x = shore.X, z = shore.Z, ox = pc.out.X, oz = pc.out.Z } -- out = away from the water (server/FestivalService)
 							local pn = pc.out
 							emit(shore.X, shore.Z, function(parent) drawPier(parent, shore, pn, ctx.vrng) end)
 							break

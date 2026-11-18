@@ -27,21 +27,48 @@ Street.onCrash = nil :: ((Model, number) -> ())? -- client/Accident
 local LAMP = {
 	red = { Color3.fromRGB(255, 50, 40), 1 }, yellow = { Color3.fromRGB(255, 200, 40), 2 }, green = { Color3.fromRGB(60, 230, 110), 3 },
 }
-local OFF = { Color3.fromRGB(90, 30, 28), Color3.fromRGB(100, 84, 30), Color3.fromRGB(30, 84, 44) }
+-- unlit lamps are nearly black so the lit one stands out (2026-11-18: the old unlit colours read as half-on)
+local OFF = { Color3.fromRGB(40, 14, 12), Color3.fromRGB(44, 36, 12), Color3.fromRGB(12, 36, 18) }
+local COUNT = { red = Color3.fromRGB(255, 60, 50), yellow = Color3.fromRGB(255, 200, 40), green = Color3.fromRGB(70, 240, 120) }
+local lampCache = setmetatable({}, { __mode = "k" }) -- [model] = { lamps = { {part, index} }, count = TextLabel? }
 
-local function paintSignal(model: Instance, t: number)
+local function paintSignal(model: Instance, t: number, camPos: Vector3?)
 	local node, group = model:GetAttribute("Node"), model:GetAttribute("Group")
 	if type(node) ~= "number" or type(group) ~= "number" then return end
-	local col = Traffic.colour(node, group, t)
-	if model:GetAttribute("Shown") == col then return end
-	model:SetAttribute("Shown", col)
-	local on = LAMP[col]
-	for i = 1, 3 do
-		local lamp = model:FindFirstChild("Lamp" .. i)
-		if lamp and lamp:IsA("BasePart") then
-			local lit = on[2] == i
-			lamp.Material = lit and Enum.Material.Neon or Enum.Material.SmoothPlastic
-			lamp.Color = lit and on[1] or OFF[i]
+	local col, _, left = Traffic.timing(node, group, t)
+	if not col then return end
+	local cache = lampCache[model]
+	if not cache then
+		cache = { lamps = {} }
+		for _, d in ipairs(model:GetDescendants()) do
+			if d:IsA("BasePart") then
+				local i = tonumber(d.Name:match("^Lamp(%d)$"))
+				if i then table.insert(cache.lamps, { d, i }) end
+			elseif d:IsA("TextLabel") and d.Parent and d.Parent.Name == "Count" then
+				cache.count = d
+			end
+		end
+		lampCache[model] = cache
+	end
+	if model:GetAttribute("Shown") ~= col then
+		model:SetAttribute("Shown", col)
+		local on = LAMP[col]
+		for _, li in ipairs(cache.lamps) do
+			local lit = on[2] == li[2]
+			li[1].Material = lit and Enum.Material.Neon or Enum.Material.SmoothPlastic
+			li[1].Color = lit and on[1] or OFF[li[2]]
+		end
+	end
+	-- the countdown, only on signals near the camera (the text is the expensive part)
+	local label = cache.count
+	if label and camPos then
+		local box = label.Parent and label.Parent.Parent
+		if box and box:IsA("BasePart") and (box.Position - camPos).Magnitude < 260 then
+			local text = tostring(math.max(1, math.ceil(left)))
+			if label.Text ~= text then label.Text = text end
+			if label.TextColor3 ~= COUNT[col] then label.TextColor3 = COUNT[col] end
+		elseif label.Text ~= "" then
+			label.Text = ""
 		end
 	end
 end
@@ -130,7 +157,7 @@ end
 -- must a vehicle doing v stop for the light at `node`, arriving on `edge` with `toNext` studs to go?
 local function mustStop(node, edge, toNext: number, v: number, t: number): boolean
 	local sig = signalsById and signalsById[node.id]
-	if not sig or not edge or edge.minor then return false end
+	if not sig or not edge or edge.minor or sig.groups[edge] == nil then return false end -- no light on this road (or inside the junction)
 	local stopLine = node.r + 5
 	if toNext < node.r + 1.5 then return false end -- already in the junction: clear it
 	if toNext - stopLine > v * v / (2 * BRAKE) + 6 then return false end -- not near yet
@@ -519,7 +546,8 @@ function Street.start()
 		acc += dt
 		if acc > 0.25 then
 			acc = 0
-			for _, m in ipairs(CollectionService:GetTagged("TrafficSignal")) do paintSignal(m, t) end
+			local camPos = cam and cam.CFrame.Position
+			for _, m in ipairs(CollectionService:GetTagged("TrafficSignal")) do paintSignal(m, t, camPos) end
 		end
 	end)
 end
