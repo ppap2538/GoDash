@@ -48,6 +48,10 @@ Game.HUNGRY_AT = 15
 Game.TIRED_AT = 12
 Game.NEED_REARM = 10
 
+-- Lakes and ponds (2026-11-19): Roblox terrain water (waves, sky reflections) whose surface is at WATER_Y.
+-- The "Water" parts under it are the dark lake bed (top 0.05) and keep the collisions and raycasts.
+Game.WATER_Y = 1.2
+
 -- World clock: one in-game day
 Game.DAY_LENGTH = 16 * 60 -- real seconds per in-game day
 Game.START_CLOCK = 7.5

@@ -36,6 +36,11 @@ Store.CODES = {
 	GODASH = { money = 2500, ends = "2027-12-31" },
 	KHONKAEN = { money = 1500, item = "milk_tea", qty = 3, ends = "2027-12-31" },
 	RIDER2026 = { money = 3000, seasonXp = 150, ends = "2026-12-31" },
+	-- one code per TikTok clip (2026-11-19), so the Creator Dashboard shows which clip brought riders in
+	-- (StoreService logs a custom event "Code <NAME>" on every use)
+	LOY2569 = { money = 2000, seasonXp = 100, ends = "2026-12-07" }, -- the Loy Krathong teaser
+	PHEE = { money = 1313, ends = "2026-12-31" }, -- the ghost + Haunted Night Radio 13.13 clip
+	TIKTOK = { money = 1500, item = "milk_tea", qty = 2, ends = "2027-06-30" }, -- the profile bio / every clip
 }
 
 ---------------------------------------------------------------------------------------------------

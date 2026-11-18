@@ -20,6 +20,7 @@ local Data = require(script.Parent.PlayerDataService)
 local Economy = require(script.Parent.EconomyService)
 local Inventory = require(script.Parent.InventoryService)
 local City = require(script.Parent.CityRemote)
+local Metrics = require(script.Parent.MetricsService)
 
 local Service = {}
 local seasonHook: ((Player, string, any) -> ())? = nil -- SeasonService: grant premium / xp
@@ -187,10 +188,25 @@ local function dateNumber(s: string): number
 	return tonumber(y or 0) * 10000 + tonumber(m or 0) * 100 + tonumber(dd or 0)
 end
 
+-- Owner-only codes (server side only, so they never reach a client): the owner types them in the same
+-- code box to set up a clip, e.g. open Loy Krathong early on this server for a teaser. Anyone else
+-- gets "That code doesn't exist", the same as a wrong code.
+local OWNER_ID = 11934070066
+local ownerCodes = {} :: { [string]: (Player) -> (boolean, string) }
+function Service.isOwner(player: Player): boolean
+	return player.UserId == OWNER_ID or (game.CreatorType == Enum.CreatorType.User and player.UserId == game.CreatorId and game.CreatorId > 0)
+end
+function Service.ownerCode(code: string, fn: (Player) -> (boolean, string))
+	ownerCodes[code:upper()] = fn
+end
+
 local function redeem(player: Player, raw: string?)
 	local d = Data.get(player)
 	if not d or type(raw) ~= "string" then return false, "Bad request" end
 	local code = raw:gsub("%s", ""):upper()
+	if ownerCodes[code] and Service.isOwner(player) then
+		return ownerCodes[code](player)
+	end
 	local def = Store.CODES[code]
 	if not def then return false, "That code doesn't exist" end
 	local today = tonumber(os.date("!%Y%m%d", os.time() + 7 * 3600))
@@ -202,6 +218,7 @@ local function redeem(player: Player, raw: string?)
 	if def.money then Economy.add(player, def.money, "code:" .. code) end
 	if def.item and Items.ById[def.item] then Inventory.add(player, def.item, def.qty or 1) end
 	if def.seasonXp and seasonHook then seasonHook(player, "xp", def.seasonXp) end
+	Metrics.event(player, "Code " .. code)
 	Net.fire(player, "Reward", { title = "Code " .. code, money = def.money, item = def.item and Items.ById[def.item] and Items.ById[def.item].name, qty = def.qty })
 	return true, "Code redeemed!"
 end

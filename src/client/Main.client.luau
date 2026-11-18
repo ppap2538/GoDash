@@ -9,8 +9,10 @@ ReplicatedStorage:WaitForChild("Remotes")
 -- Street and Cutscene, so it comes after them
 -- 2026-11-18 whole-tambon pass: Backdrop = the far city outline, Ambience = places that sound like themselves
 -- 2026-11-19 SignalAssist = "your light" panel, lane stop-line glow and red-light warning at junctions
+-- 2026-11-19 TurnHint = "in 120 m turn left" card; ClipMode = 9:16 clip camera (B); Emotes = wai / peace / selfie / dance (G)
+-- 2026-11-19 Water = lamp reflections on the lakes at night and the night water colour (terrain water lakes)
 -- 2026-11-18 LaneAssist = gentle pull to the middle of your lane while you barely steer (needs GPS's road graph)
-local order = { "Perf", "State", "Lang", "Feedback", "Crash", "Drive", "ChaseCam", "DriveFx", "OnFoot", "Rider", "HUD", "GPS", "LaneAssist", "AutoDrive", "Phone", "Choice", "Feed", "Board", "Reviews", "Invite", "Styling", "PhotoMode", "ShopApp", "SeasonApp", "CompanyApp", "LiveOps", "Festival", "Env", "Backdrop", "Ambience", "Build", "Peds", "Street", "SignalAssist", "Dogs", "Radio", "Guide", "Welcome", "Cutscene", "Ghosts", "Accident", "SpeedBumps", "StreetLife", "Finance", "License", "Tired", "Qa" }
+local order = { "Perf", "State", "Lang", "Feedback", "Crash", "Drive", "ChaseCam", "DriveFx", "OnFoot", "Rider", "HUD", "GPS", "LaneAssist", "TurnHint", "AutoDrive", "Phone", "Choice", "Feed", "Board", "Reviews", "Invite", "Styling", "PhotoMode", "ClipMode", "Emotes", "ShopApp", "SeasonApp", "CompanyApp", "LiveOps", "Festival", "Env", "Water", "Backdrop", "Ambience", "Build", "Peds", "Street", "SignalAssist", "Dogs", "Radio", "Guide", "Welcome", "Cutscene", "Ghosts", "Accident", "SpeedBumps", "StreetLife", "Finance", "License", "Tired", "Qa" }
 local started = {}
 for _, name in ipairs(order) do
 	local ok, err = xpcall(function()

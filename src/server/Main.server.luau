@@ -83,6 +83,7 @@ safe("Events", require(Services.EventService).start)
 safe("Festival", require(Services.FestivalService).start, world) -- 2026-11-18: Loy Krathong at Bueng Kaen Nakhon, 20-30 Nov
 safe("Referral", require(Services.ReferralService).start) -- 2026-11-18: invite friends, both get a reward
 safe("Ghosts", require(Services.GhostService).start, world) -- 2026-11-18: ghosts on late deliveries + the radio call-in
+safe("Emotes", require(Services.EmoteService).start) -- 2026-11-19: wai / peace / selfie poses everyone sees (client/Emotes)
 safe("Accidents", require(Services.AccidentService).start) -- 2026-11-18: hitting people or cars costs money
 safe("Health", require(Services.HealthService).start) -- 2026-11-18: falls add up to injuries; the hospital treats them
 safe("Street", StreetService.start, world, deps)

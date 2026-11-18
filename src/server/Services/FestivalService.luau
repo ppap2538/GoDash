@@ -15,6 +15,7 @@ local Workspace = game:GetService("Workspace")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage.Shared
 local Festival = require(Shared.Config.Festival)
+local GameConfig = require(Shared.Config.Game)
 local Season = require(Shared.Config.Season)
 local Util = require(Shared.Util)
 local Net = require(Shared.Net)
@@ -23,6 +24,8 @@ local Economy = require(script.Parent.EconomyService)
 local Lifestyle = require(script.Parent.LifestyleService)
 local SeasonService = require(script.Parent.SeasonService)
 local City = require(script.Parent.CityRemote)
+local Store = require(script.Parent.StoreService)
+local Time = require(script.Parent.TimeService)
 local World = script.Parent.Parent.World
 local Kit = require(World.Kit)
 local S = require(World.Scenery)
@@ -44,8 +47,10 @@ function Service.active(): boolean
 	return Workspace:GetAttribute("Festival") == LOY.id
 end
 
+local previewUntil = 0 -- the owner's LOYPREVIEW code opens it early on one server (teaser clips)
 local function inWindow(): boolean
 	if RunService:IsStudio() and Workspace:GetAttribute("QaFestival") then return true end
+	if os.clock() < previewUntil then return true end
 	local day = Util.dayNumber()
 	return day >= LOY.from and day <= LOY.to
 end
@@ -111,9 +116,11 @@ local function findWater()
 	local params = RaycastParams.new()
 	params.FilterType = Enum.RaycastFilterType.Exclude
 	params.FilterDescendantsInstances = { folder }
+	params.IgnoreWater = true -- through the terrain water to the "Water" bed part
 	local function water(p: Vector3): (boolean, number?)
 		local hit = Workspace:Raycast(V3(p.X, 40, p.Z), V3(0, -80, 0), params)
-		if hit and hit.Instance.Name == "Water" then return true, hit.Position.Y end
+		-- the "Water" parts are the lake bed now; the surface (terrain water) is at Game.WATER_Y
+		if hit and hit.Instance.Name == "Water" then return true, GameConfig.WATER_Y end
 		return false, nil
 	end
 	local shore = pierShore :: Vector3
@@ -306,6 +313,26 @@ end
 
 function Service.start(world)
 	Players.PlayerRemoving:Connect(function(p) lastFloat[p] = nil end)
+	-- owner-only codes for recording clips (typed in the normal code box; nobody else can use them)
+	Store.ownerCode("LOYPREVIEW", function()
+		previewUntil = os.clock() + 3 * 3600
+		setOn(true, world)
+		Time.set(18.3)
+		return true, "เปิดงานลอยกระทงบนเซิร์ฟเวอร์นี้ 3 ชั่วโมง ตั้งเวลาเป็นหัวค่ำแล้ว (ปิด: LOYOFF)"
+	end)
+	Store.ownerCode("LOYOFF", function()
+		previewUntil = 0
+		setOn(inWindow(), world)
+		return true, Service.active() and "ปิดโหมดพรีวิวแล้ว (งานจริงยังเปิดอยู่ตามวันที่)" or "ปิดงานลอยกระทงบนเซิร์ฟเวอร์นี้แล้ว"
+	end)
+	Store.ownerCode("FIREWORKS", function()
+		Workspace:SetAttribute("FireworksUntil", Workspace:GetServerTimeNow() + 75)
+		if not Time.isNight() then Time.set(20) end
+		return true, "พลุ 75 วินาที เริ่มเลย (ต้องเปิดงานลอยกระทงอยู่)"
+	end)
+	Store.ownerCode("NIGHT", function() Time.set(20) return true, "ตั้งเวลาเป็น 20:00" end)
+	Store.ownerCode("DUSK", function() Time.set(17.6) return true, "ตั้งเวลาเป็น 17:36 (แสงเย็น)" end)
+	Store.ownerCode("DAY", function() Time.set(9) return true, "ตั้งเวลาเป็น 09:00" end)
 	City.register("krathong", function(player, arg)
 		if not Service.active() or not launch then return false, "No festival now" end
 		local char = player.Character

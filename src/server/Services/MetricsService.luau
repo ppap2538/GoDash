@@ -54,6 +54,11 @@ function Metrics.money(player: Player, amount: number, reason: string, spent: bo
 	end)
 end
 
+-- A named moment worth counting (Creator Dashboard > Analytics > Custom events), e.g. "Code LOY2569".
+function Metrics.event(player: Player, name: string, value: number?)
+	pcall(function() AnalyticsService:LogCustomEvent(player, name, value or 1) end)
+end
+
 function Metrics.start()
 	Data.onLoaded(function(player, d)
 		local st = d.stats or {}

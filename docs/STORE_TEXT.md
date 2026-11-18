@@ -32,6 +32,13 @@ Localization -> Thai -> Experience name (the localization API is not reachable w
 
 After 30 Nov: remove the 🏮 line (and the name tag).
 
+## Codes for clips (2026-11-19)
+
+One code per clip, so Creator Dashboard > Analytics > Custom events ("Code LOY2569", ...) shows which clip brought
+riders in: `LOY2569` (Loy Krathong teaser, to 7 Dec), `PHEE` (ghost + radio clip), `TIKTOK` (profile bio, every clip).
+Codes live in `src/shared/Config/Store.luau` (CODES). The owner's own clip helpers (LOYPREVIEW, FIREWORKS, NIGHT, DUSK,
+DAY, LOYOFF) are in docs/OVERHAUL.md §19 #8; they only work for the owner's account.
+
 ## English description (for an English localization later)
 
 ```

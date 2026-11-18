@@ -7,6 +7,7 @@
 --     the lake sees the same show
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -190,20 +191,52 @@ local function burst(at: Vector3)
 			e.Color = ColorSequence.new(col, col:Lerp(Color3.new(1, 1, 1), 0.5))
 			e.LightEmission = 1
 			e.LightInfluence = 0
-			e.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1.6), NumberSequenceKeypoint.new(1, 0.2) })
+			-- (2026-11-19: from the pier, 150-300 studs away, the old 1.6-stud sparks were faint dust; bigger,
+			-- more of them, a flash and a glittering second shell for the clips)
+			e.Brightness = 3
+			e.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 4), NumberSequenceKeypoint.new(0.6, 2.6), NumberSequenceKeypoint.new(1, 0.4) })
 			e.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(0.7, 0.2), NumberSequenceKeypoint.new(1, 1) })
-			e.Lifetime = NumberRange.new(1.4, 2.2)
-			e.Speed = NumberRange.new(38, 52)
+			e.Lifetime = NumberRange.new(1.6, 2.6)
+			e.Speed = NumberRange.new(58, 80)
 			e.SpreadAngle = Vector2.new(180, 180)
 			e.Drag = 2.2
 			e.Acceleration = Vector3.new(0, -14, 0)
 			e.Rate = 0
 			e.Parent = rocket
-			e:Emit(70)
+			e:Emit(120)
+			local glitter = Instance.new("ParticleEmitter")
+			glitter.Color = ColorSequence.new(Color3.fromRGB(255, 236, 180))
+			glitter.LightEmission = 1
+			glitter.LightInfluence = 0
+			glitter.Brightness = 2.5
+			glitter.Size = NumberSequence.new(1.3)
+			glitter.Transparency = NumberSequence.new({
+				NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(0.25, 0.7), NumberSequenceKeypoint.new(0.45, 0),
+				NumberSequenceKeypoint.new(0.65, 0.75), NumberSequenceKeypoint.new(0.8, 0.1), NumberSequenceKeypoint.new(1, 1),
+			})
+			glitter.Lifetime = NumberRange.new(2.4, 3.4)
+			glitter.Speed = NumberRange.new(36, 52)
+			glitter.SpreadAngle = Vector2.new(180, 180)
+			glitter.Drag = 1.6
+			glitter.Acceleration = Vector3.new(0, -9, 0)
+			glitter.Rate = 0
+			glitter.Parent = rocket
+			glitter:Emit(55)
+			local flash = Instance.new("Part")
+			flash.Anchored, flash.CanCollide, flash.CanQuery, flash.CanTouch, flash.CastShadow = true, false, false, false, false
+			flash.Shape = Enum.PartType.Ball
+			flash.Material = Enum.Material.Neon
+			flash.Color = col:Lerp(Color3.new(1, 1, 1), 0.6)
+			flash.Size = Vector3.new(9, 9, 9)
+			flash.Transparency = 0.25
+			flash.Position = at
+			flash.Parent = fxFolder
+			TweenService:Create(flash, TweenInfo.new(0.3), { Transparency = 1, Size = Vector3.new(14, 14, 14) }):Play()
+			task.delay(0.4, function() flash:Destroy() end)
 			local light = Instance.new("PointLight")
 			light.Color = col
-			light.Range = 60
-			light.Brightness = 3
+			light.Range = 120
+			light.Brightness = 5
 			light.Parent = rocket
 			local s = Instance.new("Sound")
 			s.SoundId = Sounds.boom
@@ -228,7 +261,9 @@ local function fireworks()
 			if active() and Workspace:GetAttribute("IsNight") and typeof(at) == "Vector3" then
 				local now = Workspace:GetServerTimeNow()
 				local cam = Workspace.CurrentCamera
-				if now % LOY.SHOW_EVERY < LOY.SHOW_LENGTH and cam and (cam.CFrame.Position - at).Magnitude < 2600 then
+				-- the show every SHOW_EVERY seconds, or now when the owner's FIREWORKS code asked for one (clips)
+				local show = now % LOY.SHOW_EVERY < LOY.SHOW_LENGTH or now < (Workspace:GetAttribute("FireworksUntil") or 0)
+				if show and cam and (cam.CFrame.Position - at).Magnitude < 2600 then
 					-- over the water the krathongs drift out on (seen from the pier), 90-170 studs up
 					local a = math.random() * math.pi * 2
 					local r = math.random() * 140

@@ -32,6 +32,45 @@ local function shade(c: Color3, k: number): Color3
 	return Color3.new(math.clamp(c.R * k, 0, 1), math.clamp(c.G * k, 0, 1), math.clamp(c.B * k, 0, 1))
 end
 
+-- The back of a building that faces a lake or a park (2026-11-19, owner: "กำแพงขาวโล่งขนาดใหญ่" round
+-- Bueng Kaen Nakhon). Fronts face the street, so from the promenade every terrace showed a bare wall
+-- 30-50 studs high. Builder sets o.view on lots whose back meets water, the promenade or a park;
+-- they get windows on the back (lit at night like the fronts) and, on wide ones, a lit rooftop
+-- billboard for a made-up local business, which is what real backs facing Bueng Kaen Nakhon have.
+-- cf = the building's ground frame (front = -Z), w = width, h = height, zBack = the back plane (local +Z).
+local ADS = {
+	{ "ชานมไข่มุก ป้าแดง", "BUBBLE TEA", Color3.fromRGB(150, 70, 160) }, { "GoDash ส่งไว ทันใจ", "RIDE WITH GODASH", Color3.fromRGB(28, 168, 84) },
+	{ "หมูกระทะ ริมบึง", "THAI BBQ BUFFET", Color3.fromRGB(196, 50, 40) }, { "ส้มตำ แซ่บอีหลี", "SOM TAM", Color3.fromRGB(230, 120, 30) },
+	{ "หมอลำซิ่ง คืนวันเสาร์", "MOLAM LIVE", Color3.fromRGB(200, 40, 110) }, { "ผ้าไหม แก่นนคร", "THAI SILK", Color3.fromRGB(120, 60, 40) },
+	{ "เที่ยวไดโนเสาร์ อีสาน", "DINO PARK", Color3.fromRGB(40, 120, 170) }, { "ซ่อมมอไซ ช่างเอก", "MOTO REPAIR", Color3.fromRGB(50, 56, 64) },
+	{ "ตลาดนัดคืนนี้", "NIGHT MARKET", Color3.fromRGB(220, 160, 30) }, { "คาเฟ่ริมบึง", "LAKESIDE CAFE", Color3.fromRGB(110, 80, 60) },
+}
+function B.backDress(m: Instance, cf: CFrame, w: number, h: number, zBack: number, floors: number, tex: string, col: Color3, rng: Random)
+	if w < 8 or h < 6 then return end
+	local units = math.max(1, math.floor(w / 15.5 + 0.5))
+	facade(m, cf * CF(0, h / 2, zBack + 0.16) * CFrame.Angles(0, math.pi, 0), w - 0.6, h, tex, units, math.max(1, floors), col, rng:NextNumber() < 0.7)
+	-- a drain pipe and a few air-con units, so the wall is not one flat picture
+	Kit.part(m, V3(0.4, h - 1, 0.4), cf * CF(-w / 2 + 1.2, h / 2, zBack + 0.5), Color3.fromRGB(150, 156, 164), M.Metal, { decor = true })
+	for _ = 1, math.min(3, units) do
+		local y = math.floor(rng:NextNumber(1, math.max(1.5, floors))) * (h / math.max(1, floors)) - 2
+		if y > 3 then
+			Kit.part(m, V3(2.8, 1.9, 1.3), cf * CF(rng:NextNumber(-w / 2 + 3, w / 2 - 3), y, zBack + 0.8), Color3.fromRGB(236, 238, 240), M.SmoothPlastic, { decor = true })
+		end
+	end
+	if w >= 30 and rng:NextNumber() < 0.4 then
+		local ad = ADS[rng:NextInteger(1, #ADS)]
+		local bw = math.min(w * 0.7, 30)
+		local bh = math.clamp(bw * 0.26, 5, 8)
+		local top = cf * CF(rng:NextNumber(-(w - bw) / 2, (w - bw) / 2), h, zBack - 3)
+		for _, sx in ipairs({ -0.35, 0.35 }) do
+			Kit.part(m, V3(0.5, 4 + bh / 2, 0.5), top * CF(sx * bw, (4 + bh / 2) / 2, 0), C.metalDark, M.Metal, { decor = true })
+		end
+		local board = Kit.part(m, V3(bw, bh, 0.5), top * CF(0, 4 + bh / 2, 0) * CFrame.Angles(0, math.pi, 0), ad[3], M.SmoothPlastic, { decor = true })
+		Kit.sign(board, ad[1], { sub = ad[2], bg = ad[3], light = true, maxDistance = 900, pps = 10 })
+		Kit.nightGlow(board)
+	end
+end
+
 -- Ground pad, back wall, side walls and (optionally) a front wall with a gate opening.
 -- o: { wall, height, prev, endWall, front = true, frontHeight, gate, gateX, gateColor,
 --      ground = false | Color3, groundMat, groundVariant, back = false }
@@ -93,6 +132,7 @@ function B.home(parent: Instance, base: CFrame, w: number, dp: number, rng: Rand
 		facade(m, hb * CF(0, 10.5 + (h - 10.5) / 2, fz - 0.16), bw, h - 10.5, FACADE.town, math.max(1, math.floor(bw / 17 + 0.5)), 1, col, rng:NextNumber() < 0.5)
 		Kit.part(m, V3(bw + 1, 0.4, 3.2), hb * CF(0, 10.3, fz - 1.4), shade(col, 0.86), M.Concrete, { decor = true, shadow = true, variant = "GD_ConcreteWall" })
 	end
+	if o.view then B.backDress(m, hb, bw, h, bd / 2, two and 2 or 1, FACADE.town, col, rng) end
 	-- carport over the driveway
 	local cw = math.min(11, w - bw - 4)
 	if cw >= 8 and dp >= 34 then
@@ -135,6 +175,7 @@ function B.townhouses(parent: Instance, base: CFrame, w: number, dp: number, rng
 	for f = 2, floors do
 		facade(m, hb * CF(0, (f - 1) * fh + fh / 2, fz - 0.16), w, fh, FACADE.town, n, 1, col, rng:NextNumber() < 0.6)
 	end
+	if o.view then B.backDress(m, hb, w - 0.3, h, bd / 2, floors, FACADE.town, col, rng) end
 	-- party walls, and a painted panel per home so each one reads as its own
 	for i = 0, n do
 		Kit.part(m, V3(1.1, h, 1.1), hb * CF(-w / 2 + uw * i + (i == 0 and 0.55 or (i == n and -0.55 or 0)), h / 2, fz - 0.4), shade(col, 0.9), M.Concrete, { decor = true, variant = "GD_ConcreteWall" })
@@ -184,6 +225,7 @@ function B.apartment(parent: Instance, base: CFrame, w: number, dp: number, rng:
 		end
 	end
 	Kit.part(m, V3(bw + 0.6, 1, bd + 0.6), hb * CF(0, h + 0.5, 0), shade(col, 0.72), M.Concrete, { decor = true, variant = "GD_ConcreteWall" })
+	if o.view then B.backDress(m, hb, bw, h, bd / 2, floors, FACADE.apartment, col, rng) end
 	local sign = Kit.part(m, V3(math.min(bw * 0.6, 30), 2.8, 0.5), hb * CF(0, 8.4, fz - 0.5), Color3.fromRGB(52, 84, 140), M.SmoothPlastic, { decor = true })
 	Kit.sign(sign, APT_NAMES[rng:NextInteger(1, #APT_NAMES)], { sub = "APARTMENT", maxDistance = 260 })
 	-- parking bays
@@ -235,6 +277,15 @@ end
 function B.bigbox(parent: Instance, base: CFrame, w: number, dp: number, rng: Random, o: any)
 	local m = S.bigbox(parent, base, w, dp, rng)
 	Kit.part(m, V3(w, WALL_H, 0.8), base * CF(0, WALL_H / 2, dp / 2 - 0.4), WALLS[4], M.Concrete, { name = "Wall", variant = "GD_Plaster" })
+	if o.view then
+		-- the store's body is the biggest part S.bigbox made: (w - 6) x h x (dp - 16), centred at z = 7
+		for _, p in ipairs(m:GetChildren()) do
+			if p:IsA("BasePart") and math.abs(p.Size.X - (w - 6)) < 0.01 and math.abs(p.Size.Z - (dp - 16)) < 0.01 then
+				B.backDress(m, base, w - 6, p.Size.Y, 7 + (dp - 16) / 2, math.max(1, math.floor(p.Size.Y / 10)), FACADE.town, p.Color, rng)
+				break
+			end
+		end
+	end
 	return m
 end
 
@@ -349,6 +400,13 @@ function B.shophouses(parent: Instance, base: CFrame, w: number, dp: number, rng
 		Shophouse.row(parent, bb * CF(0, 0.3, 0), w, bd, rng, info)
 	else
 		S.row(parent, bb * CF(0, 0.3, 0), w, bd, rng, info)
+	end
+	if o.view and o.floors then
+		-- the terrace's back plane is at +bd/2 in both builders (Shophouse.row: 12.5 + 11.5 per upper floor;
+		-- S.row: 10 per floor)
+		local h = o.detail > 0 and (12.5 + (o.floors - 1) * 11.5) or o.floors * 10
+		local back = Kit.model(parent, "Back")
+		B.backDress(back, bb * CF(0, 0.3, 0), w, h, bd / 2, o.floors, FACADE.town, Kit.PASTEL[rng:NextInteger(1, #Kit.PASTEL)], rng)
 	end
 	if dp - bd > 5 then
 		-- service yard behind the terrace

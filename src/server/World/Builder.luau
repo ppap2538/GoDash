@@ -29,6 +29,7 @@ local Streamer = require(script.Parent.Streamer)
 local RoadMarks = require(script.Parent.RoadMarks) -- 2026-11-18: zebras, stop lines, roundabout islands
 local Lakeside = require(script.Parent.Lakeside) -- 2026-11-18: lakeside promenades (Bueng Kaen Nakhon ...)
 local Skyline = require(script.Parent.Skyline) -- 2026-11-18: the far city outline the clients draw (client/Backdrop)
+local WaterSurface = require(script.Parent.WaterSurface) -- 2026-11-19: terrain water with waves in every lake and pond
 
 local M = Kit.M
 local C = Kit.COLORS
@@ -97,6 +98,9 @@ end
 -- When the land is too narrow or too shallow for what was picked, build the next smaller thing
 -- (an empty yard is the last resort, not the first).
 local FALLBACK = { tower = "apartment", apartment = "townhouse", bigbox = "row", house = "townhouse", townhouse = "row", farm = "field" }
+
+-- what a lot's back can look onto that people see from the other side (Blocks.backDress)
+local VIEW = { water = true, promenade = true, lakeside = true, park = true, pier = true }
 
 local ADDRESS_KIND = { row = "shop", townhouse = "house", house = "house", apartment = "house", tower = "office", bigbox = "office", farm = "house" }
 local GROUND = {
@@ -462,6 +466,8 @@ function Builder.build(map, opts)
 	end
 	local F = map.features
 	world.water = {}
+	local LAKE_BED = Color3.fromRGB(30, 62, 58)
+	if emitAll then WaterSurface.setup() end
 	for wi, w in ipairs(F.water) do
 		local minX, maxX, minZ, maxZ = math.huge, -math.huge, math.huge, -math.huge
 		for i = 1, #w.pts, 2 do
@@ -475,14 +481,17 @@ function Builder.build(map, opts)
 			if xb - xa > 2 then
 				reserve(obb((xa + xb) / 2, z, 1, 0, (xb - xa) / 2 + 3, step / 2 + 3, "water"))
 				if wm then
+					-- the dark lake bed under the terrain water (World/WaterSurface); still named "Water": it
+					-- carries the collisions and the raycasts
 					local len = xb - xa
 					local pieces = math.ceil(len / 2000)
 					for k = 0, pieces - 1 do
-						Kit.part(wm, V3(len / pieces, 0.7, step + 0.4), CF(xa + len / pieces * (k + 0.5), -0.1, z), C.water, M.SmoothPlastic, { name = "Water", reflectance = 0.28 })
+						Kit.part(wm, V3(len / pieces, 0.7, step + 0.4), CF(xa + len / pieces * (k + 0.5), -0.3, z), LAKE_BED, M.SmoothPlastic, { name = "Water" })
 					end
 				end
 			end
 		end)
+		if wm then WaterSurface.fill(w.pts) end
 		if big then
 			world.lake = { x = (minX + maxX) / 2, z = (minZ + maxZ) / 2, minX = minX, maxX = maxX, minZ = minZ, maxZ = maxZ }
 			if wm then
@@ -805,6 +814,8 @@ function Builder.build(map, opts)
 						put(gridL, box)
 						local along = base.RightVector.X * e.dx + base.RightVector.Z * e.dz >= 0 and 1 or -1
 						local lot = { base = base, x = cx, z = cz, w = w, dp = dp, kind = kind, edge = e, use = use, prev = -along, endWall = true }
+						-- its back looks onto a lake or a park: dress the back (Blocks.backDress)
+						lot.view = VIEW[blocker or ""] == true and D - dp < 40
 						if prevLot and math.abs(prevEnd - s) < 0.01 then prevLot.endWall = false end
 						prevLot, prevEnd = lot, s + w
 						table.insert(lots, lot)
@@ -870,7 +881,7 @@ function Builder.build(map, opts)
 	local function drawLot(parent: Instance, lot)
 		local rng = vrng(lot.x, lot.z)
 		local base, w, dp = lot.base, lot.w, lot.dp
-		local o = { prev = lot.prev, endWall = lot.endWall, use = lot.use }
+		local o = { prev = lot.prev, endWall = lot.endWall, use = lot.use, view = lot.view }
 		local k = lot.kind
 		if k == "row" then
 			local shop = lot.shop
@@ -939,6 +950,7 @@ function Builder.build(map, opts)
 		local base = lot.base
 		local zone = map.zoneAt(lot.x, lot.z).id
 		count[lot.kind] = (count[lot.kind] or 0) + 1
+		if lot.view then count.backView = (count.backView or 0) + 1 end
 		if lot.kind == "row" then
 			local shop = lot.shop
 			local bd = math.min(34, lot.dp)

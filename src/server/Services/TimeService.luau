@@ -21,6 +21,8 @@ function Time.isNight(): boolean
 end
 
 function Time.clock(): number return clock end
+-- jump the clock (the owner's NIGHT / DUSK / DAY codes for recording clips)
+function Time.set(c: number) Workspace:SetAttribute("QaClock", c % 24) end
 function Time.day(): number return day end
 
 function Time.start()

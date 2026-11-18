@@ -467,9 +467,28 @@ Studio note (2026-11-18): after long Play sessions the Studio viewport turned wh
 screen_capture returns white then. Probably the Studio window was minimised or covered. Store shots of fireworks and the
 ghost scene are still to take.
 
-**Batch 2 (TikTok toys):** wheelie / burnout / stunt spot; night car meet + more exhausts and horns; time trial round
-the lake with a board; vertical 9:16 clip mode with drone camera; funny orders and random events; turn-by-turn
-"อีก 50 ม. เลี้ยวซ้าย"; first 10 minutes with gradual unlocks; a code per TikTok clip to see which clip brings players.
+**Batch 1b (2026-11-19, owner: "งั้นทำสิ่งที่แนะนำได้เลย": teaser tools + the look of the lake)**
+
+| # | What | State |
+|---|---|---|
+| 8 | Owner-only codes, typed in the normal code box (`StoreService.ownerCode`, server-side only, owner user id 11934070066): `LOYPREVIEW` opens Loy Krathong on that server for 3 h and sets dusk, `LOYOFF`, `FIREWORKS` (75 s show now, `FireworksUntil`), `NIGHT` 20:00, `DUSK` 17:36, `DAY` 09:00 (`Time.set`). Anyone else gets "That code doesn't exist" | PASS in Studio (all six) |
+| 9 | A code per TikTok clip: `LOY2569` (฿2,000 + 100 season XP, to 7 Dec), `PHEE` (฿1,313), `TIKTOK` (฿1,500 + 2 milk teas). Every use logs the custom event "Code <NAME>" (`Metrics.event`; Creator Dashboard > Analytics > Custom events) | PASS: LOY2569 once only, unknown code refused. Dashboard numbers NOT TESTED (live only) |
+| 10 | Lakes are terrain water (`server/World/WaterSurface`): every lake and pond outline filled at 4-stud cells (centre ≥ 1 stud inside), surface at `Game.WATER_Y` = 1.2; the old "Water" parts are the dark lake bed (top 0.05) and keep collisions/raycasts (krathongs float at WATER_Y). 105 outlines, ~33 MB of voxels on the server | PASS: waves, sky and building reflections by day; lit windows reflected at night. An Edit test showed green specks where wave troughs met the ground tiles (top 0): the dark bed parts hide them |
+| 11 | Night lights on the water (`client/Water`): lamps, lanterns and krathong candles near a lake get a shimmering streak at the mirror point toward the camera (max 6/14/24 by Perf tier); water colour eases to night blue | PASS in an Edit test scene; in game the streaks are subtle next to Roblox's own reflections |
+| 12 | Backs that face a lake, the promenade or a park (`lot.view` from the planner's blocker, `Blocks.backDress`): windows on the back (lit at night), a drain pipe and air-cons, and on wide ones a lit rooftop billboard for a made-up local business | PASS: the far shore of Bueng Kaen Nakhon shows windows and boards instead of bare 30-50 stud walls |
+| 13 | Fireworks: 4-stud sparks (were 1.6), 120 + 55 glitter, a flash, light range 120 | PASS: bursts read clearly from the pier |
+
+**Batch 2a (2026-11-19)**
+
+| # | What | State |
+|---|---|---|
+| 14 | Clip mode 9:16 (`client/ClipMode`, B or phone app "Clip"): pillarbox bars, controls on the bars (outside the crop), cameras Follow / Low chase / Side / Front / Drone / Roadside (N), HUD and Roblox menus hidden on computers (touch keeps the driving controls, drawn over the bars) | PASS on foot (Front). NOT TESTED: the moving cameras while driving, touch layout |
+| 15 | Emotes (`client/Emotes` G or 😀, `server/EmoteService`): Roblox R15 wave / dance x3 / laugh / cheer; Thai poses wai, peace sign, selfie (server sets "Emote"/"EmoteAt", every client bends the joints in PreSimulation; ✌️ and "🙏 สวัสดีครับ" badges, a phone in the selfie hand). Stops on walk / jump / sit, 8 s max | PASS: menu, dance, wai (after flipping the arm Z sign), peace (badge moved toward the camera: it hid in the hand), selfie (phone held out, ✌️ on the other hand) |
+| 16 | Turn-by-turn (`client/TurnHint`): only at junctions (graph nodes with 3+ roads), "อีก 130 ม. เลี้ยวขวา" + the road you turn into, orange in the last 40 m, "ถึงที่หมาย" at the end | PASS: card showed while driving a GPS route |
+
+**Batch 2 (TikTok toys, still to do):** wheelie / burnout / stunt spot; night car meet + more exhausts and horns; time
+trial round the lake with a board; funny orders and random events; first 10 minutes with gradual unlocks; soi dog in the
+basket; rideable swan boats; convoy / pair jobs.
 
 **Batch 3 (all ages):** plates from presets instead of typed text, content check (crash and injury = mild, ghosts =
 mild fear), the maturity questionnaire, the refundable 1,000 R$ fee (ask the owner first), a full phone test.
