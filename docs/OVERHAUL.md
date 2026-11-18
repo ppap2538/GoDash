@@ -543,6 +543,14 @@ ghost scene are still to take.
 | 40 | The first ten minutes (`client/Guide` onboardTip, `server/JobService`, City op "onboard", d.onboard): the third finished job brings a ฿1,500 starter gift (once, only when crossing 3); between orders a new rider (1-13 jobs) sees one suggestion at a time: the first motorbike (route to KK Motors when affordable) -> the Styling app -> Bueng Kaen Nakhon (route to the lake-lap start) -> clip mode and the replay | compiles; NOT TESTED by eye (the Studio profile is past 13 jobs) |
 | 41 | Bug found while testing: a fresh server took 30.8 s to build the city, the client waited only 20 s for the traffic kit and the first rider on that server saw NO local traffic all session. client/Street now waits up to 300 s (client/Dogs and the GPS checkpoints 60 -> 300 s too) | PASS: local traffic appeared after the fix |
 
+**Batch 4a (2026-11-19, owner: "ทำตามที่แนะนำได้เลย": phone/performance pass, driving styles, hot food)**
+
+| # | What | State |
+|---|---|---|
+| 42 | Phone / performance pass: city-event figures cut (market 7 -> 4 shoppers, crash 3 -> 2 people; each avatar figure is a few hundred instances, the first market was ~3,500); the new phone apps checked on screen. Measured in Studio Play (server and client in one process on this laptop): ~67 ms a frame while riding, 125k instances, 3.2 GB: a Studio number, NOT a phone measurement | phone NOT TESTED (no device emulation from here) |
+| 43 | Driving style (`client/Drive` STYLE, Settings key "style", Phone > Settings > สไตล์การขับ): easy (grip x1.3, keys x1.3, yaw follow 11, less side slip, brakes x1.12) / normal / realistic (grip x0.82, keys x0.85, yaw follow 4.5, more slide). Until the rider picks: easy on touch screens, normal on keyboards | PASS: full steer at 38 studs/s peaks at 1.35 rad/s on normal, 1.80 on easy |
+| 44 | Hot food (`Config/Gear`, `server/GearService`, phone app `client/GearApp`, d.gear; JobService; client/Spill second bar): food cools from the pick-up (240 s after a 30 s grace); hot (>= 80 %) +5 % "🔥 อาหารยังร้อนอยู่", cold (< 35 %) tip -30 %. Gear app: foam thermal bag ฿350 (warm 1.7x as long), pro box liner ฿1,200 (2.6x, and 30 % fewer spill points per jolt) | PASS: bought the foam bag through the City remote; meter showed "♨️ อุ่น" 260 s after the pick-up; Gear and Insurance app screens look right |
+
 **Still to do:** a phone pass of everything above (touch layouts of the order meter, replay controls and the Insurance app).
 
 **Batch 3 (all ages):** plates from presets instead of typed text, content check (crash and injury = mild, ghosts =

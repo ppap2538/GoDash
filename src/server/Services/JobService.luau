@@ -13,6 +13,7 @@ local Util = require(Shared.Util)
 local Net = require(Shared.Net)
 local Data = require(script.Parent.PlayerDataService)
 local Economy = require(script.Parent.EconomyService)
+local Gear = require(ReplicatedStorage.Shared.Config.Gear)
 local Metrics = require(script.Parent.MetricsService) -- Roblox Analytics: onboarding funnel
 local Board = require(script.Parent.LeaderboardService) -- weekly Top Riders
 local StoreCfg = require(Shared.Config.Store) -- ranks
@@ -247,6 +248,9 @@ local function complete(player: Player, st)
 	local timeScore = math.clamp(1.6 - ratio, 0, 1)
 	local comfort = v and v.stats.comfort or 0.8
 	local smoothPenalty = job.mode == "ride" and 0.1 or (job.def.fragile and 0.14 or 0.05)
+	-- (2026-11-19) rider gear (Config/Gear): the best delivery box holds the order steadier
+	local bag = Gear.worn(d.gear, "bag")
+	if job.mode ~= "ride" and bag then smoothPenalty *= bag.steady end
 	local smooth = math.clamp(1 - tele.harsh * smoothPenalty / comfort, 0, 1)
 	local safety = math.clamp(1 - tele.crashes * (job.def.fragile and 0.5 or 0.34) - (tele.red or 0) * 0.25, 0, 1)
 	local stars = Jobs.stars(timeScore, smooth, safety, job.def.strict)
@@ -271,6 +275,20 @@ local function complete(player: Player, st)
 		table.insert(notes, "⚡ Fast delivery bonus +" .. bonus)
 	end
 	if (tele.red or 0) > 0 then table.insert(notes, ("🚦 %d red light%s on this trip"):format(tele.red, tele.red > 1 and "s" or "")) end
+	-- (2026-11-19, the food-heat meter: client/Spill) food cools from the pick-up; a thermal bag (Config/Gear) keeps it
+	-- warm longer. Still hot: a little extra; gone cold: the customer tips less (applied to the tip below)
+	local tipCut = 1
+	if job.mode == "food" then
+		local heat = Gear.heat(d.gear, elapsed)
+		if heat >= 0.8 then
+			local warm = math.floor(pay * 0.05 + 0.5)
+			bonus += warm
+			table.insert(notes, "🔥 Still hot +" .. warm)
+		elseif heat < 0.35 then
+			tipCut = 0.7
+			table.insert(notes, "🥶 The food went cold: tip -30%")
+		end
+	end
 	-- (2026-11-19, the food-spill meter: client/Spill shows each jolt as it happens) an order that arrived exactly
 	-- as packed earns a small thank-you; jolts are named on the slip (they already cost stars, so the tip)
 	if tele.harsh == 0 and tele.crashes == 0 then
@@ -287,7 +305,7 @@ local function complete(player: Player, st)
 	local rankBefore, rankDef = StoreCfg.rankFor((d.stats.deliveries or 0) + (d.stats.rides or 0))
 	tipMult += rankDef.tip -- riders with a higher rank get better tips
 	if job.mode == "ride" then tipMult *= math.clamp(comfort, 0.6, 2) end
-	local tip = math.floor(pay * job.def.tipMax * tipK * tipMult + 0.5)
+	local tip = math.floor(pay * job.def.tipMax * tipK * tipMult * tipCut + 0.5)
 	local exp = math.floor(job.def.exp * (0.4 + stars / 5 * 0.8) + 0.5)
 
 	tip += bonus

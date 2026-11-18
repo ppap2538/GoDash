@@ -61,8 +61,26 @@ local ROUGH = {
 	[Enum.Material.Sand] = true, [Enum.Material.Pebble] = true, [Enum.Material.Cobblestone] = true, [Enum.Material.Rock] = true,
 	[Enum.Material.Slate] = true, [Enum.Material.WoodPlanks] = true, [Enum.Material.Brick] = true,
 }
+-- Driving style (2026-11-19, owner: "รถคุมยาก" -> let each rider pick): Phone > Settings > Driving style.
+--   easy   = more grip in corners, the keys turn quicker, the vehicle follows the front wheel at once, a little more braking
+--   normal = the 2026-11-19 tuning
+--   real   = less grip (brake before a corner), slower keys, the tail slides more
+-- Until the rider picks: easy on touch screens, normal on a keyboard.
+local STYLE = {
+	easy = { lat = 1.3, rate = 1.3, yaw = 11, slide = 1.25, brake = 1.12 },
+	normal = { lat = 1, rate = 1, yaw = 8, slide = 1, brake = 1 },
+	real = { lat = 0.82, rate = 0.85, yaw = 4.5, slide = 0.8, brake = 1 },
+}
+local touchDefault = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+local function styleNow()
+	local s = State.data and State.data.settings
+	local id = s and s.style
+	return STYLE[id or (touchDefault and "easy" or "normal")] or STYLE.normal
+end
+Drive.styleNow = styleNow
+
 local function maxSteer(c, speedF: number, gripMult: number?): number
-	local aLat = 35 * LAT_G * (c.stats.grip / 10.5) * (gripMult or 1)
+	local aLat = 35 * LAT_G * (c.stats.grip / 10.5) * (gripMult or 1) * styleNow().lat
 	local v = math.abs(speedF)
 	return math.min(math.rad(c.def.steer), math.atan(c.wheelbase * aLat / math.max(v * v, 1)))
 end
@@ -289,7 +307,7 @@ local function step(dt: number)
 	-- (2026-11-19: at speed the key took ~0.55 s to reach full lock, ~0.8 s with the smoothing after it: the
 	-- turn came late, then overshot, and riders zig-zagged correcting it. Now ~0.3 s; the lock itself
 	-- is still limited by the grip at that speed, so a tap is still only a nudge.)
-	local rate = analogue and 12 or (towardZero and 9 or (6 - 2.6 * fracNow))
+	local rate = analogue and 12 or (towardZero and 9 or (6 - 2.6 * fracNow) * styleNow().rate)
 	local dCmd = steerIn - c.steerCmd
 	c.steerCmd += math.clamp(dCmd, -rate * dt, rate * dt)
 	steerIn = c.steerCmd
@@ -372,6 +390,7 @@ local function step(dt: number)
 	c.steer += (target - c.steer) * math.min(1, stats.steerRate * sens * dt * 2.2)
 	local sinS, cosS = math.sin(c.steer), math.cos(c.steer)
 	local assist = settings.assist ~= false
+	local style = styleNow()
 
 	local n = #c.wheels
 	local share = mass / n
@@ -415,7 +434,7 @@ local function step(dt: number)
 			local gripRate = stats.grip * gripMult
 			if handbrake and not front then gripRate *= 0.3 end
 			local latF = -lat * share * gripRate
-			local limit = share * GRAVITY * (assist and 1.9 or 1.5) * gripMult
+			local limit = share * GRAVITY * (assist and 1.9 or 1.5) * gripMult * style.lat
 			if math.abs(latF) > limit then
 				slip += math.abs(latF) - limit
 				latF = math.sign(latF) * limit
@@ -433,7 +452,7 @@ local function step(dt: number)
 				end
 			elseif propel < -0.02 then
 				if ws > 1.5 then
-					lon = -stats.brake * share * -propel * gripMult; braking = true
+					lon = -stats.brake * share * -propel * gripMult * style.brake; braking = true
 				elseif hasPower and ws > -top * 0.28 then
 					lon = propel * stats.accel * 0.7 * share
 				end
@@ -473,10 +492,10 @@ local function step(dt: number)
 		local wantYaw = -speedF * math.tan(c.steer) / c.wheelbase
 		local av = chassis.AssemblyAngularVelocity
 		local yawNow = av:Dot(up)
-		chassis.AssemblyAngularVelocity = av + up * ((wantYaw - yawNow) * math.min(1, dt * 8))
+		chassis.AssemblyAngularVelocity = av + up * ((wantYaw - yawNow) * math.min(1, dt * style.yaw))
 		if not handbrake then
 			local lv = chassis.AssemblyLinearVelocity
-			chassis.AssemblyLinearVelocity = lv - right * (lv:Dot(right) * math.min(1, dt * 4))
+			chassis.AssemblyLinearVelocity = lv - right * (lv:Dot(right) * math.min(1, dt * 4 * style.slide))
 		end
 	end
 

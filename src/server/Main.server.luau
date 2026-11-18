@@ -91,6 +91,7 @@ safe("TimeTrial", require(Services.TimeTrialService).start, world, deps) -- 2026
 safe("CarMeet", require(Services.CarMeetService).start, world, deps) -- 2026-11-19: night car meet at the KK Plaza car park
 safe("Accidents", require(Services.AccidentService).start) -- 2026-11-18: hitting people or cars costs money
 safe("Insurance", require(Services.InsuranceService).start) -- 2026-11-19: vehicle insurance class 1 / 2+ / 3
+safe("Gear", require(Services.GearService).start) -- 2026-11-19: rider gear (thermal bags, helmets)
 safe("CityEvents", require(Services.CityEventService).start, world, deps) -- 2026-11-19: breakdowns, crashes, pop-up markets
 safe("Health", require(Services.HealthService).start) -- 2026-11-18: falls add up to injuries; the hospital treats them
 safe("Street", StreetService.start, world, deps)
@@ -148,6 +149,8 @@ Net.fn("Settings", { "string", "any" }, function(player, key, value)
 		s[key] = value -- lane = lane assist, autoGas = phone cruise (2026-11-18), ghosts = night ghost scenes
 	elseif key == "camera" and (value == "near" or value == "normal" or value == "far") then
 		s.camera = value -- client/ChaseCam distance (2026-11-18)
+	elseif key == "style" and (value == "easy" or value == "normal" or value == "real") then
+		s.style = value -- client/Drive driving style (2026-11-19)
 	elseif key == "rideAlong" and (value == "friends" or value == "all" or value == "off") then
 		s.rideAlong = value
 	elseif key == "quality" and (value == "auto" or value == "low" or value == "medium" or value == "high") then

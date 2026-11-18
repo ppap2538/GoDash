@@ -1027,6 +1027,22 @@ screens.settings = function()
 		local b = UI.button(rideRow, o[2], { Size = UDim2.new(1 / 3, -4, 1, 0), TextSize = 13, BackgroundColor3 = sel and C.green or C.bg, TextColor3 = sel and C.white or C.text }, function() set("rideAlong", o[1]) end)
 		b:SetAttribute("NoTranslate", true)
 	end
+	-- 2026-11-19 driving style (client/Drive STYLE): easy / normal / real
+	local styleCard = bigCard(96)
+	local stl = UI.label(styleCard, L("🛵 Driving style", "🛵 สไตล์การขับ"), 14, C.text, F.bold, { Position = UDim2.fromOffset(12, 6), Size = UDim2.new(1, -24, 0, 20) })
+	stl:SetAttribute("NoTranslate", true)
+	local curStyle = s.style or ((UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled) and "easy" or "normal")
+	local styleRow = UI.new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(10, 30), Size = UDim2.new(1, -20, 0, 36), Parent = styleCard })
+	UI.list(styleRow, 6, true)
+	for _, o in ipairs({ { "easy", L("Easy", "ง่าย") }, { "normal", L("Normal", "ปกติ") }, { "real", L("Realistic", "สมจริง") } }) do
+		local sel = curStyle == o[1]
+		local b = UI.button(styleRow, o[2], { Size = UDim2.new(1 / 3, -4, 1, 0), TextSize = 13, BackgroundColor3 = sel and C.green or C.bg, TextColor3 = sel and C.white or C.text }, function() set("style", o[1]) end)
+		b:SetAttribute("NoTranslate", true)
+	end
+	local sth = UI.label(styleCard, ({ easy = L("Turns quickly, holds the road, forgiving", "เลี้ยวไว เกาะถนน ให้อภัยความผิดพลาด"),
+		normal = L("Balanced", "สมดุล ไม่ง่ายไม่ยาก"), real = L("Brake before corners; the tail can slide", "ต้องเบรกก่อนเข้าโค้ง ท้ายรถไถลได้") })[curStyle] or "",
+		12, C.sub, F.med, { Position = UDim2.fromOffset(12, 70), Size = UDim2.new(1, -24, 0, 20) })
+	sth:SetAttribute("NoTranslate", true)
 	-- 2026-11-18 easier driving: camera distance, lane assist, auto gas (phones)
 	local camCard = bigCard(76)
 	local cl = UI.label(camCard, L("🎥 Camera distance", "🎥 ระยะกล้องตอนขับ"), 14, C.text, F.bold, { Position = UDim2.fromOffset(12, 6), Size = UDim2.new(1, -24, 0, 20) })

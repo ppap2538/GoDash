@@ -11,6 +11,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Net = require(Shared.Net)
 local Jobs = require(Shared.Config.Jobs)
+local Gear = require(Shared.Config.Gear)
+local Workspace = game:GetService("Workspace")
 local UI = require(script.Parent.UI.Kit)
 local Lang = require(script.Parent.Lang)
 local State = require(script.Parent.State)
@@ -22,6 +24,7 @@ local C, F = UI.C, UI.F
 local L = Lang.pick
 
 local card, icon, title, pct, fill, pop
+local heatRow, heatFill, heatText -- (2026-11-19) the food cools from the pick-up: a second bar (Config/Gear bags keep it warm)
 local harsh, crashes = 0, 0
 local key = "" -- the job id + stage this count belongs to
 local shown = 1
@@ -50,6 +53,8 @@ local function condition(j): number
 	local d = def(j)
 	local fragile = d and d.fragile == true
 	local penalty = j.mode == "ride" and 0.1 or (fragile and 0.14 or 0.05)
+	local bag = j.mode ~= "ride" and State.data and Gear.worn(State.data.gear, "bag")
+	if bag then penalty *= bag.steady end
 	local c = Drive.current()
 	local comfort = (c and c.stats and c.stats.comfort) or 0.8
 	local smooth = math.clamp(1 - harsh * penalty / math.max(comfort, 0.3), 0, 1)
@@ -94,6 +99,16 @@ local function refresh()
 	pct.Text = ("%d%%"):format(math.floor(v * 100 + 0.5))
 	fill.Size = UDim2.new(math.clamp(shown, 0, 1), 0, 1, 0)
 	fill.BackgroundColor3 = colour(v)
+	-- heat: food only, from the pick-up time (server clock)
+	local food = j.mode == "food" and type(j.pickedAt) == "number"
+	heatRow.Visible = food
+	card.Size = UDim2.fromOffset(250, food and 66 or 46)
+	if food then
+		local h = Gear.heat(State.data and State.data.gear, Workspace:GetServerTimeNow() - j.pickedAt)
+		heatFill.Size = UDim2.new(h, 0, 1, 0)
+		heatFill.BackgroundColor3 = h >= 0.8 and Color3.fromRGB(240, 110, 40) or (h >= 0.35 and Color3.fromRGB(240, 180, 60) or Color3.fromRGB(110, 160, 230))
+		heatText.Text = h >= 0.8 and L("🔥 Hot", "🔥 ร้อน") or (h >= 0.35 and L("♨️ Warm", "♨️ อุ่น") or L("🥶 Cold", "🥶 เย็นแล้ว"))
+	end
 end
 
 local function jolt(kind: string)
@@ -138,6 +153,13 @@ function Spill.start()
 	pop.TextStrokeTransparency = 0.4
 	for _, t in ipairs({ icon, title, pct, pop }) do t:SetAttribute("NoTranslate", true) end
 	UI.fitText(title, 14, 10)
+	heatRow = UI.new("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(46, 42), Size = UDim2.new(1, -56, 0, 18), Visible = false, Parent = card })
+	heatText = UI.label(heatRow, "", 12, Color3.fromRGB(255, 220, 190), F.bold, { Size = UDim2.fromOffset(78, 18) })
+	heatText:SetAttribute("NoTranslate", true)
+	local hb = UI.new("Frame", { Position = UDim2.fromOffset(80, 5), Size = UDim2.new(1, -80, 0, 7), BackgroundColor3 = Color3.fromRGB(60, 64, 74), Parent = heatRow })
+	UI.corner(hb, 4)
+	heatFill = UI.new("Frame", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.fromRGB(240, 110, 40), Parent = hb })
+	UI.corner(heatFill, 4)
 
 	Net.listen("Notify", function(kind, p)
 		if kind == "harsh" and type(p) == "table" then

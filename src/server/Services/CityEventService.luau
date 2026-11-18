@@ -145,7 +145,6 @@ local function crash(m: Model, npc, e, s: number)
 	for _, z in ipairs({ -8, 26 }) do cone(m, lane * CF(-2, 0, z)); cone(m, lane * CF(2, 0, z)) end
 	figure(m, npc, lane * CF(half * 0.5 + 1.5, 0, 32) * CFrame.Angles(0, rad(180), 0), "hail", true)
 	figure(m, npc, lane * CF(-half * 0.5 - 1, 0, 8) * CFrame.Angles(0, rad(70), 0), "stand")
-	figure(m, npc, lane * CF(-half * 0.5 - 1.2, 0, 11) * CFrame.Angles(0, rad(-110), 0), "stand")
 	-- a flashing police lamp on a stand
 	local lamp = Kit.part(m, V3(0.6, 0.6, 0.6), lane * CF(half * 0.5 - 1.2, 3.4, 30), Color3.fromRGB(40, 90, 255), M.Neon, { decor = true })
 	Kit.part(m, V3(0.18, 3.2, 0.18), lane * CF(half * 0.5 - 1.2, 1.6, 30), Color3.fromRGB(60, 60, 64), M.Metal, { decor = true })
@@ -178,7 +177,8 @@ local function market(m: Model, npc, e, s: number)
 			S.stall(m, base * CF(side * (half - 3), 0, z) * CFrame.Angles(0, rad(side * 90), 0), rng, labels[(k - 1) % #labels + 1])
 		end
 	end
-	for _ = 1, 7 do
+	-- (2026-11-19 phone pass: each avatar figure is a few hundred instances; 7 made the market ~3,500)
+	for _ = 1, 4 do
 		figure(m, npc, base * CF(rng:NextNumber(-half + 6, half - 6), 0, rng:NextNumber(-26, 26)) * CFrame.Angles(0, rng:NextNumber(0, 6.28), 0), "stand")
 	end
 	blocker(m, base * CF(0, 0, -34), V3(half * 2, 5, 3))
