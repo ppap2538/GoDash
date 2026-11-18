@@ -84,6 +84,10 @@ safe("Festival", require(Services.FestivalService).start, world) -- 2026-11-18: 
 safe("Referral", require(Services.ReferralService).start) -- 2026-11-18: invite friends, both get a reward
 safe("Ghosts", require(Services.GhostService).start, world) -- 2026-11-18: ghosts on late deliveries + the radio call-in
 safe("Emotes", require(Services.EmoteService).start) -- 2026-11-19: wai / peace / selfie poses everyone sees (client/Emotes)
+safe("Pets", require(Services.PetService).start) -- 2026-11-19: adopt a soi dog; it rides in front of you (client/Pets)
+safe("Boats", require(Services.BoatService).start, world) -- 2026-11-19: swan pedal boats at the lakeside piers (client/Boats)
+safe("Stunts", require(Services.StuntService).start, deps) -- 2026-11-19: wheelie / burnout personal bests (client/Stunts)
+safe("TimeTrial", require(Services.TimeTrialService).start, world, deps) -- 2026-11-19: lap of Bueng Kaen Nakhon against the clock
 safe("Accidents", require(Services.AccidentService).start) -- 2026-11-18: hitting people or cars costs money
 safe("Health", require(Services.HealthService).start) -- 2026-11-18: falls add up to injuries; the hospital treats them
 safe("Street", StreetService.start, world, deps)

@@ -4,9 +4,14 @@
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
+local Players = game:GetService("Players")
 local Lang = require(script.Parent.Lang)
 local Sounds = require(ReplicatedStorage:WaitForChild("Shared").Config.Sounds)
+local Pets = require(ReplicatedStorage:WaitForChild("Shared").Config.Pets)
 local Feedback = require(script.Parent.Feedback)
+local Choice = require(script.Parent.Choice)
+local State = require(script.Parent.State)
+local adoptPrompt -- defined below build(); used when a dog model is made
 
 local Dogs = {}
 local SHOW, HIDE = 420, 520
@@ -72,6 +77,62 @@ local function build(template: Model?, look: number): (Model, number)
 	return m, size.Y
 end
 
+-- Adopt a soi dog (2026-11-19, Config/Pets, server/PetService): walk up to one, hold E, pay for the vaccines
+-- and a collar, pick its name. Riders who already have a dog, or sit on a vehicle, get no prompt.
+local busy = false
+local function adopt(cfg: Instance)
+	if busy then return end
+	busy = true
+	local L = Lang.pick
+	local a = Choice.ask({ icon = "🐶", title = L("Adopt this soi dog?", "รับน้องหมาซอยไปเลี้ยงไหม?"),
+		text = L(("Vaccines and a collar: ฿%d. It follows you on foot and rides in front of you on a bike."):format(Pets.PRICE),
+			("ค่าวัคซีน + ปลอกคอ ฿%d น้องจะเดินตามคุณ และนั่งหน้ารถไปด้วยเวลาขี่มอไซ"):format(Pets.PRICE)),
+		answers = { { L("Adopt", "รับเลี้ยง") }, { L("Not now", "ไว้ก่อน") } } })
+	if a == 1 then
+		-- three names to pick from (no typed names)
+		local pool = {}
+		for i = 1, #Pets.NAMES do table.insert(pool, i) end
+		local picks = {}
+		for _ = 1, 3 do table.insert(picks, table.remove(pool, math.random(1, #pool))) end
+		local answers = {}
+		for _, i in ipairs(picks) do table.insert(answers, { "🐶 " .. L(Pets.NAMES[i].en, Pets.NAMES[i].th) }) end
+		local n = Choice.ask({ icon = "🏷", title = L("Name your dog", "ตั้งชื่อน้อง"), text = L("Pick one", "เลือกชื่อที่ชอบ"), answers = answers })
+		if n then
+			local city = ReplicatedStorage:FindFirstChild("Remotes") and ReplicatedStorage.Remotes:FindFirstChild("City")
+			if city then
+				local ok, msg = (city :: RemoteFunction):InvokeServer("adopt", ("%d,%d"):format(cfg:GetAttribute("Id") or 0, picks[n]))
+				if msg and msg ~= "" then Feedback.toast(msg, ok and "good" or "bad") end
+			end
+		end
+	end
+	busy = false
+end
+
+function adoptPrompt(model: Model, cfg: Instance)
+	local root = model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart", true)
+	if not root then return end
+	local pp = Instance.new("ProximityPrompt")
+	pp.ActionText = Lang.pick("Adopt", "รับเลี้ยง")
+	pp.ObjectText = Lang.pick("Soi dog", "หมาซอย")
+	pp.HoldDuration = 0.4
+	pp.MaxActivationDistance = 10
+	pp.RequiresLineOfSight = false
+	pp.KeyboardKeyCode = Enum.KeyCode.E
+	pp:SetAttribute("NoTranslate", true)
+	pp.Parent = root
+	pp.Triggered:Connect(function() task.spawn(adopt, cfg) end)
+	-- only for riders on foot without a dog yet
+	task.spawn(function()
+		while pp.Parent do
+			local char = Players.LocalPlayer.Character
+			local hum = char and char:FindFirstChildOfClass("Humanoid")
+			local d = State.data
+			pp.Enabled = hum ~= nil and hum.SeatPart == nil and d ~= nil and type(d.pet) ~= "table" and cfg:GetAttribute("State") ~= "chase"
+			task.wait(0.5)
+		end
+	end)
+end
+
 function Dogs.start()
 	task.spawn(function()
 		local folder = ReplicatedStorage:WaitForChild("GoDashDogs", 60)
@@ -94,10 +155,14 @@ function Dogs.start()
 				acc = 0
 				for _, cfg in ipairs(folder:GetChildren()) do
 					local pos = cfg:GetAttribute("Pos")
-					if typeof(pos) == "Vector3" then
+					if cfg:GetAttribute("State") == "gone" then
+						-- adopted by someone (server/PetService); a new stray turns up later
+						if shown[cfg] then shown[cfg].model:Destroy(); shown[cfg] = nil end
+					elseif typeof(pos) == "Vector3" then
 						local dist = (pos - camPos).Magnitude
 						if not shown[cfg] and dist < SHOW then
 							local model, h = build(template, cfg:GetAttribute("Look") or 1)
+							adoptPrompt(model, cfg)
 							model.Parent = holder
 							shown[cfg] = { model = model, height = h, pos = pos, look = Vector3.new(0, 0, -1), phase = 0, voice = 0.8 + math.random() * 0.5 }
 						elseif shown[cfg] and dist > HIDE then

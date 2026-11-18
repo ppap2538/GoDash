@@ -164,7 +164,7 @@ local function step(c, dt: number, s)
 			lastMark[w.index] = nil
 		end
 		local fxk = Perf.limit("effects") -- fewer particles on phones and slow devices (client/Perf)
-		w.smoke.Rate = ((dry and sliding > 0.15 and s.speed > 6) and (12 + 48 * sliding) or 0) * fxk
+		w.smoke.Rate = (s.burnout and 70 or ((dry and sliding > 0.15 and s.speed > 6) and (12 + 48 * sliding) or 0)) * fxk
 		w.spray.Rate = ((not dry and s.speed > 14 and ct and ct.ok) and math.clamp(s.speed * 0.9, 0, 70) or 0) * fxk
 	end
 	-- exhaust

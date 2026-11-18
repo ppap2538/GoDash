@@ -206,6 +206,24 @@ local function accept(player: Player, st)
 	push(player)
 end
 
+-- Convoy (2026-11-19, "ขบวนไรเดอร์": riding with friends pays). Other riders who are working (a job on
+-- the go, or one finished in the last CONVOY_RECENT seconds) within CONVOY_RANGE studs when you finish
+-- add CONVOY_EACH of the pay to your tip each, up to CONVOY_MAX riders. Counted for each of them too.
+local CONVOY_RANGE, CONVOY_RECENT, CONVOY_EACH, CONVOY_MAX = 160, 150, 0.12, 3
+local lastDone = {} :: { [Player]: number }
+local function convoyMates(player: Player): number
+	local me = root(player)
+	if not me then return 0 end
+	local n = 0
+	for p, st in pairs(state) do
+		if p ~= player and p.Parent and (st.job or os.clock() - (lastDone[p] or -1e9) < CONVOY_RECENT) then
+			local r = root(p)
+			if r and (r - me).Magnitude < CONVOY_RANGE then n += 1 end
+		end
+	end
+	return math.min(n, CONVOY_MAX)
+end
+
 local function complete(player: Player, st)
 	local job = st.job
 	local d = Data.get(player)
@@ -264,6 +282,13 @@ local function complete(player: Player, st)
 	local exp = math.floor(job.def.exp * (0.4 + stars / 5 * 0.8) + 0.5)
 
 	tip += bonus
+	local mates = convoyMates(player)
+	if mates > 0 then
+		local extra = math.floor(pay * CONVOY_EACH * mates + 0.5)
+		tip += extra
+		table.insert(notes, ("🛵🛵 Convoy x%d +%d"):format(mates + 1, extra))
+	end
+	lastDone[player] = os.clock()
 	tip = Twists.adjustTip(player, job, tip, stars, notes)
 	Economy.add(player, pay + tip, "job:" .. job.def.id, true)
 	Economy.addExp(player, exp)
@@ -385,6 +410,7 @@ function Service.start(world, deps)
 		local st = state[p]
 		if st then clearJob(p, st) end
 		state[p] = nil
+		lastDone[p] = nil
 	end)
 
 	Net.on("JobSetOnline", { "boolean", "string?" }, function(player, online, mode)

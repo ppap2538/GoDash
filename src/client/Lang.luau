@@ -107,7 +107,7 @@ local E = {
 	["No festival now"] = "ตอนนี้ไม่มีงานเทศกาล", ["Go to the end of the pier at Bueng Kaen Nakhon"] = "ไปที่ปลายท่าน้ำบึงแก่นนครก่อน",
 	["Wait a moment before the next one"] = "รอสักครู่ค่อยลอยอันต่อไป", ["Pick a wish"] = "เลือกคำอธิษฐานก่อน",
 	["City Feed"] = "ฟีดเมือง", ["Finance"] = "ไฟแนนซ์", ["💦 Songkran +30%"] = "💦 สงกรานต์ +30%",
-	["Top Riders"] = "อันดับไรเดอร์", ["Reviews"] = "รีวิว", ["Invite"] = "ชวนเพื่อน", ["Clip"] = "ถ่ายคลิป", ["Photo"] = "ถ่ายรูป", ["Styling"] = "แต่งซิ่ง", ["Photo mode"] = "โหมดถ่ายรูป", ["Ride along"] = "ขึ้นรถด้วย",
+	["Top Riders"] = "อันดับไรเดอร์", ["Reviews"] = "รีวิว", ["Invite"] = "ชวนเพื่อน", ["Clip"] = "ถ่ายคลิป", ["Pedal a swan boat"] = "ปั่นเรือเป็ด", ["Swan boat"] = "เรือเป็ด", ["Photo"] = "ถ่ายรูป", ["Styling"] = "แต่งซิ่ง", ["Photo mode"] = "โหมดถ่ายรูป", ["Ride along"] = "ขึ้นรถด้วย",
 	["A friend is in the passenger seat"] = "มีเพื่อนนั่งที่ผู้โดยสารอยู่", ["That plate isn't allowed"] = "ป้ายนี้ใช้ไม่ได้", ["That's already your plate"] = "ป้ายนี้ติดอยู่แล้ว",
 	["Already fitted"] = "ติดอยู่แล้ว", ["Changed"] = "เปลี่ยนแล้ว", ["Unknown choice"] = "ไม่มีตัวเลือกนี้", ["The plate check is busy, try again"] = "ระบบตรวจป้ายไม่ว่าง ลองใหม่",
 	["Only Thai letters, A-Z, numbers and -"] = "ใช้ได้เฉพาะตัวอักษรไทย A-Z ตัวเลข และ -", ["A bicycle can only change its bell"] = "จักรยานเปลี่ยนได้แค่กระดิ่ง",
@@ -283,7 +283,7 @@ local P = {
 	{ "^⏱ (.+)   🛣 Smooth (.+)   🛡 Safe (.+)$", "⏱ %1   🛣 นุ่มนวล %2   🛡 ปลอดภัย %3" },
 	{ "^💰 (.+)  (.+)$", function(a, b) return "💰 " .. n(a) .. "  " .. b end },
 	{ "^Late by (.+)$", "ส่งช้า %1" },
-	{ "^⚡ Fast delivery bonus %+(%d+)$", "⚡ โบนัสส่งไว +%1" }, { "^🚦 (%d+) red lights? on this trip$", "🚦 ฝ่าไฟแดง %1 ครั้งในรอบนี้" },
+	{ "^⚡ Fast delivery bonus %+(%d+)$", "⚡ โบนัสส่งไว +%1" }, { "^🛵🛵 Convoy x(%d+) %+(%d+)$", "🛵🛵 ขบวนไรเดอร์ %1 คัน +%2" }, { "^🚦 (%d+) red lights? on this trip$", "🚦 ฝ่าไฟแดง %1 ครั้งในรอบนี้" },
 	-- server toasts with names
 	{ "^Arrived at (.+)$", "ถึง %1 แล้ว" }, { "^Ate (.+)$", "กิน%1แล้ว" }, { "^Buy (.+) at the seed shop$", "ซื้อ%1ที่ร้านเมล็ดพันธุ์" },
 	{ "^Cooked (.+)$", "ทำ%1แล้ว" }, { "^Costs (.+)$", "ราคา %1" }, { "^Missing (.+)$", "ขาด%1" }, { "^Painted (.+)$", "ทำสี %1 แล้ว" },

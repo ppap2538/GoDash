@@ -79,7 +79,9 @@ local function drawPier(parent: Instance, shore: Vector3, out: Vector3, vrng)
 	for _, sx in ipairs({ -3.3, 3.3 }) do Kit.part(m, V3(0.3, 2.4, 34), cf * CF(sx, 3, -15), C.woodDark, M.Wood, { decor = true }) end
 	local rng = vrng(shore.X, shore.Z)
 	local white = Color3.fromRGB(246, 246, 242)
-	for b = 0, 3 do
+	-- (2026-11-19) the swans are rideable now (server/BoatService puts two beside each pier, out past the
+	-- shore: tied-up decor swans here overlapped them and the stone rim and jammed them). Loop kept empty.
+	for b = 2, 1 do
 		local side = b % 2 == 0 and -1 or 1
 		local bc = cf * CF(side * 8.5, 0.6, -8 - (b // 2) * 11) * CFrame.Angles(0, rad(rng:NextNumber(-12, 12)), 0)
 		-- a swan pedal boat: a fat white tube half in the water, raised tail, red seat, neck and head

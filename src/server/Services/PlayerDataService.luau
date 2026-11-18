@@ -52,6 +52,8 @@ local function template()
 		company = { riders = 0, level = 1, bank = 0, last = 0 },
 		badges = {}, -- [badge key] = true once awarded
 		seenNews = "", -- the "What's new" version this rider has seen
+		pet = false, -- or { look, name (Config/Pets.NAMES index), out = true, since } (server/PetService, 2026-11-19)
+		lapWeek = false, -- or { id = week, cs }: this week's best lake lap (server/TimeTrialService); all-time best = stats.bestLap
 		firstJoin = 0, lastSeen = 0,
 	}
 end

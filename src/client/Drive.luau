@@ -30,6 +30,7 @@ Drive.autopilot = nil :: ((any, any) -> (number?, number?, boolean?))?
 Drive.onCrash = nil :: ((any) -> ())?
 Drive.onHorn = nil :: (() -> ())? -- client/StreetLife
 Drive.fx = nil :: ((any, number, any) -> ())? -- client/DriveFx: per-step effects
+Drive.cameraBusy = false -- client/ClipMode: one of its camera angles owns the lens (Drive leaves FieldOfView alone)
 Drive.onHit = nil :: ((any) -> ())? -- client/Accident: { instance, dv, at, model } for every hard hit
 Drive.onExit = nil :: ((any) -> ())? -- client/DriveFx: clean up when you get off
 -- client/LaneAssist sets this: (c, ctx) -> a small steering correction (-1..1) while the rider barely steers
@@ -73,10 +74,11 @@ local function sendState(force: boolean?)
 	if not cur then return end
 	local now = os.clock()
 	local brake = cur.braking
-	if force or (now - (cur.lastSend or 0) > 0.12 and (cur.sentLights ~= cur.lights or cur.sentBrake ~= brake or cur.sentSignal ~= cur.signal)) then
+	local stunt = cur.stunt or 0 -- 1 = wheelie, 2 = burnout: other riders see it too (client/Stunts)
+	if force or (now - (cur.lastSend or 0) > 0.12 and (cur.sentLights ~= cur.lights or cur.sentBrake ~= brake or cur.sentSignal ~= cur.signal or cur.sentStunt ~= stunt)) then
 		cur.lastSend = now
-		cur.sentLights, cur.sentBrake, cur.sentSignal = cur.lights, brake, cur.signal
-		Net.send("VehicleState", cur.lights, brake, cur.signal)
+		cur.sentLights, cur.sentBrake, cur.sentSignal, cur.sentStunt = cur.lights, brake, cur.signal, stunt
+		Net.send("VehicleState", cur.lights, brake, cur.signal, stunt)
 	end
 end
 
@@ -122,7 +124,9 @@ local function exit()
 	cur = nil
 	Drive.info.driving = false
 	Drive.info.auto = false
+	Drive.info.stunt = 0
 	Drive.autoGas = false
+	if c.stunt and c.stunt ~= 0 then Net.send("VehicleState", c.lights, false, c.signal, 0) end -- no frozen wheelie for the others
 	if Drive.onExit then pcall(Drive.onExit, c) end
 	if c.audio then c.audio:stop() end
 	if c.skid then c.skid:Destroy() end
@@ -154,6 +158,8 @@ local function enter(model: Model, seat: VehicleSeat)
 	local zMin, zMax = math.huge, -math.huge
 	for _, w in ipairs(c.wheels) do zMin = math.min(zMin, w.Z); zMax = math.max(zMax, w.Z) end
 	c.wheelbase = math.max(2, (zMax > zMin) and (zMax - zMin) or 4)
+	c.zRear = zMax > -math.huge and zMax or 2 -- the rear axle: a wheelie pivots the body round it
+	c.wheelie, c.stunt = 0, 0
 	c.bodyWeld = chassis:FindFirstChild("BodyWeld")
 	c.bodyBase = CFrame.new(0, -c.originY, 0)
 	readStats(c)
@@ -164,7 +170,7 @@ local function enter(model: Model, seat: VehicleSeat)
 			local weld = bodyPart:FindFirstChild("Spin" .. key)
 			local wheelPart = model:FindFirstChild("Wheel" .. key)
 			if weld and wheelPart then
-				table.insert(c.spin, { weld = weld, base = weld.C0, r = math.max(0.3, wheelPart:GetAttribute("Radius") or 1), angle = 0 })
+				table.insert(c.spin, { weld = weld, base = weld.C0, r = math.max(0.3, wheelPart:GetAttribute("Radius") or 1), angle = 0, rear = key == "R" })
 			end
 		end
 	end
@@ -330,6 +336,13 @@ local function step(dt: number)
 	end
 	local energy = State.data and State.data.energy or 100
 	local pedalPower = c.def.pedal and (energy > 5 and 1 or 0.55) or 1
+	-- stunts (2026-11-19, TikTok toys; client/Stunts shows the timer): on a bike, R or the touch WHEELIE button
+	-- lifts the front wheel while you ride; handbrake + gas standing still is a burnout (the rear wheel spins
+	-- in its smoke, the bike stays put). No engine power, no burnout.
+	local bikeNow = c.def.class == "bike"
+	local wantWheelie = bikeNow and (UserInputService:IsKeyDown(Enum.KeyCode.R) or t.wheelie == true) and not handbrake and speedF > 6
+	local burnout = bikeNow and not c.def.pedal and hasPower and handbrake and throttle > 0.5 and math.abs(speedF) < 4
+	local propel = burnout and 0 or throttle -- what the wheels push with (the engine still revs in a burnout)
 
 	-- steering: the lock the tyres can hold at this speed (maxSteer), smoothed by the handling upgrade and the
 	-- sensitivity setting; the handbrake lets you swing the tail round anyway
@@ -392,27 +405,28 @@ local function step(dt: number)
 			-- along the wheel: engine, brakes, drag
 			local lon = 0
 			local ws = pv:Dot(wf)
-			if throttle > 0.02 then
+			if propel > 0.02 then
 				if ws < -1.5 then
-					lon = stats.brake * share * throttle; braking = true
+					lon = stats.brake * share * propel; braking = true
 				elseif hasPower and ws < top then
 					local curve = math.clamp(1 - (ws / top) ^ 3, 0.04, 1)
-					lon = throttle * stats.accel * share * curve * pedalPower * (boost and 1.18 or 1) * (0.55 + 0.45 * gripMult)
+					lon = propel * stats.accel * share * curve * pedalPower * (boost and 1.18 or 1) * (0.55 + 0.45 * gripMult)
+					if c.wheelie > 0.2 then lon *= 0.8 end -- on one wheel: a little less drive
 				end
-			elseif throttle < -0.02 then
+			elseif propel < -0.02 then
 				if ws > 1.5 then
-					lon = -stats.brake * share * -throttle * gripMult; braking = true
+					lon = -stats.brake * share * -propel * gripMult; braking = true
 				elseif hasPower and ws > -top * 0.28 then
-					lon = throttle * stats.accel * 0.7 * share
+					lon = propel * stats.accel * 0.7 * share
 				end
 			end
 			if handbrake and not front then
 				lon -= math.sign(ws) * stats.brake * 1.2 * share * math.min(1, math.abs(ws) / 2)
 				braking = true
 			end
-			lon -= ws * share * (throttle == 0 and 0.32 or 0.1) -- rolling resistance and engine braking
+			lon -= ws * share * (propel == 0 and 0.32 or 0.1) -- rolling resistance and engine braking
 			lon -= ws * math.abs(ws) * share * 0.0009 -- air
-			if math.abs(throttle) < 0.02 and math.abs(ws) < 2 then lon -= ws * share * 6 end -- hold still
+			if math.abs(propel) < 0.02 and math.abs(ws) < 2 then lon -= ws * share * 6 end -- hold still
 			local at = origin + up * (com - origin):Dot(up) -- push at the height of the centre of mass: no flip-over
 			chassis:ApplyImpulseAtPosition((wr * latF + wf * lon) * dt, at)
 		end
@@ -472,13 +486,22 @@ local function step(dt: number)
 	local pitchTarget = math.clamp(accel * (bike and 0.0015 or 0.0022), -0.07, 0.07)
 	c.lean += (leanTarget - c.lean) * math.min(1, dt * 7)
 	c.pitch += (pitchTarget - c.pitch) * math.min(1, dt * 6)
+	-- the wheelie: up to ~24 degrees round the rear axle, balancing a little
+	local wTarget = (wantWheelie and grounded > 0) and (0.42 + math.sin(os.clock() * 2.6) * 0.035) or 0
+	c.wheelie += (wTarget - c.wheelie) * math.min(1, dt * (wTarget > c.wheelie and 2.6 or 4.5))
+	if c.wheelie < 0.002 then c.wheelie = 0 end
+	c.stunt = burnout and 2 or (c.wheelie > 0.2 and 1 or 0)
+	Drive.info.stunt = c.stunt
 	if c.bodyWeld then
-		c.bodyWeld.C0 = c.bodyBase * CFrame.new(0, -c.ride + 0.2, 0) * CFrame.Angles(c.pitch, 0, c.lean) * CFrame.new(0, c.ride - 0.2, 0)
+		local wz = c.zRear or 2
+		c.bodyWeld.C0 = c.bodyBase * CFrame.new(0, -c.ride + 0.2, wz) * CFrame.Angles(c.wheelie, 0, 0) * CFrame.new(0, c.ride - 0.2, -wz)
+			* CFrame.new(0, -c.ride + 0.2, 0) * CFrame.Angles(c.pitch, 0, c.lean) * CFrame.new(0, c.ride - 0.2, 0)
 	end
 
 	-- wheels roll with the road speed; the crank follows on a bicycle
 	for _, s in ipairs(c.spin) do
-		s.angle = (s.angle + speedF * dt / s.r) % (math.pi * 2)
+		local ws = (burnout and s.rear) and 45 or speedF -- the rear wheel spins in place in a burnout
+		s.angle = (s.angle + ws * dt / s.r) % (math.pi * 2)
 		s.weld.C0 = s.base * CFrame.Angles(-s.angle, 0, 0)
 	end
 	if c.def.pedal then
@@ -495,15 +518,16 @@ local function step(dt: number)
 		Drive.info.gear = c.audio:gearNow()
 	end
 	if c.skid then
-		local want = (slip > mass * 2 and speed > 12) and math.clamp(slip / (mass * 40), 0.15, 0.6) or 0
+		local want = burnout and 0.5 or ((slip > mass * 2 and speed > 12) and math.clamp(slip / (mass * 40), 0.15, 0.6) or 0)
 		c.skid.Volume += (want - c.skid.Volume) * math.min(1, dt * 10)
 	end
 	local cam = Workspace.CurrentCamera
-	if cam and not State.cutscene then cam.FieldOfView += ((70 + rev * 12) - cam.FieldOfView) * math.min(1, dt * 3) end
+	-- (client/ClipMode sets cameraBusy while one of its own angles holds the camera and the lens)
+	if cam and not State.cutscene and not Drive.cameraBusy then cam.FieldOfView += ((70 + rev * 12) - cam.FieldOfView) * math.min(1, dt * 3) end
 	-- skid marks, tyre smoke, exhaust, speed streaks, headlight beams (client/DriveFx)
 	if Drive.fx then
 		local ok, err = pcall(Drive.fx, c, dt, { speed = speed, speedF = speedF, top = top, throttle = throttle, braking = braking,
-			handbrake = handbrake, slip = slip, mass = mass, grounded = grounded, wet = wet, hasPower = hasPower, boost = boost })
+			handbrake = handbrake, slip = slip, mass = mass, grounded = grounded, wet = wet, hasPower = hasPower, boost = boost, burnout = burnout })
 		if not ok and not c.fxWarned then c.fxWarned = true; warn("[DriveFx] " .. tostring(err)) end
 	end
 

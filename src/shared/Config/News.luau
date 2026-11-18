@@ -1,13 +1,13 @@
 -- "What's new" card: shown once per VERSION to every rider (client/LiveOps; server records it in
 -- d.seenNews). Bump VERSION and rewrite the lines with every update that players should notice.
 return {
-	VERSION = "2026-11-21",
+	VERSION = "2026-11-22",
 	LINES = {
-		{ icon = "🌊", en = "Real water in the lakes: waves by day, lamp light shimmering on it at night", th = "น้ำในบึงมีคลื่นจริง กลางคืนแสงไฟสะท้อนระยิบบนน้ำ" },
-		{ icon = "🎬", en = "Clip mode 9:16 for TikTok (B): six camera angles while you ride", th = "โหมดถ่ายคลิปแนวตั้ง 9:16 (กด B) มุมกล้อง 6 แบบระหว่างขี่" },
-		{ icon = "🙏", en = "Emotes (G or 😀): wai, peace sign, selfie, dance and more", th = "ท่าทาง (กด G หรือปุ่ม 😀): ไหว้ ชูสองนิ้ว เซลฟี่ เต้น และอื่น ๆ" },
-		{ icon = "➡️", en = "Turn-by-turn: \"In 120 m turn left\" on every route", th = "บอกทางก่อนถึงแยก \"อีก 120 ม. เลี้ยวซ้าย\"" },
-		{ icon = "🏮", en = "Loy Krathong 20-30 Nov: bigger fireworks over Bueng Kaen Nakhon", th = "ลอยกระทง 20-30 พ.ย. พลุใหญ่ขึ้นเหนือบึงแก่นนคร" },
-		{ icon = "🎁", en = "Code TIKTOK: ฿1,500 + 2 milk teas", th = "โค้ด TIKTOK รับ ฿1,500 + ชานม 2 แก้ว" },
+		{ icon = "🐶", en = "Adopt a soi dog: it rides in the basket in front of you", th = "รับเลี้ยงหมาซอย ให้น้องนั่งตะกร้าหน้ารถไปด้วยกัน" },
+		{ icon = "🦢", en = "Pedal a swan boat on Bueng Kaen Nakhon (free)", th = "ปั่นเรือเป็ดในบึงแก่นนครได้จริง (ฟรี)" },
+		{ icon = "🔥", en = "Wheelie (R) and burnout (handbrake + gas), with your best times", th = "ยกล้อ (กด R) และเบิร์นเอาท์ (เบรกมือ + เร่ง) เก็บสถิติด้วย" },
+		{ icon = "⏱", en = "Lake lap race: the fastest riders of the week on the board", th = "แข่งรอบบึง ใครเร็วสุดประจำสัปดาห์ขึ้นป้าย" },
+		{ icon = "🛵", en = "Ride in a convoy: deliver near friends for a bigger tip", th = "ขี่เป็นขบวนกับเพื่อน ส่งงานใกล้กันได้ทิปเพิ่ม" },
+		{ icon = "🎬", en = "Clip mode 9:16 (B), emotes (G), real lake water at night", th = "โหมดถ่ายคลิป 9:16 (B) ท่าทาง (G) น้ำในบึงสะท้อนไฟยามค่ำ" },
 	},
 }

@@ -1,4 +1,4 @@
--- Soi dogs. A few street dogs live in the small lanes. Walk or ride a bike past one and it runs
+-- Soi dogs. A few street dogs live in the small lanes. Run or ride a bike past one and it runs
 -- out barking; if it catches you it bites (you lose some happiness and energy). People inside a
 -- car are barked at but cannot be bitten. Leave the lane or outrun it and it gives up.
 -- The server owns each dog's position and state (attributes on a Configuration); every client
@@ -57,6 +57,7 @@ function Service.start(world, deps)
 		if ok then
 			local cfg = Instance.new("Configuration")
 			cfg.Name = "Dog"
+			cfg:SetAttribute("Id", #dogs + 1) -- server/PetService: which dog a rider adopts
 			cfg:SetAttribute("Home", home)
 			cfg:SetAttribute("Pos", home)
 			cfg:SetAttribute("State", "idle")
@@ -98,15 +99,30 @@ function Service.start(world, deps)
 			task.wait(TICK)
 			local now = os.clock()
 			local roots = {}
+			local calm = {}
 			for _, p in ipairs(Players:GetPlayers()) do
 				local r = rootOf(p)
-				if r then roots[p] = r.Position end
+				if r then
+					roots[p] = r.Position
+					-- (2026-11-19, adopting dogs) a dog chases what rushes past it: a bike, a running person.
+					-- Someone walking calmly up to it is left alone, so they can adopt it (server/PetService)
+					local v = r.AssemblyLinearVelocity
+					calm[p] = not vehicles.driving(p) and Vector3.new(v.X, 0, v.Z).Magnitude < 19
+				end
 			end
 			for _, d in ipairs(dogs) do
-				if d.state == "idle" then
+				if d.state == "gone" then
+					-- adopted (server/PetService): another stray turns up in the lane after a while
+					if now >= d.rest then
+						d.pos = d.home
+						d.cfg:SetAttribute("Pos", d.home)
+						d.cfg:SetAttribute("Look", math.random(1, 4))
+						setState(d, "idle")
+					end
+				elseif d.state == "idle" then
 					if now >= d.rest then
 						for p, pos in pairs(roots) do
-							if flat(pos - d.home).Magnitude < NOTICE and now - (bitten[p] or -100) > 45 then
+							if not calm[p] and flat(pos - d.home).Magnitude < NOTICE and now - (bitten[p] or -100) > 45 then
 								d.target = p
 								d.started = now
 								setState(d, "chase")
@@ -158,6 +174,16 @@ function Service.start(world, deps)
 		end
 	end)
 	print(("[Dogs] %d soi dogs placed"):format(#dogs))
+
+	-- server/PetService: a rider takes dog `id` home. Returns its look, or nil when it is not there / too far.
+	function Service.adopt(id: number, from: Vector3): number?
+		local d = dogs[id]
+		if not d or d.state == "gone" or flat(from - d.pos).Magnitude > 20 then return nil end
+		if d.target then d.target = nil end
+		setState(d, "gone")
+		d.rest = os.clock() + 20 * 60
+		return d.cfg:GetAttribute("Look") or 1
+	end
 
 	-- Studio test hook: Workspace attribute QaDog = true moves the nearest dog's home next to the first player
 	if game:GetService("RunService"):IsStudio() then

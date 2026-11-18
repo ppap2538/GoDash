@@ -486,9 +486,18 @@ ghost scene are still to take.
 | 15 | Emotes (`client/Emotes` G or 😀, `server/EmoteService`): Roblox R15 wave / dance x3 / laugh / cheer; Thai poses wai, peace sign, selfie (server sets "Emote"/"EmoteAt", every client bends the joints in PreSimulation; ✌️ and "🙏 สวัสดีครับ" badges, a phone in the selfie hand). Stops on walk / jump / sit, 8 s max | PASS: menu, dance, wai (after flipping the arm Z sign), peace (badge moved toward the camera: it hid in the hand), selfie (phone held out, ✌️ on the other hand) |
 | 16 | Turn-by-turn (`client/TurnHint`): only at junctions (graph nodes with 3+ roads), "อีก 130 ม. เลี้ยวขวา" + the road you turn into, orange in the last 40 m, "ถึงที่หมาย" at the end | PASS: card showed while driving a GPS route |
 
-**Batch 2 (TikTok toys, still to do):** wheelie / burnout / stunt spot; night car meet + more exhausts and horns; time
-trial round the lake with a board; funny orders and random events; first 10 minutes with gradual unlocks; soi dog in the
-basket; rideable swan boats; convoy / pair jobs.
+**Batch 2b (2026-11-19)**
+
+| # | What | State |
+|---|---|---|
+| 17 | Adopt a soi dog (`Config/Pets`, `server/PetService`, `client/Pets`, prompt in `client/Dogs`): walk up (soi dogs now chase only bikes and runners, not calm walkers), ฿300, pick one of three preset names; it trots behind you on foot, sits in a wicker basket on bicycles / the Sabai / the old moped, stands on a scooter's floorboard, lies on a sport bike's tank; hidden in cars. Phone > Settings toggles taking it along. The stray's lane gets a new dog after 20 min | PASS: adopt "มะลิ", follows on foot, rides in the basket of a Sabai 110 (lowered 0.3 after the test). NOT TESTED: scooter / sport spots, the settings toggle |
+| 18 | Swan pedal boats (`server/BoatService`, `client/Boats`): two per lakeside pier, free, E to sit, W/S/A/D or the thumbstick; LinearVelocity (speed + hold at WATER_Y) and AlignOrientation, owned by the rider; empty for 90 s -> back to the mooring. The tied-up decor swans are gone (they jammed the first test boat) | PASS: floats at 1.04, 11 studs/s. The new moorings (beside the deck, 21 out) NOT TESTED |
+| 19 | Convoy bonus (JobService): other riders working within 160 studs when you finish add 12 % of the pay each (max 3) to your tip; "🛵🛵 ขบวนไรเดอร์" on the slip | NOT TESTED (needs two players) |
+| 20 | Stunts (`client/Drive` + `client/Stunts`, `server/StuntService`): wheelie = R or the touch 🔥 button (body pivots ~24° on the rear axle), burnout = handbrake + gas standing still on a motorbike (rear wheel spins, smoke, the bike stays); timer chip, personal bests in d.stats; others see it through the vehicle's "Stunt" attribute | PASS: wheelie lifts the front (with the dog in the basket). NOT TESTED: burnout, the record toast (needs ≥ 1.5 s), others' view |
+| 21 | Lake lap (`server/TimeTrialService`, `client/TimeTrial`): 6 gates on the big roads round Bueng Kaen Nakhon from the road graph, start/finish nearest the pier; chip near the start -> arches, GPS to the next gate, clock; the server checks the gates in order 10x/s, refuses laps under the believable minimum (86 s), keeps stats.bestLap and a weekly OrderedDataStore board shown on the sign at the start | PASS: chip, arming, START·FINISH arch, GPS ribbon. NOT TESTED: a whole lap (RAM ran out) |
+
+**Batch 2 (TikTok toys, still to do):** night car meet + more exhausts and horns; funny orders and random events; first 10
+minutes with gradual unlocks.
 
 **Batch 3 (all ages):** plates from presets instead of typed text, content check (crash and injury = mild, ghosts =
 mild fear), the maturity questionnaire, the refundable 1,000 R$ fee (ask the owner first), a full phone test.

@@ -1045,6 +1045,14 @@ screens.settings = function()
 	local ghostsOn = s.ghosts ~= false
 	row("👻", L("Ghost scenes at night", "ฉากผีตอนดึก"), L("Late deliveries to lonely places may get... spooky", "ส่งของดึก ๆ ในที่เปลี่ยว อาจเจอดี"),
 		ghostsOn and "ON" or "OFF", function() set("ghosts", not ghostsOn) end, { btnWidth = 60, btnColor = ghostsOn and C.green or Color3.fromRGB(150, 158, 170) })
+	-- 2026-11-19 adopted soi dog (server/PetService): take it along or leave it at home
+	if type(d.pet) == "table" then
+		local PetNames = require(game:GetService("ReplicatedStorage").Shared.Config.Pets).NAMES
+		local n = PetNames[d.pet.name] or PetNames[1]
+		local petOut = d.pet.out ~= false
+		row("🐶", L("Take " .. n.en .. " along", "พา" .. n.th .. "ไปด้วย"), L("Your dog follows you and rides in front of you", "น้องหมาเดินตาม และนั่งหน้ารถไปกับคุณ"),
+			petOut and "ON" or "OFF", function() if call("City", "pet_out") then render() end end, { btnWidth = 60, btnColor = petOut and C.green or Color3.fromRGB(150, 158, 170) })
+	end
 	if UserInputService.TouchEnabled then
 		row("🚀", L("Auto gas", "เร่งอัตโนมัติ"), L("Tap GAS once to cruise; BRAKE stops it", "แตะ GAS ครั้งเดียววิ่งเอง กด BRAKE เพื่อหยุด"),
 			s.autoGas and "ON" or "OFF", function() set("autoGas", not s.autoGas) end, { btnWidth = 60, btnColor = s.autoGas and C.green or Color3.fromRGB(150, 158, 170) })

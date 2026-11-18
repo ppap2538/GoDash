@@ -146,6 +146,7 @@ end
 local function step(dt: number)
 	local cam = Workspace.CurrentCamera
 	local m = MODES[mode].id
+	Drive.cameraBusy = m ~= "follow" and not State.cutscene -- Drive leaves the lens alone then
 	if m == "follow" or State.cutscene then return end
 	local s, fwd, speed = subject()
 	if not s then return end
@@ -156,9 +157,10 @@ local function step(dt: number)
 		look = s + fwd * 10 + Vector3.new(0, 0.6, 0)
 		fov, k = 58 + math.min(speed, 80) * 0.12, 5
 	elseif m == "side" then
-		want = s + right3 * 10 + fwd * (2 + speed * 0.04) + Vector3.new(0, 2.2, 0)
+		-- (14 studs out: at 10 a play test only fitted the rider's middle into the 9:16 frame)
+		want = s + right3 * 14 + fwd * (2 + speed * 0.04) + Vector3.new(0, 2.6, 0)
 		look = s + fwd * (1 + speed * 0.04)
-		fov, k = 50, 4
+		fov, k = 56, 4
 	elseif m == "front" then
 		want = s + fwd * (9 + speed * 0.06) + Vector3.new(0, 2.6, 0) + right3 * 1.5
 		look = s + Vector3.new(0, 0.8, 0)
@@ -214,6 +216,7 @@ end
 function Clip.close()
 	if not Clip.active then return end
 	Clip.active = false
+	Drive.cameraBusy = false
 	RunService:UnbindFromRenderStep("GoDashClip")
 	local cam = Workspace.CurrentCamera
 	cam.FieldOfView = 70

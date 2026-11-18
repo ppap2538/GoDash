@@ -436,13 +436,16 @@ function Service.start(w, deps)
 	Net.fn("Garage", { "string", "string?", "any?" }, garage, 4)
 
 	-- lights / brake lights / indicators: cosmetic state the driver reports, replicated by attributes
-	Net.on("VehicleState", { "boolean", "boolean", "int" }, function(player, lights, brake, signal)
+	Net.on("VehicleState", { "boolean", "boolean", "int", "int?" }, function(player, lights, brake, signal, stunt)
 		local v = Service.driving(player)
 		if not v then return end
 		if v.model:GetAttribute("Lights") ~= lights then v.model:SetAttribute("Lights", lights) end
 		if v.model:GetAttribute("Brake") ~= brake then v.model:SetAttribute("Brake", brake) end
 		signal = math.clamp(signal, -1, 2)
 		if v.model:GetAttribute("Signal") ~= signal then v.model:SetAttribute("Signal", signal) end
+		-- 2026-11-19: 1 = wheelie, 2 = burnout (bikes only), drawn for everyone by client/Stunts
+		stunt = (v.def.class == "bike") and math.clamp(stunt or 0, 0, 2) or 0
+		if (v.model:GetAttribute("Stunt") or 0) ~= stunt then v.model:SetAttribute("Stunt", stunt) end
 	end, 12)
 
 	-- the driver's client reports going down (thrown off in a crash, a speed bump at full speed) or a
