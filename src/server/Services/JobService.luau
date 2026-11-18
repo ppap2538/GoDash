@@ -271,6 +271,15 @@ local function complete(player: Player, st)
 		table.insert(notes, "⚡ Fast delivery bonus +" .. bonus)
 	end
 	if (tele.red or 0) > 0 then table.insert(notes, ("🚦 %d red light%s on this trip"):format(tele.red, tele.red > 1 and "s" or "")) end
+	-- (2026-11-19, the food-spill meter: client/Spill shows each jolt as it happens) an order that arrived exactly
+	-- as packed earns a small thank-you; jolts are named on the slip (they already cost stars, so the tip)
+	if tele.harsh == 0 and tele.crashes == 0 then
+		local care = math.floor(pay * 0.06 + 0.5)
+		bonus += care
+		table.insert(notes, job.mode == "ride" and ("🙂 Smooth ride bonus +" .. care) or ("🍜 Not a drop spilled +" .. care))
+	elseif tele.harsh > 0 then
+		table.insert(notes, (job.mode == "ride" and "🤢 Rough ride: %d jolts" or "🍜 Spilled a little: %d jolts"):format(tele.harsh))
+	end
 	local tipK = math.clamp((stars - 3) / 2, 0, 1)
 	local tipMult = 1
 	if ctx.lifestyle.hasBuff(player, "spicy") then tipMult += 0.12 end

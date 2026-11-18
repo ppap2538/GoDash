@@ -655,6 +655,9 @@ local function crashScene(info: any)
 	TweenService:Create(flash, TweenInfo.new(0.45), { BackgroundTransparency = 1 }):Play()
 	task.delay(0.5, function() flash:Destroy() end)
 	Feedback.play("bodyHit", 0.75, 1, 0.5)
+	-- (2026-11-19) the rider's "oof" and the vehicle grinding on the road as it goes down
+	Feedback.play(math.random() < 0.5 and "grunt" or "grunt2", 0.55, 0.95 + math.random() * 0.15, 0.3)
+	Feedback.play("scrape", 0.42, 1.05, 0.3)
 	caption.Text = (info and type(info.caption) == "string" and info.caption) or L("💥 Hard crash! Thrown off the vehicle", "💥 ชนแรง! ปลิวลงจากรถ") -- client/SpeedBumps brings its own
 	caption.TextTransparency = 1
 	gui.Enabled = true
@@ -700,6 +703,7 @@ local function crashScene(info: any)
 						Feedback.play("bodyFall2", 0.7, 1, 0.2)
 					else
 						phase = "slide"
+						Feedback.play("scrape", 0.2, 0.62, 0.3) -- the body skidding on the road
 						local hv = Vector3.new(vel.X, 0, vel.Z)
 						slideDir = hv.Magnitude > 0.5 and hv.Unit or dir
 						slideV = math.min(hv.Magnitude * 0.7, 18)

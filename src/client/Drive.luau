@@ -55,6 +55,12 @@ rayParams.RespectCanCollide = true
 -- turn at a junction ran wide unless you braked hard; 2.0 g tightens it by a sixth and is still far from the
 -- old 3-6 g swerve.
 local LAT_G = 2.0
+-- surfaces that rumble under the tyres (EngineSound's rough-road loop)
+local ROUGH = {
+	[Enum.Material.Grass] = true, [Enum.Material.LeafyGrass] = true, [Enum.Material.Ground] = true, [Enum.Material.Mud] = true,
+	[Enum.Material.Sand] = true, [Enum.Material.Pebble] = true, [Enum.Material.Cobblestone] = true, [Enum.Material.Rock] = true,
+	[Enum.Material.Slate] = true, [Enum.Material.WoodPlanks] = true, [Enum.Material.Brick] = true,
+}
 local function maxSteer(c, speedF: number, gripMult: number?): number
 	local aLat = 35 * LAT_G * (c.stats.grip / 10.5) * (gripMult or 1)
 	local v = math.abs(speedF)
@@ -317,6 +323,8 @@ local function step(dt: number)
 			local r = Workspace:Raycast(chassis.Position, dir * (half + 3), rayParams)
 			local at = r and r.Position or (chassis.Position + dir * half)
 			Crash.effect(at, math.clamp((dv - 11) / 34, 0.12, 1), { normal = r and r.Normal or -dir, mine = true, color = c.paint })
+			-- (2026-11-19) a motorbike's plastic panels and the delivery box crack too
+			if c.def.class == "bike" then EngineSound.oneShot(chassis, Sounds.plasticHit, math.clamp((dv - 8) / 40, 0.2, 0.7), 0.9 + math.random() * 0.25) end
 			if Drive.onHit then task.spawn(Drive.onHit, { instance = r and r.Instance, dv = dv, at = at, model = c.model, car = c.def.class == "car" }) end
 			local hard = c.def.class == "car" and 38 or 24
 			if dv > hard and not State.cutscene and Drive.onCrash and os.clock() - (c.thrownAt or 0) > 4 then
@@ -372,6 +380,7 @@ local function step(dt: number)
 	local com = chassis.AssemblyCenterOfMass
 	local grounded = 0
 	local slip = 0
+	local rough = 0 -- wheels on grass, dirt, gravel, cobbles, planks (the rough-road sound)
 	local braking = false
 
 	c.contacts = c.contacts or {}
@@ -387,6 +396,7 @@ local function step(dt: number)
 			contact.pos, contact.normal = hit.Position, hit.Normal
 			contact.lat = chassis:GetVelocityAtPosition(origin):Dot(lp.Z < 0 and (right * cosS - fwd * sinS) or right)
 			grounded += 1
+			if ROUGH[hit.Material] then rough += 1 end
 			local comp = c.ride - hit.Distance
 			local pv = chassis:GetVelocityAtPosition(origin)
 			local f = share * GRAVITY + k * comp - damp * pv:Dot(up)
@@ -498,6 +508,25 @@ local function step(dt: number)
 	local wTarget = (wantWheelie and grounded > 0) and (0.42 + math.sin(os.clock() * 2.6) * 0.035) or 0
 	c.wheelie += (wTarget - c.wheelie) * math.min(1, dt * (wTarget > c.wheelie and 2.6 or 4.5))
 	if c.wheelie < 0.002 then c.wheelie = 0 end
+	-- thumps (2026-11-19, owner: more riding sounds): a kerb, a pothole or a landing kicks the chassis up (the
+	-- vertical speed jumps ahead of its own smoothed value); the box on the back of a motorbike knocks too
+	do
+		local vy = vel.Y
+		c.vySmooth = c.vySmooth and (c.vySmooth + (vy - c.vySmooth) * math.min(1, dt * 12)) or vy
+		local kick = vy - c.vySmooth
+		if grounded > 0 and kick > 5 and os.clock() - (c.thumpAt or 0) > 0.35 and not State.cutscene and speed > 4 then
+			c.thumpAt = os.clock()
+			EngineSound.oneShot(chassis, Sounds.bump, math.clamp(kick / 20, 0.15, 0.6), 0.85 + math.random() * 0.3)
+			if bike and kick > 7 then EngineSound.oneShot(chassis, Sounds.plasticHit, 0.16, 1.2) end
+		end
+		-- the front wheel coming down after a wheelie
+		if c.wheelie > 0.3 then c.wheelieUp = true end
+		if c.wheelieUp and c.wheelie < 0.06 then
+			c.wheelieUp = false
+			EngineSound.oneShot(chassis, Sounds.thud, 0.5, 0.8)
+			EngineSound.oneShot(chassis, Sounds.plasticHit, 0.18, 1.1)
+		end
+	end
 	c.stunt = burnout and 2 or (c.wheelie > 0.2 and 1 or 0)
 	Drive.info.stunt = c.stunt
 	if c.bodyWeld then
@@ -522,11 +551,21 @@ local function step(dt: number)
 	-- sound and camera
 	local rev = math.clamp(math.abs(speedF) / math.max(top, 1), 0, 1.1)
 	if c.audio then
-		c.audio:update(dt, { speed = speedF, throttle = throttle, braking = braking, hasPower = hasPower, top = top, grounded = grounded, signal = c.signal })
+		c.audio:update(dt, { speed = speedF, throttle = throttle, braking = braking, hasPower = hasPower, top = top, grounded = grounded, signal = c.signal,
+			rough = n > 0 and rough / n or 0 })
 		Drive.info.gear = c.audio:gearNow()
 	end
 	if c.skid then
 		local want = burnout and 0.5 or ((slip > mass * 2 and speed > 12) and math.clamp(slip / (mass * 40), 0.15, 0.6) or 0)
+		-- 2026-11-19 (owner: "sounds when turning, braking, falling"): the tyres squeal near the limit of their grip in a
+		-- hard corner, and chirp under hard braking; quieter on two small tyres than on four car tyres
+		if grounded > 0 and speed > 18 then
+			local budget = 35 * LAT_G * (stats.grip / 10.5) * gripMult
+			local latRatio = math.abs(yawRate * speedF) / math.max(budget, 1)
+			if latRatio > 0.8 then want = math.max(want, math.clamp((latRatio - 0.8) * 1.6, 0, bike and 0.22 or 0.38)) end
+			if braking and accel < -42 then want = math.max(want, math.clamp((-accel - 42) / 70, 0.06, bike and 0.2 or 0.32)) end
+		end
+		c.skid.PlaybackSpeed = bike and 1.25 or 1
 		c.skid.Volume += (want - c.skid.Volume) * math.min(1, dt * 10)
 	end
 	local cam = Workspace.CurrentCamera

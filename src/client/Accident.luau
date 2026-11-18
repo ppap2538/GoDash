@@ -81,6 +81,8 @@ function Accident.start()
 		local p = Peds.hit(c.chassis, (c.def.len or 6) / 2, (c.def.wid or 2) / 2)
 		if p then
 			Feedback.bad()
+			Feedback.play("bodyHit", 0.55, 1.1, 0.5) -- (2026-11-19) the knock, and the person's "oof"
+			Feedback.play(math.random() < 0.5 and "grunt" or "grunt2", 0.5, 1.15, 0.3)
 			task.spawn(claim, "ped", speed, { ped = p, template = p.template })
 		end
 	end)

@@ -33,6 +33,7 @@ local function keysNow(): { { string } }
 			if not Drive.info.pedal then table.insert(list, { "Space+W", L("Burnout (standing still)", "เบิร์นเอาท์ (ตอนจอด)") }) end
 		end
 		table.insert(list, { "B", L("Clip mode 9:16", "โหมดถ่ายคลิป 9:16") })
+		table.insert(list, { "L", L("Replay the last 10 s", "รีเพลย์ 10 วินาทีล่าสุด") })
 		if job then table.insert(list, { "G", L("Pick up / deliver", "รับ / ส่งอาหาร") }) end
 		table.insert(list, { "Q", Drive.info.auto and L("Auto drive off", "ปิดขับอัตโนมัติ") or L("Auto drive (follows the route)", "ขับอัตโนมัติตามเส้นทาง") })
 		table.insert(list, { "V", L("First-person view", "มุมมองคนขี่") })

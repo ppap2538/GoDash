@@ -23,6 +23,7 @@ local State = require(script.Parent.State)
 local Feedback = require(script.Parent.Feedback)
 local Phone = require(script.Parent.Phone)
 local Drive = require(script.Parent.Drive)
+local Replay = require(script.Parent.Replay)
 
 local Clip = {}
 Clip.active = false
@@ -134,9 +135,10 @@ local function build()
 	end
 	btn("◀", 40, function() setMode(mode - 1) end)
 	btn("▶", 40, function() setMode(mode + 1) end)
+	btn("⏪", 40, function() Replay.instant() end, Color3.fromRGB(200, 30, 40)) -- the last 10 seconds again (client/Replay)
 	btn("✖", 40, function() Clip.close() end, C.red)
 	if not TOUCH then
-		local hint = UI.label(box, L("N = camera · B = exit", "N = เปลี่ยนมุม · B = ออก"), 12, Color3.fromRGB(190, 196, 206), F.med, { Size = UDim2.new(1, 0, 0, 18) })
+		local hint = UI.label(box, L("N = camera · L = replay · B = exit", "N = เปลี่ยนมุม · L = รีเพลย์ · B = ออก"), 12, Color3.fromRGB(190, 196, 206), F.med, { Size = UDim2.new(1, 0, 0, 18) })
 		hint:SetAttribute("NoTranslate", true)
 	end
 	local cam = Workspace.CurrentCamera

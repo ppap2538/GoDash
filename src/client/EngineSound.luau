@@ -72,13 +72,17 @@ local function eq(s: Sound, low: number, mid: number, high: number): EqualizerSo
 	return e
 end
 
--- one-shot on the vehicle (3D), or on SoundService when no part is given
-local function oneShot(parent: Instance?, id: string?, volume: number, speed: number?)
+-- one-shot on the vehicle (3D), or on SoundService when no part is given; region = play only that part
+local function oneShot(parent: Instance?, id: string?, volume: number, speed: number?, region: NumberRange?)
 	if not id or id == "" then return end
 	local s = Instance.new("Sound")
 	s.SoundId = id
 	s.Volume = volume
 	s.PlaybackSpeed = speed or 1
+	if region then
+		s.PlaybackRegionsEnabled = true
+		s.PlaybackRegion = region
+	end
 	s.RollOffMinDistance = 10
 	s.RollOffMaxDistance = 200
 	s.SoundGroup = Feedback.sfxGroup
@@ -136,9 +140,17 @@ function EngineSound.new(def, chassis: BasePart)
 		end
 		self.startT = 1.0
 		if def.class == "car" then oneShot(chassis, Sounds.carDoor, 0.55, 1) end
+		-- the starter and the engine catching (2026-11-19): small engines higher, cars lower and a moment after the door
+		local startPitch = (def.class == "car" and 0.78) or ((def.style == "scooter" or def.style == "underbone" or def.style == "oldbike") and 1.4) or 1.12
+		task.delay(def.class == "car" and 0.45 or 0.05, function()
+			if self.alive then oneShot(chassis, Sounds.engineStart, def.class == "car" and 0.38 or 0.45, startPitch, Sounds.engineStartRegion) end
+		end)
 	end
 	self.road = newSound(chassis, def.class == "car" and Sounds.roadCar or Sounds.wind, true)
 	self.road:Play()
+	-- tyres on a rough surface: grass, dirt, gravel, cobbles, planks (s.rough from client/Drive)
+	self.rough = newSound(chassis, Sounds.rough, true)
+	self.rough:Play()
 	return self
 end
 
@@ -161,7 +173,7 @@ function EngineSound:update(dt: number, s)
 		if self.tickT <= 0 then
 			self.tickT = 0.38
 			self.tickOn = not self.tickOn
-			oneShot(nil, Sounds.tick, 0.16, self.tickOn and 1.95 or 1.6)
+			oneShot(nil, Sounds.turnSignal, 0.42, self.tickOn and 1.0 or 0.86, Sounds.turnSignalRegion) -- (2026-11-19: a real relay click, not the UI tick)
 		end
 	else
 		self.tickT = 0
@@ -171,6 +183,11 @@ function EngineSound:update(dt: number, s)
 	local frac = clamp01(v / top)
 	self.road.Volume = (frac ^ 1.6) * (self.def.class == "car" and 0.3 or 0.42) * (s.grounded > 0 and 1 or 0.6)
 	self.road.PlaybackSpeed = 0.8 + 0.45 * frac
+	if self.rough then
+		local want = (s.rough or 0) * math.clamp(v / 30, 0, 1) * (self.def.class == "car" and 0.4 or 0.32) * (s.grounded > 0 and 1 or 0)
+		self.rough.Volume += (want - self.rough.Volume) * math.min(1, dt * 6)
+		self.rough.PlaybackSpeed = 0.75 + 0.5 * frac
+	end
 
 	-- brakes: a squeal at the end of a hard stop
 	if s.braking and v > 15 then self.brakeArmed = true end
@@ -330,7 +347,10 @@ end
 function EngineSound:stop()
 	if not self.alive then return end
 	self.alive = false
-	local list = { self.idle, self.on, self.off, self.road, self.pedal }
+	local list = {} -- (built one by one: a missing loop must not end an ipairs early)
+	for _, k in ipairs({ "idle", "on", "off", "road", "pedal", "rough" }) do
+		if self[k] then table.insert(list, self[k]) end
+	end
 	if self.def.class == "car" then oneShot(self.chassis, Sounds.carDoor, 0.55, 0.95) end
 	task.spawn(function()
 		local t = 0

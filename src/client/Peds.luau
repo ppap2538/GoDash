@@ -1135,6 +1135,13 @@ function Peds.place(p, mode: string, pos: Vector3, look: Vector3, speed: number?
 	end
 end
 
+-- Hand a borrowed person back just as they were (client/Replay put them back where they really are).
+function Peds.release(p)
+	if not p then return end
+	p.scripted = nil
+	p.started, p.anim, p.downPosed = nil, nil, nil
+end
+
 -- Hand a borrowed person back, standing at pos: they carry on from there, slowly (they were hurt).
 function Peds.giveBack(p, pos: Vector3?, look: Vector3?)
 	if not p then return end

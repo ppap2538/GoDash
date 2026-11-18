@@ -60,6 +60,18 @@ return {
 	-- synthesised bark of our own is kept as a spare in assets/sfx (tools/make_bark.py).
 	dogBark = id(9113955372),
 	dogBark2 = id(9113956187),
+	-- riding sounds, round 2 (2026-11-19, owner: "เสียงประกอบระหว่างขับ ตอนเลี้ยว ตอนเบรก ตอนล้ม"); all ProSoundEffects
+	turnSignal = id(9112941573), -- "1963 Porsche 1": interior turn signal clicks (one click: turnSignalRegion)
+	turnSignalRegion = NumberRange.new(6.47, 6.66) :: NumberRange?, -- measured 2026-11-19: the loudest single click
+	engineStart = id(9114778476), -- "Harley Davidson 2": starter, catch, a rev (engineStartRegion)
+	engineStartRegion = NumberRange.new(1.9, 4.0) :: NumberRange?, -- measured: silent until 2.0, catches ~2.1, revs ~3.1
+	scrape = id(9116816823), -- "Metal Scrape Dragging Drain Pipe Concrete 4": a bike on its side, grinding on the road
+	slosh = id(9120580913), -- "Water Sloshes Jostling Plastic Trash Can 3": the soup in the box (played small and high)
+	passBy = id(9114240232), -- "Electric Car Pass By Airy Whirring Whine 16": a near miss
+	rough = id(9112886781), -- "Tires Cobblestones 1": rolling on a rough surface (loop)
+	grunt = id(9120417581), -- "Video Game Effects 23": a short "oof" (thrown off)
+	grunt2 = id(9120417632), -- "Video Game Effects 25"
+	plasticHit = id(9117451064), -- "Plastic Cooler 1": the delivery box knocking, plastic panels
 	-- engine built-ins
 	tick = "rbxasset://sounds/volume_slider.ogg",
 	thud = "rbxasset://sounds/action_jump_land.mp3",

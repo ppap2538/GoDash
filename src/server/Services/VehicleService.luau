@@ -448,7 +448,7 @@ function Service.start(w, deps)
 		v.owned.condition = math.max(5, v.owned.condition - 4 / v.stats.crashResist)
 		v.stats = Vehicles.computeStats(v.def, v.owned)
 		sync(v)
-		Net.fire(player, "Notify", "crash", { damage = true })
+		Net.fire(player, "Notify", "crash", { damage = true, crashes = v.tele.crashes })
 		require(script.Parent.HealthService).injure(player, v.def.class == "car" and "car" or "bike", math.clamp(tonumber(speed) or 30, 0, 200))
 	end, 0.5)
 
@@ -512,15 +512,25 @@ function Service.start(w, deps)
 						end
 						v.tele.top = math.max(v.tele.top, speed)
 						local dv = speed - v.lastSpeed
+						-- (2026-11-19, the food-spill meter: client/Spill) a hard corner and a big bump shake the order
+						-- too, not only hard braking and flooring it: the sideways part of the change of velocity in
+						-- this quarter second (> 13 studs/s = about 1.5 g) and a jump in the vertical speed (kerbs, potholes)
+						local lastVel = v.lastVel or vel
+						local dFlat = Vector3.new(vel.X - lastVel.X, 0, vel.Z - lastVel.Z).Magnitude
+						local sideways = math.sqrt(math.max(0, dFlat * dFlat - dv * dv))
+						local bumpY = math.abs(vel.Y - lastVel.Y)
+						v.lastVel = vel
 						if dv < -24 then
 							-- a wall, not a brake pedal
 							v.tele.crashes += 1
 							v.owned.condition = math.max(5, v.owned.condition - math.min(18, -dv / 3) / v.stats.crashResist)
 							v.stats = Vehicles.computeStats(v.def, v.owned)
-							Net.fire(player, "Notify", "crash", { damage = true })
-						elseif math.abs(dv) > 10 and os.clock() - v.harshAt > 1.2 then
+							Net.fire(player, "Notify", "crash", { damage = true, crashes = v.tele.crashes })
+						elseif (math.abs(dv) > 10 or (sideways > 13 and speed > 15) or bumpY > 9) and os.clock() - v.harshAt > 1.2 then
 							v.tele.harsh += 1
 							v.harshAt = os.clock()
+							local kind = math.abs(dv) > 10 and (dv < 0 and "brake" or "gas") or (sideways > 13 and "turn" or "bump")
+							Net.fire(player, "Notify", "harsh", { kind = kind, harsh = v.tele.harsh, crashes = v.tele.crashes })
 						end
 						if n % 2 == 0 then sync(v) end
 					end
