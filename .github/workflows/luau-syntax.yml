@@ -1,0 +1,47 @@
+# Every pull request and every push to main: compile all Luau files, so a syntax error is caught on GitHub
+# before it reaches Studio (tools/autosync.py puts merged code into the place automatically).
+name: Luau syntax
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get Luau 0.744
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/luau.zip" https://github.com/luau-lang/luau/releases/download/0.744/luau-ubuntu.zip
+          mkdir -p "$RUNNER_TEMP/luau"
+          unzip -q "$RUNNER_TEMP/luau.zip" -d "$RUNNER_TEMP/luau"
+          chmod +x "$RUNNER_TEMP/luau/"*
+
+      - name: Make sure the checker rejects a broken file
+        run: |
+          printf 'local x = = 1\n' > "$RUNNER_TEMP/broken.luau"
+          if "$RUNNER_TEMP/luau/luau-compile" --binary "$RUNNER_TEMP/broken.luau" > /dev/null 2>&1; then
+            echo "luau-compile accepted a syntax error: the check below would prove nothing"
+            exit 1
+          fi
+
+      - name: Compile every script
+        run: |
+          fail=0
+          count=0
+          while IFS= read -r -d '' f; do
+            count=$((count + 1))
+            if ! out=$("$RUNNER_TEMP/luau/luau-compile" --binary "$f" 2>&1 >/dev/null); then
+              echo "::error file=$f::$(echo "$out" | head -n 1)"
+              echo "$out"
+              fail=1
+            fi
+          done < <(find src tools \( -name '*.luau' -o -name '*.lua' \) -print0)
+          echo "checked $count files"
+          exit $fail

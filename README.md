@@ -43,8 +43,11 @@ Full steps and rules, in Thai and English: [CONTRIBUTING.md](CONTRIBUTING.md). O
 2. Make a branch, change files in `src/` (or `tools/`, `docs/`), open a pull request. One topic per PR.
 3. Test locally: `python -I tools/build_place.py`, open `GoDash.rbxlx` in Roblox Studio, press Play. The local file
    uses simple stand-in props and keeps progress in memory only; that is expected.
-4. Changes reach the live game only through the owner's Studio: after a PR is merged the owner syncs the scripts
-   (`tools/sync_studio.py` + `tools/sync.luau`), tests, saves and presses **File -> Publish to Roblox**.
+4. Every PR runs the **Luau syntax** check on GitHub; fix it before asking for a merge.
+5. Changes reach the live game only through the owner's Studio. After a PR is merged, **auto sync** on the owner's PC
+   (`tools/autosync.py` + the Studio plugin `tools/studio_plugin/GoDashAutoSync.lua`) puts the changed scripts into the
+   place within about a minute. The owner tests and presses **File -> Publish to Roblox**. Scripts edited directly in
+   Studio are never overwritten without asking, but please edit code here, not in Studio.
 
 Not in this repository:
 - `GoDash.rbxlx`: generated from `src/` by `tools/build_place.py`.

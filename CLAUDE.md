@@ -16,18 +16,31 @@ source of truth for the owner, the team and every Claude session.
 - **Commit messages on Windows PowerShell:** write the message to a file and use `git commit -F <file>`. A `"` inside
   `-m` splits the argument and the commit fails.
 
-## From GitHub to players
+## From GitHub to players (automatic since 2026-11-18)
 
 Players get a change only after the owner publishes:
 
-1. A PR is merged.
-2. A Claude session pulls `main` and syncs `src/` into the open Studio (`python -I tools/sync_studio.py`, serve on
-   :8791, run `tools/sync.luau`, then `sync_studio.py --done`).
-3. It tests, saves the place and pushes any fixes.
-4. The owner presses Publish.
+1. A PR is merged. GitHub Actions (`.github/workflows/luau-syntax.yml`) compiles every Luau file on each PR and push.
+2. **Auto sync** on the owner's PC moves it into Studio by itself:
+   - `tools/autosync.py` runs hidden from logon (`tools/autosync_start.ps1 -Install`; `-Uninstall` removes it).
+     It fetches `origin/main` every 60 s, fast-forwards the local checkout when safe, and serves
+     `http://127.0.0.1:8791`.
+   - The Studio plugin `tools/studio_plugin/GoDashAutoSync.lua` (copied to `%LOCALAPPDATA%\Roblox\Plugins` on each
+     start) polls every 15 s in Edit mode. It applies the scripts changed since the commit Studio last took
+     (`tools/.synced/autosync.json`), then shows a panel saying "test and Publish".
+   - A script edited in Studio as well is never overwritten silently. The panel asks: overwrite with GitHub's
+     version, or skip.
+3. The owner presses Play to check, then Publish.
 
-Other people may also edit the live place in Team Create. Before syncing, compare Studio's scripts with git and ask
-before overwriting edits made in Studio. Scripts are edited in git, not in Studio.
+Rules for Claude sessions with auto sync running:
+- **Port 8791 belongs to autosync.py.** Don't start `python -m http.server 8791`: autosync already serves the project
+  root there, so `tools/sync.luau` keeps working. Don't stop it either.
+- **Only committed code on GitHub flows automatically.** Work in progress still goes in by hand:
+  `sync_studio.py` + `sync.luau` + `--done`.
+- **Pushing work you already synced by hand is safe.** The plugin sees Studio already has it and stays quiet.
+- After changing the plugin file, run `tools/autosync_start.ps1` to copy it. Studio loads a new plugin file only after
+  a restart.
+- To change the place ids the plugin accepts (for example a dev copy), edit `PLACES` in the plugin.
 
 ## Never
 
