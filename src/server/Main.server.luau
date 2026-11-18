@@ -93,6 +93,9 @@ safe("Accidents", require(Services.AccidentService).start) -- 2026-11-18: hittin
 safe("Insurance", require(Services.InsuranceService).start) -- 2026-11-19: vehicle insurance class 1 / 2+ / 3
 safe("Gear", require(Services.GearService).start) -- 2026-11-19: rider gear (thermal bags, helmets)
 safe("Regulars", require(Services.RegularsService).init, world) -- 2026-11-19: regular customers' homes
+safe("Coop", require(Services.CoopService).start, world) -- 2026-11-19: catering orders delivered together
+safe("Crews", require(Services.CrewService).start) -- 2026-11-19: rider crews, vests, weekly table
+safe("SilkFestival", require(Services.SilkFestivalService).start, world) -- 2026-11-19: Khon Kaen Silk Festival 28 Nov - 10 Dec
 safe("CityEvents", require(Services.CityEventService).start, world, deps) -- 2026-11-19: breakdowns, crashes, pop-up markets
 safe("Health", require(Services.HealthService).start) -- 2026-11-18: falls add up to injuries; the hospital treats them
 safe("Street", StreetService.start, world, deps)

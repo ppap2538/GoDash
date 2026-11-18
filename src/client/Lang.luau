@@ -107,7 +107,7 @@ local E = {
 	["No festival now"] = "ตอนนี้ไม่มีงานเทศกาล", ["Go to the end of the pier at Bueng Kaen Nakhon"] = "ไปที่ปลายท่าน้ำบึงแก่นนครก่อน",
 	["Wait a moment before the next one"] = "รอสักครู่ค่อยลอยอันต่อไป", ["Pick a wish"] = "เลือกคำอธิษฐานก่อน",
 	["City Feed"] = "ฟีดเมือง", ["Finance"] = "ไฟแนนซ์", ["💦 Songkran +30%"] = "💦 สงกรานต์ +30%",
-	["Top Riders"] = "อันดับไรเดอร์", ["Reviews"] = "รีวิว", ["Invite"] = "ชวนเพื่อน", ["Clip"] = "ถ่ายคลิป", ["Insurance"] = "ประกันภัย", ["Grandma Somsri"] = "ยายสมศรี", ["Fah (student)"] = "น้องฟ้า นักศึกษา", ["Uncle Chai (mechanic)"] = "ลุงชัย ร้านซ่อมรถ", ["Kaew (som tam stall)"] = "พี่แก้ว ร้านส้มตำ", ["Dr. Beer (night shift)"] = "หมอเบียร์ เวรดึก", ["Gear"] = "อุปกรณ์ไรเดอร์", ["Starter gift!"] = "ของขวัญไรเดอร์ใหม่!", ["฿1,500 toward your first motorbike · KK Motors"] = "฿1,500 ไว้ซื้อมอไซคันแรก · ไปที่ KK Motors", ["Pedal a swan boat"] = "ปั่นเรือเป็ด", ["Swan boat"] = "เรือเป็ด", ["Photo"] = "ถ่ายรูป", ["Styling"] = "แต่งซิ่ง", ["Photo mode"] = "โหมดถ่ายรูป", ["Ride along"] = "ขึ้นรถด้วย",
+	["Top Riders"] = "อันดับไรเดอร์", ["Reviews"] = "รีวิว", ["Invite"] = "ชวนเพื่อน", ["Clip"] = "ถ่ายคลิป", ["Insurance"] = "ประกันภัย", ["Grandma Somsri"] = "ยายสมศรี", ["Fah (student)"] = "น้องฟ้า นักศึกษา", ["Uncle Chai (mechanic)"] = "ลุงชัย ร้านซ่อมรถ", ["Kaew (som tam stall)"] = "พี่แก้ว ร้านส้มตำ", ["Dr. Beer (night shift)"] = "หมอเบียร์ เวรดึก", ["Gear"] = "อุปกรณ์ไรเดอร์", ["Crews"] = "กลุ่มไรเดอร์", ["Catering done: full team!"] = "จัดเลี้ยงสำเร็จ ทีมครบ!", ["Catering done"] = "ส่งจัดเลี้ยงสำเร็จ", ["Starter gift!"] = "ของขวัญไรเดอร์ใหม่!", ["฿1,500 toward your first motorbike · KK Motors"] = "฿1,500 ไว้ซื้อมอไซคันแรก · ไปที่ KK Motors", ["Pedal a swan boat"] = "ปั่นเรือเป็ด", ["Swan boat"] = "เรือเป็ด", ["Photo"] = "ถ่ายรูป", ["Styling"] = "แต่งซิ่ง", ["Photo mode"] = "โหมดถ่ายรูป", ["Ride along"] = "ขึ้นรถด้วย",
 	["A friend is in the passenger seat"] = "มีเพื่อนนั่งที่ผู้โดยสารอยู่", ["That plate isn't allowed"] = "ป้ายนี้ใช้ไม่ได้", ["That's already your plate"] = "ป้ายนี้ติดอยู่แล้ว",
 	["Already fitted"] = "ติดอยู่แล้ว", ["Changed"] = "เปลี่ยนแล้ว", ["Unknown choice"] = "ไม่มีตัวเลือกนี้", ["The plate check is busy, try again"] = "ระบบตรวจป้ายไม่ว่าง ลองใหม่",
 	["Only Thai letters, A-Z, numbers and -"] = "ใช้ได้เฉพาะตัวอักษรไทย A-Z ตัวเลข และ -", ["A bicycle can only change its bell"] = "จักรยานเปลี่ยนได้แค่กระดิ่ง",
@@ -287,7 +287,14 @@ local P = {
 	{ "^🍜 Spilled a little: (%d+) jolts$", "🍜 อาหารกระฉอก %1 ครั้ง" }, { "^🛡 Class (%S+): covered for (%d+) h$", "🛡 ประกันชั้น %1: คุ้มครองแล้ว %2 ชม." },
 	{ "^🔥 Still hot %+(%d+)$", "🔥 อาหารยังร้อนอยู่ +%1" }, { "^⭐ Regular x(%d+) %+(%d+)$", "⭐ ลูกค้าประจำ ครั้งที่ %1 +%2" }, { "^⭐ Regular x(%d+)$", "⭐ ลูกค้าประจำ ครั้งที่ %1" },
 	{ "^🎁 A thank%-you gift %+(%d+)$", "🎁 ของขวัญขอบคุณ +%1" }, { "^🛢 Free oil change$", "🛢 เปลี่ยนน้ำมันเครื่องให้ฟรี" }, { "^🥶 The food went cold: tip %-30%%$", "🥶 อาหารเย็นชืดแล้ว: ทิปลด 30%" },
-	{ "^You already have it$", "มีอยู่แล้ว" },
+	{ "^You already have it$", "มีอยู่แล้ว" }, { "^Only at the Silk Festival$", "รับได้ที่เทศกาลไหมเท่านั้น" },
+	{ "^(%d+) of (%d+) riders delivered · %+฿(%d+)$", "ไรเดอร์ส่งครบ %1/%2 คน · +฿%3" }, { "^🤝 Siao %+(%d+)$", "🤝 ขี่กับเสี่ยว +%1" },
+	{ "^You're already in it$", "อยู่ในกลุ่มนี้แล้ว" }, { "^You can change crew once a day$", "เปลี่ยนกลุ่มได้วันละครั้งนะ" }, { "^Left the crew$", "ออกจากกลุ่มแล้ว" },
+	{ "^(%S+) Joined (.+)$", function(icon, name)
+		local th = ({ ["Orange Vests"] = "วินเสื้อส้ม", ["Team Lime"] = "ทีมมะนาว", ["Milk Tea Gang"] = "แก๊งชานม", ["Isan Bolts"] = "สายฟ้าอีสาน",
+			["Soi Dog Riders"] = "หมาซอยไรเดอร์", ["Lake Racers"] = "บึงแก่นนครเรซซิ่ง" })[name] or name
+		return icon .. " เข้าร่วม" .. th .. "แล้ว"
+	end },
 	{ "^Oil changed for (.+)$", "เปลี่ยนน้ำมันเครื่องแล้ว %1" }, { "^New tyres for (.+)$", "เปลี่ยนยางใหม่แล้ว %1" },
 	{ "^The oil is still fresh$", "น้ำมันเครื่องยังใหม่อยู่" }, { "^The tyres are still good$", "ยางยังดีอยู่" },
 	{ "^Done at KK Motors, a fuel station or home$", "ทำได้ที่ KK Motors ปั๊มน้ำมัน หรือที่บ้าน" }, { "^A bicycle has no engine oil$", "จักรยานไม่มีน้ำมันเครื่องนะ" },

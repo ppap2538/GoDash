@@ -15,6 +15,8 @@ local Data = require(script.Parent.PlayerDataService)
 local Economy = require(script.Parent.EconomyService)
 local Gear = require(ReplicatedStorage.Shared.Config.Gear)
 local Regulars = require(script.Parent.RegularsService)
+local Silk = require(script.Parent.SilkFestivalService)
+local Crews = require(script.Parent.CrewService)
 local RegularsCfg = require(ReplicatedStorage.Shared.Config.Regulars)
 local Metrics = require(script.Parent.MetricsService) -- Roblox Analytics: onboarding funnel
 local Board = require(script.Parent.LeaderboardService) -- weekly Top Riders
@@ -318,6 +320,13 @@ local function complete(player: Player, st)
 		tip += extra
 		table.insert(notes, ("🛵🛵 Convoy x%d +%d"):format(mates + 1, extra))
 	end
+	-- (2026-11-19) your เสี่ยว (server/SilkFestivalService) riding with you: +5 %
+	if Silk.siaoNearby(player, CONVOY_RANGE) then
+		local extra = math.floor(pay * 0.05 + 0.5)
+		tip += extra
+		table.insert(notes, "🤝 Siao +" .. extra)
+	end
+	Crews.delivered(player) -- the crew's weekly total (server/CrewService)
 	-- (2026-11-19) a regular customer (Config/Regulars): trust grows with every delivery; better tips, their story, a gift
 	if job.regular then
 		local before = Regulars.count(player, job.regular)

@@ -113,6 +113,7 @@ function Service.start()
 		if not d or not g then return false, "Bad request" end
 		local gear = gearOf(d)
 		if Gear.owns(gear, g.id) then return false, "You already have it" end
+		if g.price < 0 then return false, "Only at the Silk Festival" end
 		if not Economy.spend(player, g.price, "gear:" .. g.id) then return false, "Not enough money" end
 		gear.owned[g.id] = true
 		gear[g.slot] = g.id

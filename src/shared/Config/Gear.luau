@@ -25,6 +25,8 @@ for _, h in ipairs({
 		en = "Full-face helmet", th = "หมวกเต็มใบ", enText = "Half the injury in a crash", thText = "ล้มแล้วเจ็บน้อยลงครึ่งหนึ่ง" },
 	{ id = "helmet_dog", price = 900, protect = 0.6, shape = "half", ears = true, color = Color3.fromRGB(232, 150, 60), icon = "🐶",
 		en = "Soi-dog ears helmet", th = "หมวกหูหมาซอย", enText = "Cute ears; good for clips", thText = "มีหูน่ารัก ถ่ายคลิปปัง" },
+	{ id = "helmet_silk", price = -1, festival = true, protect = 0.6, shape = "half", color = Color3.fromRGB(170, 30, 110), icon = "🧵", shiny = true,
+		en = "Silk-pattern helmet", th = "หมวกลายผ้าไหม", enText = "Free at the Khon Kaen Silk Festival", thText = "ของที่ระลึก ไปงานเทศกาลไหมรับฟรี" },
 	{ id = "helmet_gold", price = 1500, protect = 0.5, shape = "full", color = Color3.fromRGB(230, 185, 60), icon = "👑",
 		en = "Gold rider helmet", th = "หมวกทองไรเดอร์", enText = "Shiny, and half the injury", thText = "เงาวับ ล้มแล้วเจ็บน้อยลงครึ่งหนึ่ง", shiny = true },
 }) do

@@ -44,14 +44,14 @@ local function screen()
 				order += 1
 				local have = owned[g.id] == true or g.price == 0
 				local using = have and (gear[g.slot] == g.id or (g.slot == "helmet" and not gear.helmetOff and gear.helmet == nil and g.price == 0))
-				local btn = using and L("In use", "ใช้อยู่") or (have and L("Use", "ใช้") or ("฿" .. g.price))
+				local btn = using and L("In use", "ใช้อยู่") or (have and L("Use", "ใช้") or (g.festival and L("At the festival", "ที่งานไหม") or ("฿" .. g.price)))
 				ui.row(g.icon, L(g.en, g.th), L(g.enText, g.thText), btn, function()
 					if using then return end
 					task.spawn(function()
 						ui.call("City", have and "gear_use" or "gear_buy", g.id)
 						Phone.refresh()
 					end)
-				end, { order = order, btnColor = using and TEAL or (have and C.dark or C.green), btnWidth = 76 })
+				end, { order = order, btnColor = using and TEAL or (have and C.dark or C.green), btnWidth = 76, disabled = g.festival and not have })
 			end
 			if slot.id == "helmet" then
 				order += 1
