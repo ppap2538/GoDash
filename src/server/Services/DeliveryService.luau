@@ -4,7 +4,10 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage.Shared
 local Jobs = require(Shared.Config.Jobs)
 local Items = require(Shared.Config.Items)
+local Net = require(Shared.Net)
 local Civic = require(script.Parent.CivicJobs)
+local Regulars = require(script.Parent.RegularsService)
+local RegularsCfg = require(Shared.Config.Regulars)
 
 local Delivery = {}
 Delivery.mode = "food"
@@ -73,6 +76,17 @@ function Delivery.targets(player: Player, root: Vector3, def, ctx)
 		if not table.find(last, k.id) then best = k break end
 	end
 	offered[player.UserId] = { best.id, last[1] }
+	-- (2026-11-19) one of the regular customers (Config/Regulars), at their hours, from their own home
+	local reg = Regulars.pick(player, best.pos, def, ctx.time.clock(), ctx.rng)
+	if reg then
+		local dishR = Items.ById[best.stock[ctx.rng:NextInteger(1, #best.stock)]]
+		return {
+			pickup = { pos = best.pos, name = best.name, thai = best.thai },
+			dropoff = { pos = reg.home.pos, name = reg.home.name or "Home" },
+			item = dishR and dishR.name or "Food order",
+			customer = reg.r.en, regular = reg.r.id,
+		}
+	end
 	local drop
 	for _ = 1, 60 do
 		local a = world.addresses[ctx.rng:NextInteger(1, #world.addresses)]
@@ -124,7 +138,14 @@ end
 function Delivery.onDropoff(player: Player, job, stars: number, ctx)
 	local key = stars >= 4.5 and "customer_good" or (stars >= 3 and "customer_ok" or "customer_bad")
 	if stars >= 4 and ctx.weather.isRaining() then key = "customer_rain" end
-	ctx.npc.say(player, job.dropoff.pos + Vector3.new(0, 4, 0), job.customer, ctx.npc.line(key))
+	if job.regularLine then
+		-- a regular's own words at this point of their story (JobService set it)
+		local r = RegularsCfg.BY_ID[job.regular]
+		Net.fire(player, "Dialogue", { pos = job.dropoff.pos + Vector3.new(0, 4, 0), name = r and r.en or job.customer, th = job.regularLine[2], text = job.regularLine[1],
+			nameTh = r and r.th or nil })
+	else
+		ctx.npc.say(player, job.dropoff.pos + Vector3.new(0, 4, 0), job.customer, ctx.npc.line(key))
+	end
 	local rig = job.npc
 	job.npc = nil
 	if rig then task.delay(6, function() ctx.npc.despawn(rig) end) end

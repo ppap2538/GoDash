@@ -87,6 +87,9 @@ end
 local function sync(v)
 	v.model:SetAttribute("Fuel", math.floor(v.owned.fuel * 100) / 100)
 	v.model:SetAttribute("Condition", math.floor(v.owned.condition * 10) / 10)
+	-- (2026-11-19) upkeep: client/Drive reads these into its stats (Vehicles.computeStats)
+	v.model:SetAttribute("Tread", math.floor(v.owned.tread or 100))
+	v.model:SetAttribute("OilDue", not v.def.pedal and (v.owned.oil or 0) > Vehicles.OIL_INTERVAL or nil)
 end
 
 -- cf: chassis origin frame (forward = -Z). The model is lifted to its ride height.
@@ -404,6 +407,20 @@ local function garage(player: Player, op: string, vehicleId: string?, arg: any)
 		local v = active[player]
 		if v and v.id == def.id then sync(v) end
 		return true, (atPump and "Refuelled " or "Emergency fuel ") .. string.format("%.1f L for %s", need, Util.money(cost))
+	elseif op == "oil" or op == "tyres" then
+		-- (2026-11-19) upkeep at KK Motors, a fuel station or home; not paid by insurance
+		if op == "oil" and def.pedal then return false, "A bicycle has no engine oil" end
+		if op == "oil" and (owned.oil or 0) < Vehicles.OIL_INTERVAL * 0.25 then return false, "The oil is still fresh" end
+		if op == "tyres" and (owned.tread or 100) > 85 then return false, "The tyres are still good" end
+		local home = nearService(player, { "home" })
+		if not home and not nearService(player, { "dealer", "gas" }) then return false, "Done at KK Motors, a fuel station or home" end
+		local cost = Vehicles.upkeepPrice(def, op)
+		if not Economy.spend(player, cost, op) then return false, "Costs " .. Util.money(cost) end
+		if op == "oil" then owned.oil = 0 else owned.tread = 100 end
+		Data.touch(player, "vehicles")
+		local v = active[player]
+		if v and v.id == def.id then sync(v); v.stats = Vehicles.computeStats(def, owned) end
+		return true, (op == "oil" and "Oil changed for " or "New tyres for ") .. Util.money(cost)
 	elseif op == "repair" then
 		local need = 100 - owned.condition
 		if need < 1 then return false, "No repairs needed" end
@@ -519,6 +536,8 @@ function Service.start(w, deps)
 							v.distAcc += step
 							v.owned.fuel = math.max(0, v.owned.fuel - step / 1000 * v.stats.fuelUse)
 							v.owned.condition = math.max(5, v.owned.condition - step / 9000)
+							v.owned.tread = math.max(0, (v.owned.tread or 100) - step * 100 / Vehicles.TREAD_LIFE)
+							if not v.def.pedal then v.owned.oil = (v.owned.oil or 0) + step end
 						end
 						v.tele.top = math.max(v.tele.top, speed)
 						local dv = speed - v.lastSpeed

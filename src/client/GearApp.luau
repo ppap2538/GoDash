@@ -42,8 +42,8 @@ local function screen()
 			sec:SetAttribute("NoTranslate", true)
 			for _, g in ipairs(items) do
 				order += 1
-				local have = owned[g.id] == true
-				local using = have and gear[g.slot] == g.id
+				local have = owned[g.id] == true or g.price == 0
+				local using = have and (gear[g.slot] == g.id or (g.slot == "helmet" and not gear.helmetOff and gear.helmet == nil and g.price == 0))
 				local btn = using and L("In use", "ใช้อยู่") or (have and L("Use", "ใช้") or ("฿" .. g.price))
 				ui.row(g.icon, L(g.en, g.th), L(g.enText, g.thText), btn, function()
 					if using then return end
@@ -52,6 +52,17 @@ local function screen()
 						Phone.refresh()
 					end)
 				end, { order = order, btnColor = using and TEAL or (have and C.dark or C.green), btnWidth = 76 })
+			end
+			if slot.id == "helmet" then
+				order += 1
+				local off = gear.helmetOff == true
+				ui.row("🚫", L("No helmet", "ไม่ใส่หมวก"), L("Police checkpoints fine you, and crashes hurt more", "ด่านตรวจปรับเพิ่ม และล้มแล้วเจ็บกว่าเดิม"), off and L("Chosen", "เลือกอยู่") or L("Choose", "เลือก"), function()
+					if off then return end
+					task.spawn(function()
+						ui.call("City", "gear_use", "none:helmet")
+						Phone.refresh()
+					end)
+				end, { order = order, btnColor = off and Color3.fromRGB(190, 60, 50) or C.dark, btnWidth = 76 })
 			end
 		end
 	end

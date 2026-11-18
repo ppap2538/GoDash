@@ -604,6 +604,8 @@ function Factory.build(def, owned, cf: CFrame, ownerId: number?): Model
 		for _, up in ipairs(Vehicles.UPGRADES) do model:SetAttribute("Up_" .. up.id, owned[up.id] or 0) end
 		model:SetAttribute("Fuel", owned.fuel)
 		model:SetAttribute("Condition", owned.condition)
+		model:SetAttribute("Tread", math.floor(owned.tread or 100))
+		model:SetAttribute("OilDue", not def.pedal and (owned.oil or 0) > Vehicles.OIL_INTERVAL or nil)
 	end
 	model:SetAttribute("Lights", false)
 	model:SetAttribute("Brake", false)

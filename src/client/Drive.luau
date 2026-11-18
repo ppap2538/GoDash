@@ -16,6 +16,7 @@ local Sounds = require(Shared.Config.Sounds)
 local Net = require(Shared.Net)
 local State = require(script.Parent.State)
 local Feedback = require(script.Parent.Feedback)
+local Lang = require(script.Parent.Lang)
 local Crash = require(script.Parent.Crash)
 local EngineSound = require(script.Parent.EngineSound)
 
@@ -92,7 +93,7 @@ local function attr(model: Instance, name: string, default: number): number
 end
 
 local function readStats(c)
-	local owned = { condition = attr(c.model, "Condition", 100) }
+	local owned = { condition = attr(c.model, "Condition", 100), tread = attr(c.model, "Tread", 100), oilDue = c.model:GetAttribute("OilDue") == true }
 	for _, up in ipairs(Vehicles.UPGRADES) do owned[up.id] = attr(c.model, "Up_" .. up.id, 0) end
 	c.stats = Vehicles.computeStats(c.def, owned)
 end
@@ -367,6 +368,14 @@ local function step(dt: number)
 	if not c.def.pedal and c.def.fuelCap > 0 and fuel > 0 and fuel / c.def.fuelCap < 0.15 and not c.lowFuelWarn then
 		c.lowFuelWarn = os.clock()
 		Feedback.toast("⛽ Fuel is low. Phone > Maps > Nearest fuel station.", "bad")
+	end
+	-- (2026-11-19) overdue engine oil (server/VehicleService upkeep): now and then the engine cuts out for a moment
+	if hasPower and not c.def.pedal and c.model:GetAttribute("OilDue") and speed > 6 and os.clock() > (c.oilCheckAt or 0) then
+		c.oilCheckAt = os.clock() + 40
+		if math.random() < 0.3 then
+			Drive.stallUntil = os.clock() + 2.5
+			Feedback.toast(Lang.pick("🛢 The engine cut out! The oil change is overdue", "🛢 เครื่องดับ! ถึงเวลาเปลี่ยนน้ำมันเครื่องแล้ว"), "bad")
+		end
 	end
 	local energy = State.data and State.data.energy or 100
 	local pedalPower = c.def.pedal and (energy > 5 and 1 or 0.55) or 1

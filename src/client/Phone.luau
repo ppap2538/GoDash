@@ -465,6 +465,18 @@ screens.garage = function(arg)
 			row("🔧", "Repair", o.condition >= 99 and "In perfect shape" or ("Restore to 100%" .. (arg.home and " · home workshop −50%" or "")), "Repair", function()
 				call("Garage", "repair", def.id); render()
 			end, { disabled = o.condition >= 99 })
+			-- (2026-11-19) upkeep: engine oil and tyres
+			local Lp = Lang.pick
+			if not def.pedal then
+				local used = math.floor(math.min(999, (o.oil or 0) / Vehicles.OIL_INTERVAL * 100))
+				local ol = row("🛢", Lp("Engine oil", "น้ำมันเครื่อง"), Lp(("%d%% of its life used%s"):format(used, used >= 100 and " · OVERDUE" or ""), ("ใช้ไปแล้ว %d%%%s"):format(used, used >= 100 and " · เลยกำหนดแล้ว!" or "")),
+					Util.money(Vehicles.upkeepPrice(def, "oil")), function() call("Garage", "oil", def.id); render() end, { disabled = used < 25, btnWidth = 78 })
+				for _, l in ipairs(ol:GetDescendants()) do if l:IsA("TextLabel") then l:SetAttribute("NoTranslate", true) end end
+			end
+			local tread = math.floor(o.tread or 100)
+			local tl = row("🛞", Lp("Tyres", "ยาง"), Lp(("Tread %d%%%s"):format(tread, tread < 20 and " · slippery!" or ""), ("ดอกยางเหลือ %d%%%s"):format(tread, tread < 20 and " · ลื่นแล้ว!" or "")),
+				Util.money(Vehicles.upkeepPrice(def, "tyres")), function() call("Garage", "tyres", def.id); render() end, { disabled = tread > 85, btnWidth = 78 })
+			for _, l in ipairs(tl:GetDescendants()) do if l:IsA("TextLabel") then l:SetAttribute("NoTranslate", true) end end
 		end
 		if mode == "service" then
 			row("⬆️", "Upgrades & paint", "Tune your " .. (def and def.name or "vehicle"), "Open", function() go("vehicle", { id = d.activeVehicle, dealer = true }, "Tuning") end)

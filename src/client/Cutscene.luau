@@ -838,7 +838,7 @@ local function ticketCard(reason: string, amount: number, n: number?, limit: num
 	text(band, waived and L("🤝 THEY LET IT GO", "🤝 คู่กรณีไม่เอาเรื่อง") or (ins and L("🛡 INSURANCE CLAIM", "🛡 เคลมประกัน")) or (claim and L("🧾 DAMAGE CLAIM", "🧾 ใบเรียกค่าเสียหาย") or L("🚔 TRAFFIC TICKET", "🚔 ใบสั่ง · TRAFFIC TICKET")), 0, 40, 18, Color3.new(1, 1, 1), Enum.Font.GothamBlack)
 	local CHARGE = {
 		redlight = L("Ran a red light", "ฝ่าสัญญาณไฟแดง"), sidewalk = L("Riding on the pavement", "ขับขี่บนทางเท้า"),
-		nolicence = L("No driving licence", "ไม่มีใบอนุญาตขับขี่"),
+		nolicence = L("No driving licence", "ไม่มีใบอนุญาตขับขี่"), nohelmet = L("Riding without a helmet", "ไม่สวมหมวกกันน็อก"),
 		hit_ped = L("Ran into a pedestrian", "ชนคนเดินถนน"), hit_car = L("Crashed into another vehicle", "ชนรถคันอื่น"),
 		zebra = L("Didn't stop at a zebra crossing", "ไม่หยุดให้คนข้ามทางม้าลาย"),
 	}
@@ -857,6 +857,7 @@ local function ticketCard(reason: string, amount: number, n: number?, limit: num
 		redlight = L("Stop at red. Turning left on red is allowed.", "ไฟแดงต้องหยุด (เลี้ยวซ้ายผ่านตลอดได้)"),
 		sidewalk = L("Pavements are for feet. Officers patrol near the markets.", "ทางเท้ามีไว้เดิน แถวตลาดมีเทศกิจนะ"),
 		nolicence = L("Take the test at the bus terminal (the queue is long).", "ไปสอบใบขับขี่ที่สถานีขนส่ง (คิวยาวหน่อย)"),
+		nohelmet = L("Phone > Gear: the half helmet is free.", "มือถือ > อุปกรณ์ไรเดอร์ หมวกครึ่งใบใส่ได้ฟรี"),
 		hit_ped = L("Slow down where people walk: markets, shops, crossings.", "ย่านตลาด หน้าร้าน ทางม้าลาย ขับช้าๆ นะ"),
 		hit_car = L("Keep your distance and brake in time.", "เว้นระยะห่าง เบรกให้ทันนะ"),
 		zebra = L("Someone on the crossing? Stop and let them cross.", "มีคนอยู่บนทางม้าลาย ต้องหยุดให้ข้ามก่อนนะ"),
@@ -1091,6 +1092,7 @@ local function fineScene(info: any)
 			or (reason == "zebra" and L("🚸 Pulled over: you didn't stop at the crossing", "🚸 ตำรวจเรียกจอด: ไม่หยุดให้คนข้ามทางม้าลาย"))
 			or (reason == "sidewalk" and L("📢 Municipal officer: no riding on the pavement!", "📢 เทศกิจเรียก: ห้ามขี่บนทางเท้า!"))
 			or (reason == "nolicence" and L("🚨 Checkpoint: no driving licence!", "🚨 ด่านตรวจ: ไม่มีใบขับขี่!"))
+			or (reason == "nohelmet" and L("🪖 Checkpoint: no helmet!", "🪖 ด่านตรวจ: ไม่สวมหมวกกันน็อก!"))
 			or L("🚨 Pulled over at a police checkpoint", "🚨 ตำรวจเรียกจอดที่ด่านตรวจ")
 	end
 	setCaption()

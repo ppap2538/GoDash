@@ -15,6 +15,7 @@ local Shared = ReplicatedStorage.Shared
 local Net = require(Shared.Net)
 local Data = require(script.Parent.PlayerDataService)
 local Fines = require(script.Parent.FineService)
+local Gear = require(game:GetService("ReplicatedStorage").Shared.Config.Gear)
 local Kit = require(script.Parent.Parent.World.Kit)
 local RiderPose = require(Shared.RiderPose)
 
@@ -265,13 +266,16 @@ function Police.start(world, deps)
 								-- (2026-11-17) no licence for this kind of vehicle: twice the fine (server/LicenseService)
 								local class = v.def.class == "car" and "car" or "bike"
 								local noLicence = d ~= nil and d.licence ~= nil and d.licence[class] ~= true
+								-- (2026-11-19) a motorbike without a helmet (Config/Gear): half a fine more
+								local noHelmet = class == "bike" and d ~= nil and Gear.worn(d.gear, "helmet") == nil
+								local fine = Police.FINE * ((noLicence and 2 or 1) + (noHelmet and 0.5 or 0))
 								-- (2026-11-19) the daily limit: past it the officers only warn (server/FineService)
-								local ok, amount, why, n, limit = Fines.charge(player, "ticket", noLicence and Police.FINE * 2 or Police.FINE, "checkpoint")
+								local ok, amount, why, n, limit = Fines.charge(player, "ticket", fine, "checkpoint")
 								if ok then
 									local en, th = Fines.countText(n, limit)
 									Net.fire(player, "Notify", "toast", { text = ("🚨 Police checkpoint! Fine %s"):format(amount > 0 and ("฿" .. amount) or "(no cash)") .. en,
 										th = ("🚨 ด่านตรวจ! ปรับ %s"):format(amount > 0 and ("฿" .. amount) or "(ไม่มีเงินสด)") .. th, bad = true })
-									Net.fire(player, "Notify", "scene", { kind = "fine", reason = noLicence and "nolicence" or "checkpoint", amount = amount, n = n, limit = limit }) -- client/Cutscene: pulled over, a ticket
+									Net.fire(player, "Notify", "scene", { kind = "fine", reason = noLicence and "nolicence" or (noHelmet and "nohelmet" or "checkpoint"), amount = amount, n = n, limit = limit }) -- client/Cutscene: pulled over, a ticket
 									Net.fire(player, "Notify", "feed", { key = noLicence and "nolicence" or "fine_checkpoint", vars = { amount = amount, pos = pos } })
 								else
 									Fines.warn(player, "ticket", why, "🚨 Police checkpoint", "🚨 ด่านตรวจ")

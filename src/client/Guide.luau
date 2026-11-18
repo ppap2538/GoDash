@@ -396,6 +396,16 @@ local function compute()
 	if t and not t.job then
 		return { icon = "📍", target = t.pos, title = L("Going to ", "กำลังไป ") .. Lang.t(t.name), detail = L("Follow the green line on the road.", "ขี่ตามเส้นสีเขียวบนถนน") }
 	end
+	-- (2026-11-19) upkeep due (server/VehicleService): overdue engine oil or bald tyres, shown between orders
+	if myVehicle and (myVehicle:GetAttribute("OilDue") == true or (myVehicle:GetAttribute("Tread") or 100) < 15) then
+		local oil = myVehicle:GetAttribute("OilDue") == true
+		local gas = pos and nearestGas(pos)
+		return { icon = oil and "🛢" or "🛞", color = C.orange,
+			title = oil and L("Engine oil change overdue", "ถึงกำหนดเปลี่ยนน้ำมันเครื่องแล้ว") or L("Your tyres are worn smooth", "ยางหัวโล้นแล้ว ลื่นมาก"),
+			detail = oil and L("The engine may cut out. Fuel stations and KK Motors change it (Phone > Garage).", "เครื่องอาจดับกลางทาง เปลี่ยนได้ที่ปั๊มหรือ KK Motors (มือถือ > โรงรถ)")
+				or L("Less grip, longer braking. Fuel stations and KK Motors fit new ones.", "เกาะถนนน้อยลง เบรกไกลขึ้น เปลี่ยนได้ที่ปั๊มหรือ KK Motors"),
+			button = gas and { text = L("Route to a fuel station", "นำทางไปปั๊ม"), fn = function() GPS.setTarget(gas.pos, gas.name) end } or nil }
+	end
 	-- (2026-11-19) a new rider between orders: the next thing worth trying
 	local tip = onboardTip(d, pos)
 	if tip then return tip end

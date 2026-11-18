@@ -53,6 +53,7 @@ local function template()
 		badges = {}, -- [badge key] = true once awarded
 		seenNews = "", -- the "What's new" version this rider has seen
 		pet = false, -- or { look, name (Config/Pets.NAMES index), out = true, since } (server/PetService, 2026-11-19)
+		regulars = false, -- or { [id] = deliveries } (server/RegularsService, Config/Regulars, 2026-11-19)
 		gear = false, -- or { owned = { [id] = true }, bag = id, helmet = id } (server/GearService, Config/Gear, 2026-11-19)
 		onboard = false, -- or { gift, style, lake, clip = true }: the first-ten-minutes tips already done (client/Guide, 2026-11-19)
 		insurance = false, -- or { plan = "c1" | "c2" | "c3", untilT = os.time() } (server/InsuranceService, 2026-11-19)

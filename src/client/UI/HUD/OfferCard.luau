@@ -75,6 +75,11 @@ local function refresh(job)
 		refs.pay.Text = Util.money(o.pay)
 		refs.from.Text = (o.mode == "ride" and "🧍 Pick up: " or "🍱 From: ") .. Lang.name(o.pickup)
 		refs.to.Text = "📍 To: " .. Lang.name(o.dropoff)
+		if o.regular then
+			-- (2026-11-19) a regular customer (Config/Regulars): who, and how many times you've been
+			local n = (tonumber(o.regularN) or 0) + 1
+			refs.to.Text = "⭐ " .. Lang.pick(("Regular: %s · visit %d"):format(Lang.t(o.customer or ""), n), ("ลูกค้าประจำ: %s · ครั้งที่ %d"):format(Lang.t(o.customer or ""), n))
+		end
 		refs.info.Text = ("%s trip · %s to pick-up · %s · +%d EXP"):format(Util.dist(o.dist), Util.dist(o.toPickup), o.item, o.exp)
 		refs.bonus.Text = bonusLine(o.bonus or "")
 	else

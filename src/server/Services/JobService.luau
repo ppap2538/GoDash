@@ -14,6 +14,8 @@ local Net = require(Shared.Net)
 local Data = require(script.Parent.PlayerDataService)
 local Economy = require(script.Parent.EconomyService)
 local Gear = require(ReplicatedStorage.Shared.Config.Gear)
+local Regulars = require(script.Parent.RegularsService)
+local RegularsCfg = require(ReplicatedStorage.Shared.Config.Regulars)
 local Metrics = require(script.Parent.MetricsService) -- Roblox Analytics: onboarding funnel
 local Board = require(script.Parent.LeaderboardService) -- weekly Top Riders
 local StoreCfg = require(Shared.Config.Store) -- ranks
@@ -47,6 +49,7 @@ local function public(st)
 			id = o.id, mode = o.mode, type = o.def.id, name = o.def.name, icon = o.def.icon, pay = o.pay, exp = o.def.exp,
 			dist = o.dist, pickup = o.pickup, dropoff = o.dropoff, item = o.item, customer = o.customer,
 			expires = o.expires, seconds = Game.OFFER_SECONDS, bonus = o.bonusText, toPickup = o.toPickup,
+			regular = o.regular, regularN = o.regular and Regulars.count(player, o.regular) or nil,
 		}
 	end
 	if st.job then
@@ -54,7 +57,7 @@ local function public(st)
 		out.job = {
 			id = j.id, mode = j.mode, type = j.def.id, name = j.def.name, icon = j.def.icon, pay = j.pay, exp = j.def.exp,
 			stage = j.stage, pickup = j.pickup, dropoff = j.dropoff, item = j.item, customer = j.customer,
-			dist = j.dist, parSeconds = j.parSeconds, pickedAt = j.pickedAt, startedAt = j.startedAt, now = os.time(),
+			dist = j.dist, parSeconds = j.parSeconds, pickedAt = j.pickedAt, startedAt = j.startedAt, now = os.time(), regular = j.regular,
 		}
 	end
 	return out
@@ -161,7 +164,7 @@ local function makeOffer(player: Player, st, d)
 	nextId += 1
 	st.offer = {
 		id = "J" .. nextId, mode = mode, def = def, module = module, pay = pay, dist = dist, toPickup = toPickup,
-		pickup = t.pickup, dropoff = t.dropoff, item = t.item, customer = t.customer,
+		pickup = t.pickup, dropoff = t.dropoff, item = t.item, customer = t.customer, regular = t.regular,
 		expires = os.clock() + Game.OFFER_SECONDS, bonusText = bonusText,
 	}
 	Net.fire(player, "JobOffer", public(st).offer)
@@ -199,7 +202,7 @@ local function accept(player: Player, st)
 	local par = math.floor(o.dist / Jobs.PAR_SPEED * o.def.par + Jobs.PAR_PAD)
 	st.job = {
 		id = o.id, mode = o.mode, def = o.def, module = o.module, pay = o.pay, dist = o.dist,
-		pickup = o.pickup, dropoff = o.dropoff, item = o.item, customer = o.customer,
+		pickup = o.pickup, dropoff = o.dropoff, item = o.item, customer = o.customer, regular = o.regular,
 		stage = "pickup", startedAt = os.time(), startedClock = os.clock(), parSeconds = par,
 	}
 	o.module.onAccept(player, st.job, ctx)
@@ -314,6 +317,30 @@ local function complete(player: Player, st)
 		local extra = math.floor(pay * CONVOY_EACH * mates + 0.5)
 		tip += extra
 		table.insert(notes, ("🛵🛵 Convoy x%d +%d"):format(mates + 1, extra))
+	end
+	-- (2026-11-19) a regular customer (Config/Regulars): trust grows with every delivery; better tips, their story, a gift
+	if job.regular then
+		local before = Regulars.count(player, job.regular)
+		local share = RegularsCfg.tipBonus(before)
+		local n, line, gift = Regulars.done(player, job.regular)
+		job.regularLine = line
+		if share > 0 then
+			local extra = math.floor(pay * share + 0.5)
+			tip += extra
+			table.insert(notes, ("⭐ Regular x%d +%d"):format(n, extra))
+		else
+			table.insert(notes, ("⭐ Regular x%d"):format(n))
+		end
+		if gift > 0 then
+			tip += gift
+			table.insert(notes, ("🎁 A thank-you gift +%d"):format(gift))
+		end
+		-- Uncle Chai the mechanic changes your oil at the 7th delivery
+		if job.regular == "chai" and n == 7 and v and v.owned then
+			v.owned.oil = 0
+			Data.touch(player, "vehicles")
+			table.insert(notes, "🛢 Free oil change")
+		end
 	end
 	lastDone[player] = os.clock()
 	tip = Twists.adjustTip(player, job, tip, stars, notes)

@@ -15,6 +15,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Net = require(ReplicatedStorage.Shared.Net)
 local Data = require(script.Parent.PlayerDataService)
+local Gear = require(game:GetService("ReplicatedStorage").Shared.Config.Gear)
 
 local Health = {}
 Health.LIMP = 25
@@ -39,6 +40,11 @@ function Health.injure(player: Player, kind: string, speed: number)
 	local d = Data.get(player)
 	if not d then return end
 	local add = kind == "car" and math.clamp(3 + speed * 0.1, 3, 15) or math.clamp(8 + speed * 0.25, 8, 35)
+	-- (2026-11-19) on two wheels the helmet matters (Config/Gear): a good one halves it, none makes it worse
+	if kind ~= "car" then
+		local helmet = Gear.worn(d.gear, "helmet")
+		add = math.floor(add * (helmet and helmet.protect or 1.25) + 0.5)
+	end
 	local before = d.injury or 0
 	set(player, d, before + add)
 	local now = d.injury

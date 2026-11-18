@@ -171,7 +171,19 @@ export type Owned = { engine: number, tires: number, suspension: number, brakes:
 	color: number, fuel: number, condition: number }
 
 function Vehicles.newOwned(v: Vehicle): Owned
-	return { engine = 0, tires = 0, suspension = 0, brakes = 0, eco = 0, handling = 0, color = 1, fuel = v.fuelCap, condition = 100 }
+	return { engine = 0, tires = 0, suspension = 0, brakes = 0, eco = 0, handling = 0, color = 1, fuel = v.fuelCap, condition = 100, tread = 100, oil = 0 }
+end
+
+-- Upkeep (2026-11-19, owner: "ทำตามที่แนะนำ": tyres wear, the engine oil needs changing). tread 100 = new tyres, worn
+-- down by distance (100 per TREAD_LIFE studs); oil = studs since the last oil change, due after OIL_INTERVAL. Worn
+-- tyres hold the road less (dry and wet); overdue oil costs speed and the engine may cut out now and then (client/Drive).
+-- Changed at KK Motors, a fuel station or home (server/VehicleService "oil" / "tyres"); insurance does not pay upkeep.
+Vehicles.TREAD_LIFE = 300000 -- about 2-3 hours of riding
+Vehicles.OIL_INTERVAL = 150000 -- about 1-1.5 hours of riding
+function Vehicles.upkeepPrice(v: Vehicle, what: string): number
+	local car = v.class == "car"
+	if what == "oil" then return car and 450 or 120 end
+	return car and 1600 or 350 -- a set of tyres
 end
 
 -- The numbers the driving code actually uses.
@@ -179,12 +191,15 @@ function Vehicles.computeStats(v: Vehicle, o: any)
 	local e, t, s, b, eco, h = o.engine or 0, o.tires or 0, o.suspension or 0, o.brakes or 0, o.eco or 0, o.handling or 0
 	local cond = math.clamp((o.condition or 100) / 100, 0, 1)
 	local wear = 0.75 + 0.25 * cond -- a worn vehicle is slower
+	local tread = math.clamp((o.tread or 100) / 100, 0, 1)
+	local oilDue = o.oilDue == true or (o.oil or 0) > Vehicles.OIL_INTERVAL
+	if oilDue then wear *= 0.93 end
 	return {
 		topSpeed = v.topSpeed * (1 + 0.07 * e) * wear,
 		accel = v.accel * (1 + 0.10 * e) * wear,
 		brake = v.brake * (1 + 0.15 * b),
-		grip = v.grip * (1 + 0.09 * t),
-		wetGrip = 0.62 + 0.11 * t, -- multiplier used when the road is wet
+		grip = v.grip * (1 + 0.09 * t) * (0.8 + 0.2 * tread),
+		wetGrip = (0.62 + 0.11 * t) * (0.7 + 0.3 * tread), -- multiplier used when the road is wet
 		steer = v.steer,
 		steerRate = 3.2 * (1 + 0.08 * h),
 		springDamp = 1 + 0.2 * s,
