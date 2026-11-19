@@ -38,10 +38,21 @@ local function get(player: Player)
 	return st
 end
 
+-- (2026-11-19, viral pack) player traffic police (server/TrafficPoliceService): when an officer on duty is near,
+-- a red light, a zebra crossing or riding on the pavement is theirs to catch instead of the automatic ticket.
+-- policeHook(player, amount, reason) -> true = an officer takes it (the rider is now "wanted" for a minute).
+Fines.policeHook = nil :: ((Player, number, string) -> boolean)?
+local POLICE_REASONS = { redlight = true, zebra = true, sidewalk = true }
+
 -- Decide and take the money. kind = "ticket" | "bill". Returns:
 --   ok (false = let off: show a warning), the amount taken (0 when the pocket is empty),
---   why ("limit" | "gap" | "cash") when let off, and the count / limit after this one.
-function Fines.charge(player: Player, kind: string, amount: number, reason: string): (boolean, number, string?, number, number)
+--   why ("limit" | "gap" | "cash" | "police") when let off, and the count / limit after this one.
+-- byOfficer = a player officer pulled them over (the police hook is skipped then).
+function Fines.charge(player: Player, kind: string, amount: number, reason: string, byOfficer: boolean?): (boolean, number, string?, number, number)
+	if kind == "ticket" and not byOfficer and POLICE_REASONS[reason] and Fines.policeHook then
+		local ok, taken = pcall(Fines.policeHook, player, amount, reason)
+		if ok and taken then return false, 0, "police", 0, Fines.TICKETS end
+	end
 	local st = get(player)
 	local k = st[kind] or st.ticket
 	local limit = kind == "bill" and Fines.BILLS or Fines.TICKETS
@@ -72,6 +83,12 @@ end
 -- The toast when someone is let off. what / whatTh name the offence ("🚦 Ran a red light").
 function Fines.warn(player: Player, kind: string, why: string?, what: string, whatTh: string)
 	local st = get(player)
+	if why == "police" then
+		-- a player officer saw it: run, or pull over (server/TrafficPoliceService)
+		Net.fire(player, "Notify", "toast", { text = what .. ": 🚨 a traffic officer saw that! Get away, or get pulled over",
+			th = whatTh .. ": 🚨 ตำรวจจราจรเห็นแล้ว! หนีให้พ้น หรือโดนเรียกจอด", bad = true })
+		return
+	end
 	if os.clock() - st.warnAt < WARN_GAP then return end
 	st.warnAt = os.clock()
 	local en, th

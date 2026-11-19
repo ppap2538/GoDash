@@ -590,7 +590,8 @@ function Service.start(world, deps)
 						end
 						push(player)
 					end
-					if st.online and not st.paused and not st.offer and not st.job and now >= (st.nextAt or 0) then
+					-- (2026-11-19) a traffic officer on duty (server/TrafficPoliceService) takes no orders
+					if st.online and not st.paused and not st.offer and not st.job and now >= (st.nextAt or 0) and not player:GetAttribute("PoliceDuty") then
 						st.nextAt = now + 6
 						local ok, err = pcall(makeOffer, player, st, d)
 						if not ok then warn("[Job] offer failed: " .. tostring(err)) end

@@ -91,7 +91,8 @@ safe("TimeTrial", require(Services.TimeTrialService).start, world, deps) -- 2026
 safe("CarMeet", require(Services.CarMeetService).start, world, deps) -- 2026-11-19: night car meet at the KK Plaza car park
 safe("Accidents", require(Services.AccidentService).start) -- 2026-11-18: hitting people or cars costs money
 safe("Insurance", require(Services.InsuranceService).start) -- 2026-11-19: vehicle insurance class 1 / 2+ / 3
-safe("Gear", require(Services.GearService).start) -- 2026-11-19: rider gear (thermal bags, helmets)
+safe("Gear", require(Services.GearService).start) -- 2026-11-19: rider gear (thermal bags; helmets removed the same day)
+safe("TrafficPolice", require(Services.TrafficPoliceService).start) -- 2026-11-19: player traffic police (viral pack)
 safe("Regulars", require(Services.RegularsService).init, world) -- 2026-11-19: regular customers' homes
 safe("Coop", require(Services.CoopService).start, world) -- 2026-11-19: catering orders delivered together
 safe("Crews", require(Services.CrewService).start) -- 2026-11-19: rider crews, vests, weekly table
