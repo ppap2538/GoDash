@@ -245,8 +245,8 @@ local function onboardTip(d, pos: Vector3?)
 	end
 	if jobs >= 9 and not seen(d, "clip") then
 		return { icon = "🎬", title = L("Make a clip", "ถ่ายคลิปเท่ๆ"),
-			detail = touch and L("The Clip app frames 9:16 for TikTok; ⏪ replays your last 10 seconds.", "แอปถ่ายคลิปจัดภาพ 9:16 ลง TikTok ได้เลย ⏪ ดูรีเพลย์ 10 วิล่าสุด")
-				or L("B = clip mode 9:16 for TikTok · L = replay your last 10 seconds", "B = โหมดถ่ายคลิป 9:16 · L = ดูรีเพลย์ 10 วิล่าสุด"),
+			detail = touch and L("The Clip app frames 9:16 for TikTok; ⏺ records a clip you can share; ⏪ replays your last 10 seconds.", "แอปถ่ายคลิปจัดภาพ 9:16 ลง TikTok ได้เลย ⏺ อัดคลิปแล้วแชร์ได้ ⏪ ดูรีเพลย์ 10 วิล่าสุด")
+				or L("B = clip mode 9:16 for TikTok · ⏺ records a clip · L = replay your last 10 seconds", "B = โหมดถ่ายคลิป 9:16 · ⏺ อัดคลิป · L = ดูรีเพลย์ 10 วิล่าสุด"),
 			button = { text = L("Try it", "ลองเลย"), fn = function()
 				markSeen("clip")
 				local ok, Clip = pcall(require, script.Parent.ClipMode)

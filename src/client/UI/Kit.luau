@@ -213,6 +213,14 @@ function UI.screen(name: string, order: number?): (ScreenGui, UIScale)
 	return gui, scale
 end
 
+-- The dark veil behind a modal. A UI.screen keeps clear of Roblox's top bar and of device cut-outs, so a plain
+-- 1x1 frame in one leaves that strip uncovered (owner, 2026-11-19: "แถบดำคลุมไม่เต็มจอ"): this one reaches past
+-- every edge (a ScreenGui does not clip its children).
+function UI.scrim(parent: Instance, transparency: number?): Frame
+	return UI.new("Frame", { Name = "Scrim", BackgroundColor3 = UI.C.black, BackgroundTransparency = transparency or 0.5,
+		AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.new(1, 800, 1, 800), Parent = parent })
+end
+
 -- Quick "appear" bounce for a widget that owns a UIScale named Pop (made on first use).
 function UI.pop(inst: Instance, from: number?)
 	local sc: any = inst:FindFirstChild("Pop")

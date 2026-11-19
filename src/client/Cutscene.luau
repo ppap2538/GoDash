@@ -1134,6 +1134,7 @@ local function fineScene(info: any)
 		-- 1. the CCTV replay of what happened (client/Replay): accidents, red lights, the crossing
 		if not onFoot and (claim or reason == "redlight" or reason == "zebra") then
 			local hitAt = tonumber(info.hitAt) or (sceneAt - 0.5)
+			Replay.keepEvent(hitAt, claim and "claim" or reason) -- for "keep this moment" (client/ClipMode)
 			local samples = Replay.take(hitAt - 3.3, hitAt + 1.3)
 			if #samples >= 8 and not skip then
 				tween(caption, 0.2, { TextTransparency = 1 })

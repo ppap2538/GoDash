@@ -24,7 +24,7 @@ local function show()
 	if shown then return end
 	shown = true
 	local gui = UI.screen("GoDashWelcome", Layers.Modal + 5)
-	local dim = UI.new("Frame", { BackgroundColor3 = C.black, BackgroundTransparency = 0.45, Size = UDim2.fromScale(1, 1), Parent = gui })
+	local dim = UI.scrim(gui, 0.45)
 	local center = Layout.region(Layout.stage(gui), "Center")
 	local card = UI.new("Frame", { BackgroundColor3 = C.card, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(440, 380), Parent = center })
 	UI.corner(card, 24)

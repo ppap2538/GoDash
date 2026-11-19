@@ -58,7 +58,7 @@ end
 ---------------------------------------------------------------------------------------------------
 local function newsCard()
 	local gui = UI.screen("GoDashNews", Layers.Modal + 3)
-	local dim = UI.new("Frame", { BackgroundColor3 = C.black, BackgroundTransparency = 0.5, Size = UDim2.fromScale(1, 1), Parent = gui })
+	local dim = UI.scrim(gui, 0.5)
 	local center = Layout.region(Layout.stage(gui), "Center")
 	local h = 120 + #News.LINES * 46
 	local card = UI.new("Frame", { BackgroundColor3 = C.card, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(460, h), Parent = center })

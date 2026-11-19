@@ -6,6 +6,10 @@
 --   * Instant replay (owner: "เพิ่มตามแนะนำ": watch the last 10 seconds, for clips): L, or the ⏪ button in clip
 --     mode. Six cameras (TV, chase, low, front, drone, roadside), pause, half speed; it loops until you close it.
 --     Pull up first (below ~12 km/h): the vehicle is held still while you watch.
+--   * Clips (owner, 2026-11-19: "a record button in the game"): in clip mode ⏺ records the replay through once
+--     (client/Capture); after an accident, a red light or the zebra fine, client/Cutscene keeps the moment
+--     (Replay.keepEvent) and client/ClipMode offers "keep this moment": it plays with the camera cutting by
+--     itself and slow motion round the hit, recorded.
 -- While you drive, the last few seconds are kept: your vehicle, the people around it (client/Peds) and the AI
 -- cars near you (client/Street), 15 times a second. For a replay the real actors are moved (on this screen only)
 -- and put back exactly where they were: your vehicle is anchored here for it (nothing is sent to the server
@@ -23,6 +27,7 @@ local Lang = require(script.Parent.Lang)
 local Feedback = require(script.Parent.Feedback)
 local State = require(script.Parent.State)
 local UI = require(script.Parent.UI.Kit)
+local Capture = require(script.Parent.Capture)
 
 local Replay = {}
 local L = Lang.pick
@@ -70,6 +75,20 @@ function Replay.take(t0: number, t1: number)
 		out = keep
 	end
 	return out
+end
+
+-- The last accident, red light or crossing fine, kept for "keep this moment" (client/ClipMode offers to record it
+-- once the scene is over): the seconds before it and just after, copied while they are still in the ring.
+Replay.lastEvent = nil
+local kept = Instance.new("BindableEvent")
+-- fires with no arguments: read Replay.lastEvent (a BindableEvent copies a table it carries, and the samples
+-- must stay the very same tables, people and cars)
+Replay.eventKept = kept.Event
+function Replay.keepEvent(hitAt: number, kind: string?)
+	local samples = Replay.take(hitAt - 6.5, hitAt + 1.8)
+	if #samples < 30 then return end
+	Replay.lastEvent = { samples = samples, hitAt = hitAt, kind = kind, model = samples[#samples].model, at = os.clock() }
+	kept:Fire()
 end
 
 -- between which samples is time t: i, k (0..1 toward sample i + 1)
@@ -376,7 +395,14 @@ local CAMS = {
 	{ id = "road", en = "Roadside", th = "ข้างทาง" },
 }
 
-function Replay.instant()
+-- opts (all optional):
+--   samples + hitAt = a kept moment (Replay.lastEvent) instead of the last 10 seconds
+--   record   = record it as a clip with client/Capture: it plays once from the start, then the clip is offered to
+--              save or share (client/ClipMode's done card); a device that can't record just loops it as usual
+--   director = the camera cuts by itself: chase, then the TV angle in slow motion round hitAt
+-- In clip mode the panel also has ⏺: the same replay again from the start, recorded.
+function Replay.instant(opts: { [string]: any }?)
+	local o = opts or {}
 	if busy or State.cutscene then return end
 	local c = Drive.current()
 	if not c or not c.chassis or not c.chassis.Parent then
@@ -388,8 +414,18 @@ function Replay.instant()
 		Feedback.toast(L("⏪ Slow down and pull up first, then L", "⏪ ชะลอจอดก่อน แล้วกด L ดูรีเพลย์"), "bad")
 		return
 	end
-	local now = os.clock()
-	local samples = Replay.take(now - 10, now)
+	local samples
+	if o.samples then
+		samples = o.samples
+		if #samples == 0 or samples[#samples].model ~= c.model then
+			Feedback.toast(L("⏪ That moment was on another vehicle", "⏪ ตอนนั้นขี่คันอื่นอยู่ ดูรีเพลย์นี้ไม่ได้"), "bad")
+			return
+		end
+	else
+		local now = os.clock()
+		samples = Replay.take(now - 10, now)
+	end
+	local hitAt: number? = o.hitAt
 	if #samples < 15 then
 		Feedback.toast(L("⏪ Nothing to replay yet: ride a little first", "⏪ ยังไม่มีภาพ ขี่ต่ออีกนิดนะ"), "bad")
 		return
@@ -436,7 +472,8 @@ function Replay.instant()
 	local panel = UI.new("Frame", { BackgroundColor3 = Color3.fromRGB(16, 18, 24), BackgroundTransparency = 0.2, Parent = gui })
 	UI.corner(panel, 12)
 	if bar >= 230 then
-		panel.Position = UDim2.fromOffset(12, 190)
+		-- (under client/ClipMode's controls, which sit under Roblox's top-left buttons)
+		panel.Position = UDim2.fromOffset(12, game:GetService("GuiService"):GetGuiInset().Y + 180)
 		panel.Size = UDim2.fromOffset(bar - 24, 150)
 	else
 		panel.AnchorPoint = Vector2.new(0.5, 1)
@@ -468,6 +505,10 @@ function Replay.instant()
 	local orbit = 0
 	local ended = false
 	local holdT = 0
+	local lastId = ""
+	-- recording (client/Capture): once = play it through one time and close; waiting = the device is still
+	-- answering (the first frame stands still meanwhile, so the clip starts clean); recOn = it is recording
+	local once, waiting, recOn = false, false, false
 	local function camName() return L(CAMS[camI].en, CAMS[camI].th) end
 	local function setCam(i: number)
 		camI = (i - 1) % #CAMS + 1
@@ -483,6 +524,28 @@ function Replay.instant()
 	local pauseB = btn("⏸", 54, function() paused = not paused end)
 	local slowB = btn("🐢 0.5x", 76, function() slow = not slow end)
 	btn("✖ " .. L("Close", "ออก"), 76, function() ended = true end, UI.C.red)
+	local function beginRecord()
+		if waiting or recOn then return end
+		pt, holdT, camPos, roadCam, paused = t0, 0, nil, nil, false
+		once, waiting = true, true
+		task.spawn(function()
+			local ok, why = Capture.start()
+			waiting = false
+			if ok and ended then
+				Capture.stop() -- closed while the device was still answering
+			elseif ok then
+				recOn = true
+				-- the panel would be in the clip when it sits over the picture (no clip-mode bar wide enough)
+				if bar < 230 then panel.Visible = false end
+			else
+				Capture.say(Capture.explain(why), "bad")
+				once = false -- keep looping: a screen recorder can still take it
+			end
+		end)
+	end
+	if clipOn and Capture.available() then
+		btn("⏺ " .. L("Rec", "อัด"), 76, beginRecord, Color3.fromRGB(200, 30, 40))
+	end
 
 	local inputConn = UserInputService.InputBegan:Connect(function(input, processed)
 		if processed then return end
@@ -494,13 +557,28 @@ function Replay.instant()
 
 	RunService:BindToRenderStep("GoDashReplay", Enum.RenderPriority.Last.Value + 3, function(rdt)
 		local dt = math.min(rdt, 1 / 20)
-		if not paused then
+		-- the director: chase up to the moment, then a cut to the TV angle, in slow motion round the moment
+		local id = CAMS[camI].id
+		local rate = 1
+		if o.director and hitAt then
+			id = pt < hitAt - 1.4 and "chase" or "tv"
+			if math.abs(pt - hitAt) < 0.6 then rate = 0.35 end
+		end
+		if id ~= lastId then lastId, camPos, roadCam = id, nil, nil end -- a cut, not a swoop
+		if not paused and not waiting then
 			if pt >= t1 then
-				-- hold the last frame a moment, then go round again
+				-- hold the last frame a moment, then go round again (or, played once, close)
 				holdT += dt
-				if holdT > 0.8 then pt, holdT, camPos, roadCam = t0, 0, nil, nil end
+				if holdT > (once and 1.0 or 0.8) then
+					if once then
+						if not ended and recOn then Capture.stop() end
+						ended = true
+					else
+						pt, holdT, camPos, roadCam = t0, 0, nil, nil
+					end
+				end
 			else
-				pt = math.min(t1, pt + dt * (slow and 0.5 or 1))
+				pt = math.min(t1, pt + dt * (slow and 0.5 or 1) * rate)
 			end
 		end
 		local cf = apply(pt, dt)
@@ -508,7 +586,6 @@ function Replay.instant()
 		local fwd = Vector3.new(cf.LookVector.X, 0, cf.LookVector.Z)
 		fwd = fwd.Magnitude > 0.05 and fwd.Unit or Vector3.zAxis
 		local right = Vector3.new(-fwd.Z, 0, fwd.X)
-		local id = CAMS[camI].id
 		local want, look, fov, k
 		if id == "tv" then
 			want = s + right * 18 + fwd * 8 + Vector3.new(0, 4.5, 0)
@@ -540,14 +617,19 @@ function Replay.instant()
 		cam.CFrame = CFrame.lookAt(camPos :: Vector3, look)
 		cam.FieldOfView = fov
 		prog.Size = UDim2.fromScale(math.clamp((pt - t0) / math.max(t1 - t0, 0.1), 0, 1), 1)
-		info.Text = ("🎥 %s   ·   -%.1f %s%s"):format(camName(), math.max(0, t1 - pt), L("s", "วิ"), UserInputService.KeyboardEnabled and L("   ·   N cam · Space pause · L close", "   ·   N มุม · Space หยุด · L ออก") or "")
+		info.Text = ("%s🎥 %s   ·   -%.1f %s%s"):format(recOn and "🔴 REC   " or (waiting and "⏳ " or ""), o.director and hitAt and L("Auto", "อัตโนมัติ") or camName(),
+			math.max(0, t1 - pt), L("s", "วิ"), UserInputService.KeyboardEnabled and L("   ·   N cam · Space pause · L close", "   ·   N มุม · Space หยุด · L ออก") or "")
 		pauseB.Text = paused and "▶" or "⏸"
 		slowB.Text = slow and "🐢 0.5x ✓" or "🐢 0.5x"
 		tag.TextTransparency = (os.clock() % 1.2) < 0.9 and 0 or 0.4
 	end)
 
+	if o.record then beginRecord() end
+
 	task.spawn(function()
 		while not ended and gui.Parent and Drive.current() == c do task.wait(0.1) end
+		-- stop the clip before the actors jump back to where they are now
+		if recOn then Capture.stop() end
 		inputConn:Disconnect()
 		RunService:UnbindFromRenderStep("GoDashReplay")
 		pcall(restore)
@@ -575,6 +657,16 @@ function Replay.start()
 		if processed or busy then return end
 		if input.KeyCode == Enum.KeyCode.L then Replay.instant() end
 	end)
+	-- QA hook (Studio only): Workspace QaKeepMoment = true keeps the last seconds as if something had just
+	-- happened, so client/ClipMode's "keep this moment" can be tried without staging a crash
+	if RunService:IsStudio() then
+		Workspace:GetAttributeChangedSignal("QaKeepMoment"):Connect(function()
+			if not Workspace:GetAttribute("QaKeepMoment") then return end
+			Workspace:SetAttribute("QaKeepMoment", nil)
+			local newest = count > 0 and buf[head]
+			if newest then Replay.keepEvent(newest.t - 2, "qa") end
+		end)
+	end
 end
 
 return Replay
