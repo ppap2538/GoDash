@@ -528,7 +528,9 @@ function Service.start(w, deps)
 	task.spawn(function()
 		local n = 0
 		while true do
-			task.wait(STEP)
+			-- (the real time since the last look: a busy server waits longer than STEP, and the jolt limits below are
+			-- accelerations over this span, not over a fixed quarter second)
+			local span = math.max(task.wait(STEP), STEP)
 			n += 1
 			for player, v in pairs(active) do
 				if not v.model.Parent or not v.chassis.Parent then
@@ -557,13 +559,33 @@ function Service.start(w, deps)
 						local dv = speed - v.lastSpeed
 						-- (2026-11-19, the food-spill meter: client/Spill) a hard corner and a big bump shake the order
 						-- too, not only hard braking and flooring it: the sideways part of the change of velocity in
-						-- this quarter second (> 13 studs/s = about 1.5 g) and a jump in the vertical speed (kerbs, potholes)
-						local lastVel = v.lastVel or vel
+						-- this quarter second and a jump in the vertical speed (kerbs, potholes); the limits are below
+						-- (a velocity from before the rider got off is no reference: compare only with the last look)
+						local fresh = v.lastVel ~= nil and os.clock() - (v.lastVelAt or 0) < span + 0.3
+						local lastVel = fresh and v.lastVel or vel
+						if not fresh then dv = 0 end
 						local dFlat = Vector3.new(vel.X - lastVel.X, 0, vel.Z - lastVel.Z).Magnitude
 						local sideways = math.sqrt(math.max(0, dFlat * dFlat - dv * dv))
 						local bumpY = math.abs(vel.Y - lastVel.Y)
 						v.lastVel = vel
-						if dv < -24 then
+						v.lastVelAt = os.clock()
+						-- (later 2026-11-19, owner: "ยังไม่ขับชนอะไรเลยแต่...เสียหายแล้ว" with the order at 21 %): the fixed limits
+						-- (10 studs/s along, 13 sideways per quarter second) sat below what the vehicle does when ridden
+						-- normally: the steering allows 2 g (2.6 g in the easy style) and S is a full brake on a keyboard, so
+						-- every full-lock corner above ~25 km/h and every stop from speed counted as a jolt. A jolt is now only
+						-- what the vehicle's own controls can't do: brake + handbrake together, a kerb, a pothole, a knock.
+						-- (Studio, Sabai 110: a full brake from 40 lost up to 12.2 studs/s a quarter second, a full-lock swerve
+						-- at 30 up to 16 sideways; the limits for that bike are 14.4 and 23.1)
+						local st = v.stats
+						local roll = 0.1 * math.max(speed, v.lastSpeed) + 2 -- rolling resistance and air at the faster end
+						local brakeCap = (st.brake * 1.12 + roll) * span + 2.5 -- a full press of the brake (easy style 1.12x)
+						local gasCap = st.accel * 1.18 * span + 2.5 -- flat out with the boost
+						local turnCap = 35 * 2.0 * 1.3 * (st.grip / 10.5) * span + 2.5 -- the tightest corner the steering allows (Drive LAT_G x easy)
+						local hardLon = dv < -brakeCap or dv > gasCap
+						local hardTurn = sideways > turnCap and speed > 15
+						-- a crash: more than brake + handbrake can stop it (a fast car's emergency stop is not a wall)
+						local crashCap = math.max(24, (st.brake * 1.72 + roll) * span + 4)
+						if dv < -crashCap then
 							-- a wall, not a brake pedal
 							v.tele.crashes += 1
 							v.owned.condition = math.max(5, v.owned.condition - math.min(18, -dv / 3) / v.stats.crashResist)
@@ -571,11 +593,11 @@ function Service.start(w, deps)
 							if v.model:GetAttribute("Cargo") then v.model:SetAttribute("CargoDrop", workspace:GetServerTimeNow()); countDay(player, "drops") end
 							countDay(player, "crashes")
 							Net.fire(player, "Notify", "crash", { damage = true, crashes = v.tele.crashes })
-						elseif (math.abs(dv) > 10 or (sideways > 13 and speed > 15) or bumpY > 9) and os.clock() - v.harshAt > 1.2 then
+						elseif (hardLon or hardTurn or bumpY > 9) and os.clock() - v.harshAt > 1.2 then
 							v.tele.harsh += 1
 							v.harshAt = os.clock()
 							countDay(player, "harsh")
-							local kind = math.abs(dv) > 10 and (dv < 0 and "brake" or "gas") or (sideways > 13 and "turn" or "bump")
+							local kind = hardLon and (dv < 0 and "brake" or "gas") or (hardTurn and "turn" or "bump")
 							Net.fire(player, "Notify", "harsh", { kind = kind, harsh = v.tele.harsh, crashes = v.tele.crashes })
 						end
 						if n % 2 == 0 then sync(v) end
