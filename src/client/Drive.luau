@@ -433,6 +433,8 @@ local function step(dt: number)
 	local braking = false
 
 	c.contacts = c.contacts or {}
+	-- walking a two-wheeler round at a standstill (the turn itself is set after the wheels, see "walks the bike")
+	local shuffle = c.def.class == "bike" and math.abs(speedF) < 3 and math.abs(steerIn) > 0.3 and not handbrake and not State.cutscene
 	for i = 1, n do
 		local lp = c.wheels[i]
 		local origin = cf:PointToWorldSpace(Vector3.new(lp.X, 0, lp.Z))
@@ -471,6 +473,7 @@ local function step(dt: number)
 			local gripRate = stats.grip * gripMult
 			if handbrake and not front then gripRate *= 0.3 end
 			local latF = -lat * share * gripRate
+			if shuffle then latF *= 0.12 end -- (walking the bike round on the spot: the tyres slide round, see below)
 			local limit = share * GRAVITY * (assist and 1.9 or 1.5) * gripMult * style.lat
 			if math.abs(latF) > limit then
 				slip += math.abs(latF) - limit
@@ -534,6 +537,15 @@ local function step(dt: number)
 			local lv = chassis.AssemblyLinearVelocity
 			chassis.AssemblyLinearVelocity = lv - right * (lv:Dot(right) * math.min(1, dt * 4 * style.slide))
 		end
+	end
+
+	-- (2026-11-19, owner: "drove into a back yard, hit a tree, then it was stuck") at a standstill a rider walks the
+	-- bike round with their feet: steering while (almost) stopped turns a two-wheeler on the spot, slowly, so a tight
+	-- yard or a nose against a wall can be backed out of. (Moving, the steering works as before.)
+	if shuffle and grounded > 0 then
+		local av = chassis.AssemblyAngularVelocity
+		local want = -math.sign(steerIn) * 1.25 -- rad/s; right (steer > 0) turns the nose right, as the assist does when moving
+		chassis.AssemblyAngularVelocity = av + up * ((want - av:Dot(up)) * math.min(1, dt * 6))
 	end
 
 	-- flipped over? set it back on its wheels
