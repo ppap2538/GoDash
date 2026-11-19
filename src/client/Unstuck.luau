@@ -94,7 +94,12 @@ function Unstuck.start()
 		if roadAcc >= 1 then
 			roadAcc = 0
 			local graph = GPS.graph()
-			local e, _, _, dist = graph and graph:nearest(c.chassis.Position)
+			-- (not `graph and graph:nearest(...)`: an `and` keeps only the first value, so dist came back nil)
+			local e, dist = nil, math.huge
+			if graph then
+				local e1, _, _, d1 = graph:nearest(c.chassis.Position)
+				e, dist = e1, d1 or math.huge
+			end
 			local half = e and ((e.def and e.def.width or 16) / 2 + 9) or 1e9
 			if e and dist > half and speed < 6 then offFor += 1 else offFor = 0 end
 		end

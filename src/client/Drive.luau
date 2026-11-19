@@ -67,10 +67,14 @@ local ROUGH = {
 --   normal = the 2026-11-19 tuning
 --   real   = less grip (brake before a corner), slower keys, the tail slides more
 -- Until the rider picks: easy on touch screens, normal on a keyboard.
+-- 2026-11-19 (owner: "การบังคับยังยาก ... ตอบสนองเร็วมาก", the steering reacts far too fast): turnMax caps how fast
+-- the vehicle may swing round (rad/s). The grip limit alone allowed 3-4.5 rad/s at 15-25 km/h, so a tap of A/D
+-- at town speed flicked the nose 30-40°. The cap only bites below ~35 km/h; faster, the grip limit is lower
+-- anyway, so the junction turn at 50 km/h is as tight as before.
 local STYLE = {
-	easy = { lat = 1.3, rate = 1.3, yaw = 11, slide = 1.25, brake = 1.12 },
-	normal = { lat = 1, rate = 1, yaw = 8, slide = 1, brake = 1 },
-	real = { lat = 0.82, rate = 0.85, yaw = 4.5, slide = 0.8, brake = 1 },
+	easy = { lat = 1.3, rate = 1.1, yaw = 11, slide = 1.25, brake = 1.12, turnMax = 2.3 },
+	normal = { lat = 1, rate = 1, yaw = 8, slide = 1, brake = 1, turnMax = 2.1 },
+	real = { lat = 0.82, rate = 0.85, yaw = 4.5, slide = 0.8, brake = 1, turnMax = 1.9 },
 }
 local touchDefault = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
 local function styleNow()
@@ -81,9 +85,12 @@ end
 Drive.styleNow = styleNow
 
 local function maxSteer(c, speedF: number, gripMult: number?): number
-	local aLat = 35 * LAT_G * (c.stats.grip / 10.5) * (gripMult or 1) * styleNow().lat
+	local style = styleNow()
+	local aLat = 35 * LAT_G * (c.stats.grip / 10.5) * (gripMult or 1) * style.lat
 	local v = math.abs(speedF)
-	return math.min(math.rad(c.def.steer), math.atan(c.wheelbase * aLat / math.max(v * v, 1)))
+	-- yaw rate = v·tan(steer)/wheelbase: keep it under the grip (aLat / v) and under the style's turnMax
+	local turn = math.min(aLat / math.max(v, 1), style.turnMax)
+	return math.min(math.rad(c.def.steer), math.atan(c.wheelbase * turn / math.max(v, 1)))
 end
 Drive.maxSteer = maxSteer
 
@@ -329,10 +336,15 @@ local function step(dt: number)
 	-- (2026-11-19: at speed the key took ~0.55 s to reach full lock, ~0.8 s with the smoothing after it: the
 	-- turn came late, then overshot, and riders zig-zagged correcting it. Now ~0.3 s; the lock itself
 	-- is still limited by the grip at that speed, so a tap is still only a nudge.)
-	local rate = analogue and 12 or (towardZero and 9 or (6 - 2.6 * fracNow) * styleNow().rate)
+	-- (later 2026-11-19, owner: "ตอบสนองเร็วมาก"): a key now takes ~0.25 s to full lock in town, ~0.4 s at top speed,
+	-- through a curve, so the first moment of a press is only a nudge and holding it builds to the full turn.
+	-- Letting go still centres at once (9/s), which is what stops the late-turn zig-zag.
+	if steerIn ~= 0 then c.steerKeys = not analogue and t.steer == 0 end
+	local rate = analogue and 8 or (towardZero and 9 or (4 - 1.6 * fracNow) * styleNow().rate)
 	local dCmd = steerIn - c.steerCmd
 	c.steerCmd += math.clamp(dCmd, -rate * dt, rate * dt)
 	steerIn = c.steerCmd
+	if c.steerKeys and steerIn ~= 0 then steerIn = math.sign(steerIn) * math.abs(steerIn) ^ 1.5 end
 	-- lane assist: a gentle pull to the middle of your lane while you barely steer (client/LaneAssist)
 	if Drive.laneAssist and math.abs(steerIn) < 0.08 and not handbrake and not Drive.info.auto then
 		local ok, corr = pcall(Drive.laneAssist, c, { cf = cf, fwd = fwd, right = right, speedF = speedF, dt = dt, maxAngle = maxSteer(c, speedF),

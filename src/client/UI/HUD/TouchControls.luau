@@ -81,8 +81,9 @@ function Touch.build(stage: Frame)
 		local half = pad.AbsoluteSize.X / 2
 		local k = math.clamp((x - originX) / (half * 0.86), -1, 1)
 		if math.abs(k) < DEAD then k = 0 else k = (k - DEAD * math.sign(k)) / (1 - DEAD) end
-		-- a little curve: fine control near the middle, full lock still at the end
-		t.steer = math.sign(k) * math.abs(k) ^ 1.35
+		-- a curve: fine control near the middle, full lock still at the end (1.35 -> 1.6 on 2026-11-19, owner: the
+		-- steering reacts too fast)
+		t.steer = math.sign(k) * math.abs(k) ^ 1.6
 		local s = math.max(0.1, pad.AbsoluteSize.X / PAD_W) -- screen px per layout px
 		knob.Position = UDim2.new(0.5, k * (half / s - (PAD_H - 26) / 2 - 4), 0.5, 0)
 	end
