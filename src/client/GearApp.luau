@@ -15,8 +15,9 @@ local TEAL = Color3.fromRGB(16, 130, 120)
 
 local SLOTS = {
 	{ id = "bag", en = "DELIVERY BAGS", th = "กระเป๋าส่งอาหาร" },
-	{ id = "helmet", en = "HELMETS", th = "หมวกกันน็อก" },
 }
+-- (helmets were taken out of the game 2026-11-19: Config/Gear.HELMETS = false)
+if Gear.HELMETS then table.insert(SLOTS, { id = "helmet", en = "HELMETS", th = "หมวกกันน็อก" }) end
 
 local function screen()
 	local ui = Phone.ui

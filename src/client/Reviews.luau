@@ -20,11 +20,16 @@ local seen = 0 -- reviews counted when the app was last opened (for the red dot)
 
 -- what customers write, per tag (a few ways each; the review's seed picks one)
 local SAY = {
-	fast = { { "Super fast! Arrived before I even put my phone down.", "ไวมากกก วางโทรศัพท์ยังไม่ทันก็มาถึงแล้ว" }, { "Lightning delivery, thank you!", "ส่งไวทันใจ ขอบคุณค่ะ" } },
+	fast = { { "Super fast! Arrived before I even put my phone down.", "ไวมากกก วางโทรศัพท์ยังไม่ทันก็มาถึงแล้ว" }, { "Lightning delivery, thank you!", "ส่งไวทันใจ ขอบคุณค่ะ" },
+		{ "Did you teleport? Be honest.", "วาร์ปมาใช่ไหม บอกมาตามตรง" }, { "Faster than my ex replying to my messages.", "ไวกว่าแฟนเก่าตอบแชทอีก" } },
 	hot = { { "The food was still hot. 10/10.", "อาหารยังร้อนอยู่เลย ให้สิบเต็มสิบ" }, { "Arrived steaming, soup not spilled at all.", "ร้อนๆ น้ำซุปไม่หกสักหยด" } },
-	great = { { "Polite rider, smooth and on time. Will order again.", "ไรเดอร์สุภาพ ขับนุ่ม ตรงเวลา จะสั่งอีกแน่นอน" }, { "Perfect. Have a five-star day!", "เพอร์เฟกต์ ขอให้วันนี้เป็นวันห้าดาวนะ" } },
+	great = { { "Polite rider, smooth and on time. Will order again.", "ไรเดอร์สุภาพ ขับนุ่ม ตรงเวลา จะสั่งอีกแน่นอน" }, { "Perfect. Have a five-star day!", "เพอร์เฟกต์ ขอให้วันนี้เป็นวันห้าดาวนะ" },
+		{ "My mum wants to adopt this rider.", "แม่ฉันอยากรับไรเดอร์คนนี้เป็นลูกบุญธรรม" }, { "10/10 would get hungry again.", "สิบเต็มสิบ จะหิวอีกเพื่อสั่งคนนี้" } },
 	ok = { { "Fine. Nothing special.", "โอเค ไม่มีอะไรพิเศษ" }, { "Got it. Thanks.", "ได้ของแล้ว ขอบคุณ" } },
-	late = { { "A bit late, the noodles got soggy.", "มาช้าไปหน่อย เส้นอืดแล้ว" }, { "Took longer than the app said.", "นานกว่าที่แอปบอกนะ" } },
+	late = { { "A bit late, the noodles got soggy.", "มาช้าไปหน่อย เส้นอืดแล้ว" }, { "Took longer than the app said.", "นานกว่าที่แอปบอกนะ" },
+		{ "My noodles grew into a whole new dish on the way.", "เส้นอืดจนกลายเป็นเมนูใหม่ไปแล้ว" } },
+	-- (2026-11-19) a soi dog got the rider on the way
+	dog = { { "The rider arrived with a soi dog fan club behind them.", "ไรเดอร์มาพร้อมแฟนคลับหมาซอยวิ่งตามมาเป็นขบวน" }, { "I heard the barking before I saw the bike. Still five stars.", "ได้ยินเสียงหมาเห่าก่อนเห็นรถอีก แต่ให้ห้าดาว" } },
 	verylate = { { "Way too late. I nearly cooked something myself.", "ช้ามากกก เกือบจะลุกไปทำกับข้าวเองแล้ว" }, { "My food arrived cold. Please hurry next time.", "อาหารเย็นชืดหมดแล้ว คราวหน้ารีบหน่อยนะ" } },
 	bumpy = { { "The bag looked like it went through a storm.", "ถุงมาสภาพเหมือนผ่านพายุมา" }, { "Rode like a race, everything shook loose.", "ขี่อย่างกับแข่ง ของในถุงกระจายหมด" } },
 	spilled = { { "The soup spilled all over the bag!", "น้ำแกงหกเลอะทั้งถุงเลย!" }, { "Fragile order, rough ride. Half of it broke.", "ของแตกง่ายแต่ขี่โหด เสียหายไปครึ่งนึง" } },
@@ -32,6 +37,10 @@ local SAY = {
 	comfy = { { "So smooth I nearly fell asleep.", "ขี่นุ่มมาก เกือบหลับเลย" }, { "Comfortable ride, nice and careful.", "นั่งสบาย ขับระวังดีมาก" } },
 	crash = { { "We crashed on the way. Are you OK?!", "ชนระหว่างทางด้วย เป็นอะไรไหมเนี่ย!" }, { "My order arrived... after a crash.", "ของมาถึงนะ... หลังจากชนมาแล้ว" } },
 	redlight = { { "Ran a red light. Please be careful!", "ฝ่าไฟแดงด้วย ระวังหน่อยนะ!" }, { "Fast, but the red light was red, you know.", "ไวก็ไวแหละ แต่ไฟแดงก็คือแดงนะ" } },
+	-- (2026-11-19) the big loads (Jobs.BIGLOADS)
+	bigload = { { "A whole fridge on a motorbike?! Legend.", "ขนตู้เย็นมากับมอไซค์?! ตำนานชัดๆ" }, { "I filmed the whole thing. Going viral tonight.", "อัดคลิปไว้หมดแล้ว คืนนี้ไวรัลแน่นอน" },
+		{ "The neighbours came out to clap. Five stars.", "เพื่อนบ้านออกมาปรบมือกันเลย ห้าดาวไปเลย" } },
+	dropped = { { "It arrived... with a dent and a story.", "ของมาถึงนะ... พร้อมรอยบุบและเรื่องเล่า" }, { "Saw it bounce down the road. Five stars for the show though.", "เห็นมันกลิ้งกลางถนนเลย แต่ให้คะแนนความบันเทิงเต็ม" } },
 }
 -- the advice for the most common complaints
 local FIX = {
@@ -42,8 +51,9 @@ local FIX = {
 	rough = { "🧍 Passengers felt unsafe: brake earlier and corner gently.", "🧍 ผู้โดยสารไม่สบายใจ: เบรกก่อนถึง เข้าโค้งช้าๆ" },
 	crash = { "💥 Crashes cost stars, money and injuries: keep your distance.", "💥 ชนบ่อย เสียทั้งดาว เงิน และบาดเจ็บ: เว้นระยะห่างหน่อย" },
 	redlight = { "🚦 Red lights: stop at red (left on red is OK).", "🚦 ไฟแดง: หยุดรอ (เลี้ยวซ้ายผ่านตลอดได้)" },
+	dropped = { "📦 Big loads: brake early and ride gently, or it falls off.", "📦 ของชิ้นใหญ่: เบรกล่วงหน้า ขี่นุ่มๆ ไม่งั้นของตก" },
 }
-local BAD = { late = 1, verylate = 2, bumpy = 1, spilled = 2, rough = 1, crash = 2, redlight = 1 }
+local BAD = { late = 1, verylate = 2, bumpy = 1, spilled = 2, rough = 1, crash = 2, redlight = 1, dropped = 2 }
 
 local function stars(s: number): string
 	local full = math.floor(s + 0.25)

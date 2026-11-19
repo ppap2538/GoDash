@@ -169,6 +169,16 @@ function Capture.save(video, cb: ((boolean) -> ())?)
 	if not ok and cb then cb(false) end
 end
 
+-- a screenshot with the GUI in it (client/Recap shares the day card): cb(capture or nil)
+function Capture.screenshot(cb: (any) -> ())
+	local ok = pcall(function()
+		CS:TakeScreenshotCaptureAsync(function(_result, shot)
+			cb(shot)
+		end, { UICaptureMode = Enum.UICaptureMode.All })
+	end)
+	if not ok then cb(nil) end
+end
+
 -- the device's share sheet (TikTok and the like), with an invite to the game where the device allows it;
 -- a device without a share sheet downloads the clip instead. cb(shared: boolean)
 function Capture.share(video, cb: ((boolean) -> ())?)

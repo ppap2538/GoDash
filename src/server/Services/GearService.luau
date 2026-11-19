@@ -88,7 +88,32 @@ function Service.helmetOn(player: Player)
 end
 
 function Service.start()
-	-- the helmet goes on when you sit on a bike, comes off when you get off
+	-- (2026-11-19, owner: "เอาหมวกกันนอคออกเลย") helmets left the game: a rider who paid for one gets the money back
+	-- once (the helmet comes off the profile; the silk souvenir was free, nothing to pay back)
+	if not Gear.HELMETS then
+		Data.onLoaded(function(player, d)
+			if type(d.gear) ~= "table" or type(d.gear.owned) ~= "table" then return end
+			local back = 0
+			for id, h in pairs(Gear.RETIRED_HELMETS) do
+				if d.gear.owned[id] then
+					d.gear.owned[id] = nil
+					if h.price > 0 then back += h.price end
+				end
+			end
+			if d.gear.helmet ~= nil or d.gear.helmetOff ~= nil then d.gear.helmet, d.gear.helmetOff = nil, nil end
+			Data.touch(player, "gear")
+			if back > 0 then
+				Economy.add(player, back, "helmet_refund")
+				task.delay(6, function()
+					if player.Parent then
+						require(ReplicatedStorage.Shared.Net).fire(player, "Notify", "toast",
+							{ text = ("🪖 Helmets are gone from the game: ฿%d back for yours"):format(back), th = ("🪖 เกมเอาหมวกกันน็อกออกแล้ว คืนเงินค่าหมวกให้ ฿%d"):format(back), good = true })
+					end
+				end)
+			end
+		end)
+	end
+	-- the helmet goes on when you sit on a bike, comes off when you get off (never, while Gear.HELMETS = false)
 	task.spawn(function()
 		while true do
 			task.wait(0.5)

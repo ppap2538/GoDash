@@ -18,6 +18,10 @@ Gear.ITEMS = {
 	{ id = "bag_pro", slot = "bag", icon = "🧳", price = 1200, keep = 2.6, steady = 0.7,
 		en = "Pro delivery box liner", th = "กล่องเก็บอุณหภูมิรุ่นโปร", enText = "Hot 2.6x as long, and the order sloshes less", thText = "ร้อนนานขึ้น 2.6 เท่า และน้ำซุปกระฉอกน้อยลง" },
 }
+-- (2026-11-19, owner: "เอาหมวกกันนอคออกเลย") helmets are gone from the game: nobody wears one, checkpoints don't
+-- fine for it, crashes hurt the same. The old list stays only so server/GearService can refund what riders paid.
+Gear.HELMETS = false
+Gear.RETIRED_HELMETS = {}
 for _, h in ipairs({
 	{ id = "helmet_half", price = 0, protect = 0.75, shape = "half", color = Color3.fromRGB(236, 236, 232), icon = "⛑",
 		en = "Half helmet (free)", th = "หมวกครึ่งใบ (แถมฟรี)", enText = "Comes with every rider", thText = "ไรเดอร์ทุกคนได้ฟรี" },
@@ -31,7 +35,7 @@ for _, h in ipairs({
 		en = "Gold rider helmet", th = "หมวกทองไรเดอร์", enText = "Shiny, and half the injury", thText = "เงาวับ ล้มแล้วเจ็บน้อยลงครึ่งหนึ่ง", shiny = true },
 }) do
 	h.slot = "helmet"
-	table.insert(Gear.ITEMS, h)
+	if Gear.HELMETS then table.insert(Gear.ITEMS, h) else Gear.RETIRED_HELMETS[h.id] = h end
 end
 Gear.DEFAULT_HELMET = "helmet_half"
 
@@ -50,7 +54,7 @@ end
 -- chose to ride without one (gear.helmetOff)
 function Gear.worn(gear, slot: string)
 	local t = type(gear) == "table" and gear or {}
-	if slot == "helmet" and t.helmetOff then return nil end
+	if slot == "helmet" and (t.helmetOff or not Gear.HELMETS) then return nil end
 	local id = t[slot]
 	local g = id and Gear.BY_ID[id]
 	if g and Gear.owns(t, id) then return g end

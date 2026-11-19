@@ -21,14 +21,35 @@ local last = {} :: { [Player]: number }
 Service.PED = { base = 120, perSpeed = 5, cap = 450 } -- hospital bill: ~฿165 at 9 studs/s, ฿450 from ~66
 Service.CAR = { base = 80, perSpeed = 5, cap = 600 } -- repair bill: ~฿180 at 20, ~฿355 at 55, ฿600 from ~104
 Service.SHARE = 0.25
+-- (2026-11-19, viral pack) the fake-injury scammer (client/Accident): someone throws themselves at a slow bike,
+-- the CCTV replay shows no hit, and they pay the rider for the trouble. People live only on the clients, so the
+-- server can't check it: a small sum, at most SCAM_DAY a real day and one a minute.
+Service.SCAM = { min = 80, max = 150 }
+Service.SCAM_DAY = 3
+local lastScam = {} :: { [Player]: number }
+
+local function scam(player: Player, d)
+	if os.clock() - (lastScam[player] or -1e9) < 60 then return false, "" end
+	lastScam[player] = os.clock()
+	local Economy = require(script.Parent.EconomyService)
+	Economy.rollDay(d)
+	local n = tonumber(d.daily.scams) or 0
+	if n >= Service.SCAM_DAY then return true, "", { scam = true, amount = 0 } end
+	d.daily.scams = n + 1
+	local amount = math.random(Service.SCAM.min // 10, Service.SCAM.max // 10) * 10
+	Economy.add(player, amount, "scam_caught")
+	Data.touch(player, "daily")
+	return true, "", { scam = true, amount = amount }
+end
 
 function Service.start()
-	game:GetService("Players").PlayerRemoving:Connect(function(p) last[p] = nil end)
+	game:GetService("Players").PlayerRemoving:Connect(function(p) last[p] = nil; lastScam[p] = nil end)
 	City.register("accident", function(player, arg)
 		local d = Data.get(player)
 		if not d or type(arg) ~= "string" then return false, "" end
 		local kind, s = arg:match("^(%a+):(%d+)$")
 		local speed = tonumber(s)
+		if kind == "scam" and speed then return scam(player, d) end
 		if (kind ~= "ped" and kind ~= "car") or not speed then return false, "" end
 		if os.clock() - (last[player] or -1e9) < 15 then return false, "" end
 		last[player] = os.clock()

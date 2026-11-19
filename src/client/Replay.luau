@@ -80,6 +80,7 @@ end
 -- The last accident, red light or crossing fine, kept for "keep this moment" (client/ClipMode offers to record it
 -- once the scene is over): the seconds before it and just after, copied while they are still in the ring.
 Replay.lastEvent = nil
+Replay.moments = {} -- this session's kept moments, newest first (at most 6): client/Recap's highlight reel
 local kept = Instance.new("BindableEvent")
 -- fires with no arguments: read Replay.lastEvent (a BindableEvent copies a table it carries, and the samples
 -- must stay the very same tables, people and cars)
@@ -88,6 +89,8 @@ function Replay.keepEvent(hitAt: number, kind: string?)
 	local samples = Replay.take(hitAt - 6.5, hitAt + 1.8)
 	if #samples < 30 then return end
 	Replay.lastEvent = { samples = samples, hitAt = hitAt, kind = kind, model = samples[#samples].model, at = os.clock() }
+	table.insert(Replay.moments, 1, Replay.lastEvent)
+	while #Replay.moments > 6 do table.remove(Replay.moments) end
 	kept:Fire()
 end
 
@@ -400,7 +403,11 @@ local CAMS = {
 --   record   = record it as a clip with client/Capture: it plays once from the start, then the clip is offered to
 --              save or share (client/ClipMode's done card); a device that can't record just loops it as usual
 --   director = the camera cuts by itself: chase, then the TV angle in slow motion round hitAt
+--   external = someone else runs the capture (client/Recap's highlight reel): play once, no ⏺, onDone() at the end
+--   chain    = another replay follows at once: leave the HUD hidden and the camera alone (the last one restores all)
 -- In clip mode the panel also has ⏺: the same replay again from the start, recorded.
+local chainedHuds = {} :: { ScreenGui }
+function Replay.isBusy(): boolean return busy end
 function Replay.instant(opts: { [string]: any }?)
 	local o = opts or {}
 	if busy or State.cutscene then return end
@@ -508,7 +515,7 @@ function Replay.instant(opts: { [string]: any }?)
 	local lastId = ""
 	-- recording (client/Capture): once = play it through one time and close; waiting = the device is still
 	-- answering (the first frame stands still meanwhile, so the clip starts clean); recOn = it is recording
-	local once, waiting, recOn = false, false, false
+	local once, waiting, recOn = o.external == true, false, false
 	local function camName() return L(CAMS[camI].en, CAMS[camI].th) end
 	local function setCam(i: number)
 		camI = (i - 1) % #CAMS + 1
@@ -543,9 +550,10 @@ function Replay.instant(opts: { [string]: any }?)
 			end
 		end)
 	end
-	if clipOn and Capture.available() then
+	if clipOn and Capture.available() and not o.external then
 		btn("⏺ " .. L("Rec", "อัด"), 76, beginRecord, Color3.fromRGB(200, 30, 40))
 	end
+	if o.external and bar < 230 then panel.Visible = false end -- (the reel is being recorded: nothing over the picture)
 
 	local inputConn = UserInputService.InputBegan:Connect(function(input, processed)
 		if processed then return end
@@ -617,7 +625,7 @@ function Replay.instant(opts: { [string]: any }?)
 		cam.CFrame = CFrame.lookAt(camPos :: Vector3, look)
 		cam.FieldOfView = fov
 		prog.Size = UDim2.fromScale(math.clamp((pt - t0) / math.max(t1 - t0, 0.1), 0, 1), 1)
-		info.Text = ("%s🎥 %s   ·   -%.1f %s%s"):format(recOn and "🔴 REC   " or (waiting and "⏳ " or ""), o.director and hitAt and L("Auto", "อัตโนมัติ") or camName(),
+		info.Text = ("%s🎥 %s   ·   -%.1f %s%s"):format((recOn or (o.external and Capture.state == "rec")) and "🔴 REC   " or (waiting and "⏳ " or ""), o.director and hitAt and L("Auto", "อัตโนมัติ") or camName(),
 			math.max(0, t1 - pt), L("s", "วิ"), UserInputService.KeyboardEnabled and L("   ·   N cam · Space pause · L close", "   ·   N มุม · Space หยุด · L ออก") or "")
 		pauseB.Text = paused and "▶" or "⏸"
 		slowB.Text = slow and "🐢 0.5x ✓" or "🐢 0.5x"
@@ -634,11 +642,19 @@ function Replay.instant(opts: { [string]: any }?)
 		RunService:UnbindFromRenderStep("GoDashReplay")
 		pcall(restore)
 		gui:Destroy()
-		for _, g in ipairs(huds) do if g.Parent then g.Enabled = true end end
-		cam.FieldOfView = oldFov
-		cam.CameraType = Enum.CameraType.Custom
+		if o.chain then
+			-- another replay follows at once: the HUD stays hidden, the camera stays where it is
+			for _, g in ipairs(huds) do table.insert(chainedHuds, g) end
+		else
+			for _, g in ipairs(huds) do if g.Parent then g.Enabled = true end end
+			for _, g in ipairs(chainedHuds) do if g.Parent then g.Enabled = true end end
+			cam.FieldOfView = #chainedHuds > 0 and 70 or oldFov
+			table.clear(chainedHuds)
+			cam.CameraType = Enum.CameraType.Custom
+		end
 		State.cutscene = false
 		busy = false
+		if o.onDone then task.spawn(o.onDone, ended) end
 	end)
 end
 

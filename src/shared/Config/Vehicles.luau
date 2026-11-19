@@ -96,7 +96,7 @@ Vehicles.PAINT_PRICE = 250
 
 -- Styling ("แต่งซิ่ง", 2026-11-17 growth plan): looks only, no driving numbers. Bought in the phone's
 -- Styling app; going back to "none" / the standard horn is free. owned.style = { glow, plate, sticker, horn }.
-Vehicles.STYLE_PRICES = { glow = 1500, plate = 800, sticker = 500, horn = 300, exhaust = 800 }
+Vehicles.STYLE_PRICES = { glow = 1500, plate = 800, sticker = 500, horn = 300, exhaust = 800, box = 600 }
 Vehicles.GLOWS = {
 	{ name = "Neon Green", thai = "เขียวนีออน", color = Color3.fromRGB(40, 255, 120) },
 	{ name = "Ice Blue", thai = "ฟ้าน้ำแข็ง", color = Color3.fromRGB(60, 190, 255) },
@@ -140,6 +140,20 @@ Vehicles.HORNS = {
 	-- 2026-11-19 (TikTok toys: more horns)
 	{ name = "Tuk-tuk", thai = "ตุ๊กตุ๊ก", pitch = 1.9 },
 	{ name = "Little tune", thai = "แตรเพลง", pitch = 1 },
+	-- 2026-11-19 (viral pack) tune horns: { pitch, at seconds } played on the horn sound (client/EngineSound, Styling)
+	-- La Cucaracha is a traditional folk tune (public domain); the other two are our own
+	{ name = "La Cucaracha", thai = "ลาคูคาราชา", tune = { { 1, 0 }, { 1, 0.13 }, { 1, 0.26 }, { 1.335, 0.42 }, { 1.682, 0.62 },
+		{ 1, 0.95 }, { 1, 1.08 }, { 1, 1.21 }, { 1.335, 1.37 }, { 1.682, 1.57 } } },
+	{ name = "Isan bounce", thai = "แตรอีสานเด้งๆ", tune = { { 1, 0 }, { 1.125, 0.14 }, { 1.5, 0.28 }, { 1.335, 0.42 }, { 1.125, 0.56 }, { 1.5, 0.7 }, { 2, 0.9 } } },
+	{ name = "Duck", thai = "เป็ดก๊าบๆ", tune = { { 2.3, 0, 0.5 }, { 2.05, 0.15, 0.5 } } },
+}
+-- delivery-box skins (2026-11-19, viral pack): two-wheelers' box or bag (server/World/VehicleFactory.style). Made-up looks.
+Vehicles.BOXES = {
+	{ name = "Watermelon", thai = "แตงโม", icon = "🍉", color = Color3.fromRGB(52, 150, 64), lid = Color3.fromRGB(36, 112, 48), stripes = Color3.fromRGB(28, 90, 40) },
+	{ name = "Ginger cat", thai = "แมวส้ม", icon = "🐱", color = Color3.fromRGB(236, 150, 70), lid = Color3.fromRGB(236, 150, 70), cat = true },
+	{ name = "Pha khao ma plaid", thai = "ลายผ้าขาวม้า", icon = "🟥", color = Color3.fromRGB(196, 46, 60), lid = Color3.fromRGB(196, 46, 60), plaid = true },
+	{ name = "Shark", thai = "ฉลาม", icon = "🦈", color = Color3.fromRGB(110, 128, 146), lid = Color3.fromRGB(110, 128, 146), shark = true },
+	{ name = "Pastel pink", thai = "ชมพูพาสเทล", icon = "🌸", color = Color3.fromRGB(250, 180, 204), lid = Color3.fromRGB(255, 214, 228) },
 }
 Vehicles.PLATE_MAX = 8 -- characters on a custom plate (Thai letters, A-Z, digits, space, dash)
 -- The plate everyone gets until they buy their own: two Thai letters and a number from the user id.
@@ -152,6 +166,8 @@ end
 -- text others see): a word from this list and a number 1-999 ("ซิ่ง 99"). Plates bought before stay.
 Vehicles.PLATE_WORDS = {
 	"ซิ่ง", "แซ่บ", "เท่", "ไว", "เฮง", "รวย", "ปัง", "ชิล", "หล่อ", "สวย", "GO", "KK", "FAST", "RIDE", "ISAN", "COOL",
+	-- 2026-11-19 (viral pack) more words people grin at in a clip
+	"หิว", "ส่งไว", "ขอทาง", "สายบุญ", "เด็กแว้น", "ลุยๆ", "มาแล้ว", "รอแป๊บ", "ใจเย็น", "แม่ห่วง", "LOL", "VIRAL",
 }
 for _, l in ipairs(PLATE_LETTERS) do table.insert(Vehicles.PLATE_WORDS, l) end
 Vehicles.PLATE_LUCKY = { 9, 99, 168, 555, 789, 999 }

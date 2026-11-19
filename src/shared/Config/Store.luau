@@ -41,6 +41,21 @@ Store.CODES = {
 	LOY2569 = { money = 2000, seasonXp = 100, ends = "2026-12-07" }, -- the Loy Krathong teaser
 	PHEE = { money = 1313, ends = "2026-12-31" }, -- the ghost + Haunted Night Radio 13.13 clip
 	TIKTOK = { money = 1500, item = "milk_tea", qty = 2, ends = "2027-06-30" }, -- the profile bio / every clip
+	-- the viral pack (2026-11-19): in-game clips, absurd cargo, the fake-injury scammer
+	CLIP = { money = 1200, ends = "2027-06-30" }, -- the "record clips in the game" clip
+	BIGLOAD = { money = 1800, ends = "2027-06-30" }, -- the absurd cargo clip
+	JABPO = { money = 1500, ends = "2027-06-30" }, -- the scammer caught on CCTV clip (จับโป๊ะ)
+}
+
+---------------------------------------------------------------------------------------------------
+-- creator codes (2026-11-19): a content creator gets their own code; a rider types it in the same box to
+-- support them, once per rider (d.creator), and gets a welcome gift. StoreService counts the uses per
+-- creator (OrderedDataStore GoDash_Creators) and the owner code CREATORS shows the top ten, so the owner can
+-- thank the creators who bring riders in. To add a creator: one line, CODE = { name = "their name" }.
+---------------------------------------------------------------------------------------------------
+Store.CREATOR_GIFT = 1000
+Store.CREATORS = {
+	GODASHTH = { name = "GoDash Official" },
 }
 
 ---------------------------------------------------------------------------------------------------

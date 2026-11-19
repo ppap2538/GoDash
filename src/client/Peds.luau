@@ -1096,7 +1096,8 @@ function Peds.near(pos: Vector3, r: number)
 	local out = {}
 	local now = os.clock()
 	for _, p in ipairs(all) do
-		if p.active and p.pos and p.model and not p.scripted then
+		-- (a scammer, client/Accident, is borrowed but still recorded: the CCTV replay must show them jumping in)
+		if p.active and p.pos and p.model and (not p.scripted or p.scam) then
 			local dx, dz = p.pos.X - pos.X, p.pos.Z - pos.Z
 			if dx * dx + dz * dz < r * r then
 				table.insert(out, { p = p, pos = p.pos, look = p.look, down = p.downUntil ~= nil and now < p.downUntil })

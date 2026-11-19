@@ -10,6 +10,8 @@
 local Players = game:GetService("Players")
 local MarketplaceService = game:GetService("MarketplaceService")
 local BadgeService = game:GetService("BadgeService")
+local DataStoreService = game:GetService("DataStoreService")
+local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage.Shared
 local Store = require(Shared.Config.Store)
@@ -200,6 +202,33 @@ function Service.ownerCode(code: string, fn: (Player) -> (boolean, string))
 	ownerCodes[code:upper()] = fn
 end
 
+-- creator codes (Config/Store.CREATORS): uses per creator, counted for good in an ordered data store
+local creatorStore = DataStoreService:GetOrderedDataStore("GoDash_Creators" .. (RunService:IsStudio() and "_Studio" or ""))
+
+local function supportCreator(player: Player, d, code: string)
+	local who = Store.CREATORS[code]
+	-- (fixed messages: client/Lang translates whole strings)
+	if type(d.creator) == "string" and d.creator ~= "" then return false, "You already support a creator" end
+	d.creator = code
+	Data.touch(player, "creator")
+	Economy.add(player, Store.CREATOR_GIFT, "creator:" .. code)
+	Metrics.event(player, "Creator " .. code)
+	task.spawn(function()
+		pcall(function() creatorStore:IncrementAsync(code, 1) end)
+	end)
+	Net.fire(player, "Reward", { title = "💜 " .. who.name, money = Store.CREATOR_GIFT })
+	return true, "Thanks for supporting a creator!"
+end
+
+-- owner code CREATORS: the top ten creator codes by riders who used them
+local function creatorBoard(): (boolean, string)
+	local ok, pages = pcall(function() return creatorStore:GetSortedAsync(false, 10) end)
+	if not ok or not pages then return false, "The creator board is busy, try again" end
+	local out = {}
+	for _, e in ipairs(pages:GetCurrentPage()) do table.insert(out, ("%s %d"):format(e.key, e.value)) end
+	return true, #out > 0 and table.concat(out, " · ") or "No creator codes used yet"
+end
+
 local function redeem(player: Player, raw: string?)
 	local d = Data.get(player)
 	if not d or type(raw) ~= "string" then return false, "Bad request" end
@@ -207,6 +236,7 @@ local function redeem(player: Player, raw: string?)
 	if ownerCodes[code] and Service.isOwner(player) then
 		return ownerCodes[code](player)
 	end
+	if Store.CREATORS[code] then return supportCreator(player, d, code) end
 	local def = Store.CODES[code]
 	if not def then return false, "That code doesn't exist" end
 	local today = tonumber(os.date("!%Y%m%d", os.time() + 7 * 3600))
@@ -255,6 +285,7 @@ function Service.start()
 		if player.Character then task.delay(1, Service.refreshTag, player) end
 	end)
 	City.register("code", redeem)
+	Service.ownerCode("CREATORS", creatorBoard)
 	City.register("news_seen", function(player, version)
 		local d = Data.get(player)
 		if not d or type(version) ~= "string" or #version > 20 then return false, "" end

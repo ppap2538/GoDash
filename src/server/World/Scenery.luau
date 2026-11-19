@@ -306,6 +306,8 @@ function S.tree(parent: Instance, base: CFrame, rng: Random, kind: string?, opts
 		local flat = CFrame.new(base.Position) * CFrame.Angles(0, rad(rng:NextNumber(0, 360)), 0)
 		local tree = Assets.place(parent, name, flat * CF(0, -0.2, 0), scale)
 		if tree then
+			-- (2026-11-19) client/Nature sways the trees near the camera in the wind
+			if k ~= "bush" and k ~= "flower" then tree:AddTag("Sway") end
 			if plan.trunk then
 				local h = (tree:GetAttribute("Height") or 20) * scale
 				local trunk = Kit.cyl(parent, plan.trunk * scale + 0.5, h * 0.45, flat * CF(0, h * 0.225, 0), bark, M.Wood, { name = "Trunk", transparency = 1 })

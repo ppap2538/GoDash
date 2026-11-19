@@ -37,6 +37,11 @@ local function preview(style: number)
 		s:Play()
 		task.delay(3, function() s:Destroy() end)
 	end
+	local h = Vehicles.HORNS[style]
+	if h and h.tune then
+		for _, n in ipairs(h.tune) do task.delay(n[2], function() play(Sounds.horn, 1.1 * n[1], n[3] or 0.42) end) end
+		return
+	end
 	if style == 5 then play(Sounds.bell, 1, 0.45)
 	elseif style == 2 then play(Sounds.horn, 0.75, 0.6)
 	elseif style == 3 then play(Sounds.horn, 0.82, 0.6); task.delay(0.22, function() play(Sounds.horn, 0.78, 0.6) end)
@@ -80,7 +85,7 @@ local function screen()
 
 	local hero = ui.bigCard(84, PURPLE)
 	noT(UI.label(hero, L("🔧 Styling", "🔧 แต่งซิ่ง"), 18, C.white, F.black, { Position = UDim2.fromOffset(14, 10), Size = UDim2.new(1, -28, 0, 24) }))
-	noT(UI.label(hero, L("Make it yours: light, plate, sticker, horn. Looks only.", "แต่งให้เป็นของเรา: ไฟใต้ท้อง ป้ายทะเบียน สติกเกอร์ แตร (สวยอย่างเดียว ไม่เพิ่มความเร็ว)"), 12, C.white, F.med,
+	noT(UI.label(hero, L("Make it yours: light, plate, sticker, box, horn. Looks only.", "แต่งให้เป็นของเรา: ไฟใต้ท้อง ป้ายทะเบียน สติกเกอร์ ลายกล่อง แตร (สวยอย่างเดียว ไม่เพิ่มความเร็ว)"), 12, C.white, F.med,
 		{ Position = UDim2.fromOffset(14, 36), Size = UDim2.new(1, -28, 0, 40), TextWrapped = true, TextYAlignment = Enum.TextYAlignment.Top }))
 
 	-- which vehicle
@@ -175,6 +180,19 @@ local function screen()
 					if locked then unlockHint(s.need) elseif not on then fit("sticker", i) end
 				end, { btnWidth = 54, height = 42, btnColor = on and C.green or (locked and C.dark or PURPLE) })
 			for _, x in ipairs(r:GetDescendants()) do if x:IsA("TextLabel") then x:SetAttribute("NoTranslate", true) end end
+		end
+
+		-- delivery-box skin (2026-11-19, viral pack; Config/Vehicles.BOXES): two-wheelers only
+		if def.class == "bike" then
+			ui.section(L("DELIVERY BOX · ", "ลายกล่องส่งของ · ") .. Util.money(Vehicles.STYLE_PRICES.box))
+			for i = 0, #Vehicles.BOXES do
+				local b = Vehicles.BOXES[i]
+				local on = (st.box or 0) == i
+				local r = ui.row(b and b.icon or "🟩", b and (Lang.code == "th" and b.thai or b.name) or L("GoDash green (standard)", "เขียว GoDash (แบบปกติ)"), nil,
+					on and "✓" or (b and L("Fit", "ใส่") or L("Free", "ฟรี")), function() if not on then fit("box", i) end end,
+					{ btnWidth = 54, height = 42, btnColor = on and C.green or PURPLE })
+				for _, x in ipairs(r:GetDescendants()) do if x:IsA("TextLabel") then x:SetAttribute("NoTranslate", true) end end
+			end
 		end
 	end
 

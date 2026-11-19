@@ -158,6 +158,8 @@ local function exit()
 	if Drive.onExit then pcall(Drive.onExit, c) end
 	if c.audio then c.audio:stop() end
 	if c.skid then c.skid:Destroy() end
+	for _, s in ipairs(c.susp or {}) do s.force:Destroy(); s.att:Destroy() end -- (the springs: see enter)
+	c.susp = nil
 	if c.bodyWeld and c.bodyWeld.Parent then c.bodyWeld.C0 = c.bodyBase end
 	for _, s in ipairs(c.spin or {}) do
 		if s.weld.Parent then s.weld.C0 = s.base end
@@ -182,6 +184,25 @@ local function enter(model: Model, seat: VehicleSeat)
 	for i = 1, 4 do
 		local w = model:GetAttribute("Wheel" .. i)
 		if typeof(w) == "Vector3" then table.insert(c.wheels, w) end
+	end
+	-- (2026-11-19, owner: "รถยังดูกระตุกๆวาปๆจมดิน") the springs hold the vehicle up with a VectorForce at each wheel,
+	-- applied by the physics solver on every one of its 240 steps a second. It used to be one impulse a frame with
+	-- the frame time capped at 1/30 s: below 30 fps gravity pulled for the whole frame but the spring pushed for only
+	-- part of it, so the vehicle sank into the road and bounced back (the jitter, the "warping", the wheels in the ground)
+	c.susp = {}
+	for i, w in ipairs(c.wheels) do
+		local a = Instance.new("Attachment")
+		a.Name = "GoDashSusp" .. i
+		a.Position = Vector3.new(w.X, -c.originY, w.Z)
+		a.Parent = chassis
+		local vf = Instance.new("VectorForce")
+		vf.Name = "GoDashSusp" .. i
+		vf.Attachment0 = a
+		vf.RelativeTo = Enum.ActuatorRelativeTo.World
+		vf.ApplyAtCenterOfMass = false
+		vf.Force = Vector3.zero
+		vf.Parent = chassis
+		c.susp[i] = { force = vf, att = a }
 	end
 	local zMin, zMax = math.huge, -math.huge
 	for _, w in ipairs(c.wheels) do zMin = math.min(zMin, w.Z); zMax = math.max(zMax, w.Z) end
@@ -420,6 +441,8 @@ local function step(dt: number)
 		c.contacts[i] = contact
 		contact.ok = hit ~= nil
 		contact.front = lp.Z < 0
+		local spring = c.susp and c.susp[i]
+		if not hit and spring then spring.force.Force = Vector3.zero end
 		if hit then
 			contact.pos, contact.normal = hit.Position, hit.Normal
 			contact.lat = chassis:GetVelocityAtPosition(origin):Dot(lp.Z < 0 and (right * cosS - fwd * sinS) or right)
@@ -430,7 +453,12 @@ local function step(dt: number)
 			local f = share * GRAVITY + k * comp - damp * pv:Dot(up)
 			f = math.clamp(f, 0, share * GRAVITY * 4)
 			-- push along the ground normal, not the chassis: a rider's weight tilting the body must not shove it backwards
-			chassis:ApplyImpulseAtPosition(hit.Normal * (f * dt), origin)
+			-- (a steady force the solver applies every physics step; the old per-frame impulse only as a fallback)
+			if spring then
+				spring.force.Force = hit.Normal * f
+			else
+				chassis:ApplyImpulseAtPosition(hit.Normal * (f * dt), origin)
+			end
 
 			local front = lp.Z < 0
 			local wf, wr = fwd, right

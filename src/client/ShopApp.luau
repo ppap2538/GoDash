@@ -95,7 +95,7 @@ local function screen()
 			Phone.refresh()
 		end
 	end))
-	noT(UI.label(card, L("New codes come with updates and in our TikTok / Facebook posts.", "โค้ดใหม่มากับอัปเดตและโพสต์ TikTok / Facebook ของเกม"), 11, C.sub, F.med,
+	noT(UI.label(card, L("New codes come with updates and in our TikTok / Facebook posts. A creator's code works here too.", "โค้ดใหม่มากับอัปเดตและโพสต์ TikTok / Facebook ของเกม · โค้ดครีเอเตอร์ก็ใส่ช่องนี้ได้"), 11, C.sub, F.med,
 		{ Position = UDim2.fromOffset(12, 54), Size = UDim2.new(1, -24, 0, 24), TextWrapped = true }))
 end
 

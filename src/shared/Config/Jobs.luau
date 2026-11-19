@@ -16,6 +16,10 @@ Jobs.FOOD = {
 		base = 120, perStud = 0.034, minDist = 3000, maxDist = 9000, par = 0.9, exp = 80, cargo = 2, tipMax = 0.6, strict = true },
 	rainy = { id = "rainy", name = "Rainy Day Delivery", icon = "🌧", color = Color3.fromRGB(70, 150, 210), level = 1, weight = 45,
 		base = 45, perStud = 0.024, minDist = 1500, maxDist = 5500, par = 1.25, exp = 36, cargo = 1, tipMax = 0.45, rainOnly = true },
+	-- (2026-11-19, viral pack) absurd loads strapped onto whatever you ride: a fridge, a mattress, a pile of durians...
+	-- (Jobs.BIGLOADS). It wobbles, slides when you brake hard and falls off in a crash (client/Cargo); pays well
+	bigload = { id = "bigload", name = "Big Load by Bike", icon = "📦", color = Color3.fromRGB(230, 120, 40), level = 2, weight = 9,
+		base = 90, perStud = 0.03, minDist = 900, maxDist = 4500, par = 1.3, exp = 55, cargo = 1, tipMax = 0.55, fragile = true, absurd = true },
 	-- jobs at the real landmarks (server/CivicJobs, 2026-11-18): only at the hours they make sense
 	docs = { id = "docs", name = "Urgent Documents", icon = "📄", color = Color3.fromRGB(70, 90, 160), level = 3, weight = 11,
 		base = 60, perStud = 0.026, maxDist = 7000, par = 0.85, exp = 44, cargo = 1, tipMax = 0.3, strict = true,
@@ -71,6 +75,19 @@ Jobs.RIDE = {
 		hours = { { 9, 15.5 } },
 		civic = { from = { home = true }, to = { pois = { "museum" } }, item = "1 passenger", who = { "Ajarn Wit", "Khun Oat", "Phi Nan" } } },
 }
+-- the loads of a "bigload" order (2026-11-19): id = the model client/Cargo builds, from = shop kinds it is picked up
+-- at (DeliveryService), en / th = the order text
+Jobs.BIGLOADS = {
+	{ id = "fridge", from = { "mall", "convenience" }, en = "A two-door fridge", th = "ตู้เย็น 2 ประตู" },
+	{ id = "mattress", from = { "mall" }, en = "A king-size mattress", th = "ฟูกนอน 6 ฟุต" },
+	{ id = "durian", from = { "market", "nightmarket" }, en = "A pile of durians", th = "ทุเรียนกองโต" },
+	{ id = "plant", from = { "market" }, en = "A giant potted palm", th = "ต้นปาล์มกระถางยักษ์" },
+	{ id = "water", from = { "convenience" }, en = "Twelve packs of drinking water", th = "น้ำดื่ม 12 แพ็ค" },
+	{ id = "fans", from = { "mall", "convenience" }, en = "Four electric fans", th = "พัดลม 4 ตัว" },
+}
+Jobs.BIGLOAD_BY_ID = {}
+for _, b in ipairs(Jobs.BIGLOADS) do Jobs.BIGLOAD_BY_ID[b.id] = b end
+
 Jobs.MEAL_BONUS = 0.15 -- food orders at the lunch (11:00-13:00) and dinner (17:30-19:30) rush
 
 Jobs.RAIN_BONUS = 0.25 -- extra pay for any job done in the rain

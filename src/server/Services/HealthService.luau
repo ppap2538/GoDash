@@ -41,7 +41,8 @@ function Health.injure(player: Player, kind: string, speed: number)
 	if not d then return end
 	local add = kind == "car" and math.clamp(3 + speed * 0.1, 3, 15) or math.clamp(8 + speed * 0.25, 8, 35)
 	-- (2026-11-19) on two wheels the helmet matters (Config/Gear): a good one halves it, none makes it worse
-	if kind ~= "car" then
+	-- (helmets were taken out of the game 2026-11-19: Gear.HELMETS = false, the injury stays as it is)
+	if kind ~= "car" and Gear.HELMETS then
 		local helmet = Gear.worn(d.gear, "helmet")
 		add = math.floor(add * (helmet and helmet.protect or 1.25) + 0.5)
 	end

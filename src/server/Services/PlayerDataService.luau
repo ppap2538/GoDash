@@ -26,7 +26,7 @@ local function template()
 		rating = 5, ratingCount = 0,
 		reviews = {}, -- the last 30 customer reviews, newest first: { t, s (stars), m (mode), who, tip, tags, seed } (client/Reviews)
 		stats = { deliveries = 0, rides = 0, distance = 0, earned = 0, harvests = 0, planted = 0, fiveStars = 0, playSeconds = 0 },
-		daily = { day = 0, income = 0, jobs = 0, safeBonus = 0, merit = 0, interest = 0 },
+		daily = { day = 0, income = 0, jobs = 0, safeBonus = 0, merit = 0, interest = 0, dist = 0, crashes = 0, harsh = 0, dogs = 0, drops = 0, scams = 0, fines = 0 },
 		vehicles = { [Game.START_VEHICLE] = Vehicles.newOwned(start) },
 		activeVehicle = Game.START_VEHICLE,
 		plot = false, -- or { tier, furniture = { {uid, id, x, z, rot} }, fridge = {}, nextUid }
@@ -60,6 +60,7 @@ local function template()
 		onboard = false, -- or { gift, style, lake, clip = true }: the first-ten-minutes tips already done (client/Guide, 2026-11-19)
 		insurance = false, -- or { plan = "c1" | "c2" | "c3", untilT = os.time() } (server/InsuranceService, 2026-11-19)
 		lapWeek = false, -- or { id = week, cs }: this week's best lake lap (server/TimeTrialService); all-time best = stats.bestLap
+		creator = false, -- the creator code this rider supports (Config/Store.CREATORS, server/StoreService, 2026-11-19)
 		firstJoin = 0, lastSeen = 0,
 	}
 end

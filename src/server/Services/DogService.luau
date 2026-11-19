@@ -6,6 +6,7 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Net = require(ReplicatedStorage.Shared.Net)
+local Data = require(script.Parent.PlayerDataService)
 
 local Service = {}
 local MAX_DOGS = 140 -- (2026-11-16: was 16; the sois felt empty. 2026-11-18: 40 -> 140 for the whole tambon)
@@ -157,6 +158,12 @@ function Service.start(world, deps)
 								lifestyle.add(p, -4, nil, -10)
 								local tele = vehicles.telemetry(p)
 								if tele then tele.dog = (tele.dog or 0) + 1 end
+								-- (2026-11-19) today's count for the day recap (client/Recap)
+								local pd = Data.get(p)
+								if pd and type(pd.daily) == "table" then
+									pd.daily.dogs = (tonumber(pd.daily.dogs) or 0) + 1
+									Data.touch(p, "daily")
+								end
 								Net.fire(p, "Notify", "toast", { text = "🐕 A soi dog bit you!  −10 happiness", th = "🐕 โดนหมาซอยงับ! ความสุข −10", bad = true })
 								Net.fire(p, "Notify", "feed", { key = "dog_bite", vars = { pos = d.home } })
 								d.target = nil

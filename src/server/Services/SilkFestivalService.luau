@@ -10,6 +10,7 @@ local Workspace = game:GetService("Workspace")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage.Shared
 local Net = require(Shared.Net)
+local Gear = require(Shared.Config.Gear)
 local Data = require(script.Parent.PlayerDataService)
 local Store = require(script.Parent.StoreService)
 local World = script.Parent.Parent.World
@@ -192,8 +193,9 @@ function Service.start(world)
 			elseif not inWindow() and folder then
 				teardown()
 			end
-			-- the souvenir: walk into the festival, get the silk helmet (once)
-			if center then
+			-- the souvenir: walk into the festival, get the silk helmet (once). Helmets were taken out of the game
+			-- (2026-11-19, Config/Gear.HELMETS = false), so no souvenir then
+			if center and Gear.HELMETS then
 				for _, p in ipairs(Players:GetPlayers()) do
 					local r = p.Character and p.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
 					local d = Data.get(p)

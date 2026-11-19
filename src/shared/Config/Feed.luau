@@ -22,6 +22,12 @@ Feed.authors = {
 }
 
 Feed.posts = {
+	-- client/Accident: the fake-injury scammer caught on CCTV (2026-11-19, viral pack)
+	scam_caught = {
+		t("🎥 จับโป๊ะ! คนแกล้งล้มใส่รถไรเดอร์ {name} แถว{place} กล้องวงจรปิดจับได้ชัดแจ๋ว สุดท้ายต้องจ่ายค่าทำขวัญเอง 555", "🎥 Busted! Someone faked a crash with rider {name} near {place}. The CCTV saw it all, and in the end THEY paid. Haha"),
+		t("เตือนภัย: มุกกระโดดตัดหน้ารถใช้ไม่ได้แล้วแถว{place} ไรเดอร์ {name} มีกล้องวงจรปิดเป็นพยาน", "Warning: the jump-in-front-of-a-bike trick doesn't work near {place} any more. Rider {name} had CCTV as a witness."),
+		t("ล้มสวยมาก ให้ 10 คะแนนการแสดง แต่กล้องวงจรปิดให้ 0 (ไรเดอร์ {name} ฝากมา)", "Beautiful fall, 10 for acting. The CCTV gave it a 0. (Sent in by rider {name})"),
+	},
 	-- server/GhostService: a rider called in to the made-up ghost radio show after a night delivery (2026-11-18)
 	ghost_radio = {
 		t("🎙️ เมื่อคืน {name} โทรเข้ารายการ วิทยุคืนหลอน 13.13 เล่าว่าไปส่งของแถว{place} แล้วเจอดี! ใครอยู่แถวนั้นบ้าง 😱", "🎙️ Last night {name} called the Haunted Night Radio 13.13 show: a delivery near {place} and... something was there 😱"),
@@ -30,7 +36,7 @@ Feed.posts = {
 	},
 	crash = {
 		t("เมื่อกี้เห็นไรเดอร์ {name} บินข้ามแฮนด์แถว{place} ลุกขึ้นมาปัดฝุ่นแล้วไปต่อ อดทนมากกก", "Just saw rider {name} fly over the handlebars near {place}, dust off and carry on. Respect."),
-		t("ใครทำหมวกกันน็อกหล่นแถว{place} ไรเดอร์ {name} ฝากบอกว่าไม่ใช่ของเขา (แต่ของเขาจริงๆ)", "Someone dropped a helmet near {place}. Rider {name} says it isn't theirs. (It is.)"),
+		t("ใครทำรองเท้าแตะหล่นแถว{place} ไรเดอร์ {name} ฝากบอกว่าไม่ใช่ของเขา (แต่ของเขาจริงๆ)", "Someone dropped a flip-flop near {place}. Rider {name} says it isn't theirs. (It is.)"),
 		t("คลิปไวรัลวันนี้: {name} vs กำแพง ผลคือกำแพงชนะ 1-0", "Today's viral clip: {name} vs a wall. Wall wins 1-0."),
 	},
 	fine_checkpoint = {

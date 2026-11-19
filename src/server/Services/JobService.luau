@@ -51,7 +51,7 @@ local function public(st)
 			id = o.id, mode = o.mode, type = o.def.id, name = o.def.name, icon = o.def.icon, pay = o.pay, exp = o.def.exp,
 			dist = o.dist, pickup = o.pickup, dropoff = o.dropoff, item = o.item, customer = o.customer,
 			expires = o.expires, seconds = Game.OFFER_SECONDS, bonus = o.bonusText, toPickup = o.toPickup,
-			regular = o.regular, regularN = o.regular and Regulars.count(player, o.regular) or nil,
+			regular = o.regular, regularN = o.regular and Regulars.count(player, o.regular) or nil, cargo = o.cargo,
 		}
 	end
 	if st.job then
@@ -60,6 +60,7 @@ local function public(st)
 			id = j.id, mode = j.mode, type = j.def.id, name = j.def.name, icon = j.def.icon, pay = j.pay, exp = j.def.exp,
 			stage = j.stage, pickup = j.pickup, dropoff = j.dropoff, item = j.item, customer = j.customer,
 			dist = j.dist, parSeconds = j.parSeconds, pickedAt = j.pickedAt, startedAt = j.startedAt, now = os.time(), regular = j.regular,
+			cargo = j.cargo,
 		}
 	end
 	return out
@@ -75,6 +76,9 @@ local function toast(player: Player, text: string, bad: boolean?)
 end
 
 local function pickType(player: Player, d, module)
+	-- QA hook (Studio only): Workspace QaJobType = a job type id -> every offer is that type (e.g. "bigload")
+	local qa = RunService:IsStudio() and Workspace:GetAttribute("QaJobType")
+	if type(qa) == "string" and module.types[qa] then return module.types[qa] end
 	local raining = ctx.weather.isRaining()
 	local v = ctx.vehicles.get(player)
 	local slow = (not v) or v.def.topSpeed < 40 -- on foot or a bicycle: only short hops make sense
@@ -127,7 +131,7 @@ local function makeOffer(player: Player, st, d)
 		end
 	end
 	local t = module.targets(player, pos, def, ctx)
-	if not t and def.civic then
+	if not t and (def.civic or def.absurd) then
 		-- no landmark pair that fits (none near, or none open): an ordinary job instead
 		def = module.types[mode == "food" and "normal" or "ride"]
 		t = module.targets(player, pos, def, ctx)
@@ -166,16 +170,24 @@ local function makeOffer(player: Player, st, d)
 	nextId += 1
 	st.offer = {
 		id = "J" .. nextId, mode = mode, def = def, module = module, pay = pay, dist = dist, toPickup = toPickup,
-		pickup = t.pickup, dropoff = t.dropoff, item = t.item, customer = t.customer, regular = t.regular,
+		pickup = t.pickup, dropoff = t.dropoff, item = t.item, customer = t.customer, regular = t.regular, cargo = t.cargo,
 		expires = os.clock() + Game.OFFER_SECONDS, bonusText = bonusText,
 	}
 	Net.fire(player, "JobOffer", public(st).offer)
 	push(player)
 end
 
+-- (2026-11-19) the big load strapped on the rider's vehicle: the model attribute "Cargo" (every client draws it,
+-- client/Cargo); VehicleService sets "CargoDrop" when a crash throws it off
+local function setCargo(player: Player, kind: string?)
+	local v = ctx.vehicles.get(player)
+	if v and v.model and v.model.Parent then v.model:SetAttribute("Cargo", kind) end
+end
+
 local function clearJob(player: Player, st)
 	local job = st.job
 	if job then
+		if job.cargo then setCargo(player, nil) end
 		job.module.cleanup(job, ctx)
 		st.job = nil
 	end
@@ -204,7 +216,7 @@ local function accept(player: Player, st)
 	local par = math.floor(o.dist / Jobs.PAR_SPEED * o.def.par + Jobs.PAR_PAD)
 	st.job = {
 		id = o.id, mode = o.mode, def = o.def, module = o.module, pay = o.pay, dist = o.dist,
-		pickup = o.pickup, dropoff = o.dropoff, item = o.item, customer = o.customer, regular = o.regular,
+		pickup = o.pickup, dropoff = o.dropoff, item = o.item, customer = o.customer, regular = o.regular, cargo = o.cargo,
 		stage = "pickup", startedAt = os.time(), startedClock = os.clock(), parSeconds = par,
 	}
 	o.module.onAccept(player, st.job, ctx)
@@ -250,6 +262,7 @@ local function complete(player: Player, st)
 		return
 	end
 	local ratio = elapsed / math.max(10, job.parSeconds)
+	job.lateRatio = ratio -- (DeliveryService: a late order gets the scolding line)
 	local timeScore = math.clamp(1.6 - ratio, 0, 1)
 	local comfort = v and v.stats.comfort or 0.8
 	local smoothPenalty = job.mode == "ride" and 0.1 or (job.def.fragile and 0.14 or 0.05)
@@ -263,6 +276,15 @@ local function complete(player: Player, st)
 
 	local pay = job.pay
 	local notes = {}
+	-- (2026-11-19) a big load that fell off on the way arrives dented
+	if job.cargo then
+		setCargo(player, nil)
+		if tele.crashes > 0 then
+			job.cargoDropped = true
+			pay = math.floor(pay * 0.7)
+			table.insert(notes, "📦 The load fell off on the way −30%")
+		end
+	end
 	if d.energy < 10 then
 		pay = math.floor(pay * Game.TIRED_PAY_MULT)
 		table.insert(notes, "😪 Tired −20%")
@@ -377,7 +399,9 @@ local function complete(player: Player, st)
 		elseif job.mode == "ride" and smooth >= 0.95 and comfort >= 1 then
 			table.insert(tags, "comfy")
 		end
-		if tele.crashes > 0 then table.insert(tags, "crash") end
+		if tele.crashes > 0 then table.insert(tags, job.cargo and "dropped" or "crash") end
+		if job.cargo and tele.crashes == 0 then table.insert(tags, "bigload") end
+		if (tele.dog or 0) > 0 then table.insert(tags, "dog") end -- (2026-11-19) a soi dog got you on the way
 		if (tele.red or 0) > 0 then table.insert(tags, "redlight") end
 		if job.mode ~= "ride" and ratio < 1 and smooth >= 0.9 and #tags < 2 then table.insert(tags, "hot") end
 		if #tags == 0 then table.insert(tags, stars >= 4.5 and "great" or "ok") end
@@ -444,6 +468,7 @@ local function action(player: Player)
 		job.pickedAt = os.time()
 		job.pickedClock = os.clock()
 		ctx.vehicles.resetTelemetry(player)
+		if job.cargo then setCargo(player, job.cargo) end
 		job.module.onPickup(player, job, ctx)
 		Metrics.step(player, "Picked up")
 		if job.mode == "food" then Net.fire(player, "Notify", "scene", { kind = "pickup", pos = job.pickup.pos, name = job.pickup.name }) end

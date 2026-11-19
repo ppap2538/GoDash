@@ -240,12 +240,25 @@ function Env.start()
 		atmosphere.Decay = lerpC(lerpC(Color3.fromRGB(46, 52, 80), Color3.fromRGB(156, 178, 204), dayK), Color3.fromRGB(104, 110, 120), gloom)
 		atmosphere.Glare = (0.02 + golden * 0.14) * (1 - gloom)
 		dof.FarIntensity = lerp(0.08, 0.18, gloom)
+		-- (2026-11-19) clip mode (client/ClipMode sets State.clipFocus = studs to the rider): a film-camera focus,
+		-- the rider sharp and the street behind softly out of focus
+		local focus = State.clipFocus
+		if type(focus) == "number" then
+			dof.FocusDistance = focus
+			dof.InFocusRadius = math.max(8, focus * 0.55)
+			dof.FarIntensity = 0.3
+			dof.NearIntensity = 0.1
+		else
+			dof.FocusDistance = 40
+			dof.InFocusRadius = 200
+			dof.NearIntensity = 0
+		end
 		if clouds then
 			clouds.Cover = cloudNow
 			clouds.Density = lerp(0.4, 0.9, gloom)
 			clouds.Color = lerpC(lerpC(Color3.fromRGB(100, 106, 132), Color3.fromRGB(255, 255, 255), dayK), Color3.fromRGB(128, 134, 144), gloom)
 		end
-		rays.Intensity = 0.03 * (1 - gloom) + golden * 0.1
+		rays.Intensity = 0.03 * (1 - gloom) + golden * 0.14 -- (a little more of the low sun's rays: nice to watch, still no glare)
 		bloom.Intensity = lerp(0.35, 0.25, dayK) -- signs and lamps glow a little more at night
 
 		rainEmitter.Rate = rainNow * 1400

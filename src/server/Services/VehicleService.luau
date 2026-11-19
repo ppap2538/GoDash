@@ -20,6 +20,15 @@ local active = {} -- [player] = { model, chassis, seat, def, id, owned, lastPos,
 local world, missions
 local lastSpawn = {}
 
+-- (2026-11-19) today's counters for the day recap (client/Recap): crashes, harsh jolts, loads dropped
+local function countDay(player: Player, field: string)
+	local d = Data.get(player)
+	if not d then return end
+	Economy.rollDay(d)
+	d.daily[field] = (tonumber(d.daily[field]) or 0) + 1
+	Data.touch(player, "daily")
+end
+
 -- Telemetry the job system reads: reset at pick-up, read at drop-off.
 function Service.telemetry(player: Player)
 	local v = active[player]
@@ -341,6 +350,7 @@ local function garage(player: Player, op: string, vehicleId: string?, arg: any)
 		local price = Vehicles.STYLE_PRICES[kind]
 		if not price then return false, "Bad request" end
 		if def.pedal and kind ~= "horn" then return false, "A bicycle can only change its bell" end
+		if kind == "box" and def.class ~= "bike" then return false, "Only motorbikes have a delivery box" end
 		owned.style = type(owned.style) == "table" and owned.style or {}
 		local st = owned.style
 		local free = false
@@ -363,7 +373,8 @@ local function garage(player: Player, op: string, vehicleId: string?, arg: any)
 		else
 			value = tonumber(value)
 			if value == nil then return false, "Bad request" end
-			local list = kind == "glow" and Vehicles.GLOWS or (kind == "sticker" and Vehicles.STICKERS or (kind == "exhaust" and Vehicles.EXHAUSTS or Vehicles.HORNS))
+			local list = kind == "glow" and Vehicles.GLOWS or (kind == "sticker" and Vehicles.STICKERS or (kind == "exhaust" and Vehicles.EXHAUSTS
+				or (kind == "box" and Vehicles.BOXES or Vehicles.HORNS)))
 			if kind == "horn" or kind == "exhaust" then
 				if not list[value] then return false, "Unknown choice" end
 				free = value == 1
@@ -475,6 +486,9 @@ function Service.start(w, deps)
 		v.owned.condition = math.max(5, v.owned.condition - 4 / v.stats.crashResist)
 		v.stats = Vehicles.computeStats(v.def, v.owned)
 		sync(v)
+		-- (2026-11-19) a big load strapped on (JobService "Cargo") is thrown off: every client draws it falling (client/Cargo)
+		if v.model:GetAttribute("Cargo") then v.model:SetAttribute("CargoDrop", workspace:GetServerTimeNow()); countDay(player, "drops") end
+		countDay(player, "crashes")
 		Net.fire(player, "Notify", "crash", { damage = true, crashes = v.tele.crashes })
 		require(script.Parent.HealthService).injure(player, v.def.class == "car" and "car" or "bike", math.clamp(tonumber(speed) or 30, 0, 200))
 	end, 0.5)
@@ -554,10 +568,13 @@ function Service.start(w, deps)
 							v.tele.crashes += 1
 							v.owned.condition = math.max(5, v.owned.condition - math.min(18, -dv / 3) / v.stats.crashResist)
 							v.stats = Vehicles.computeStats(v.def, v.owned)
+							if v.model:GetAttribute("Cargo") then v.model:SetAttribute("CargoDrop", workspace:GetServerTimeNow()); countDay(player, "drops") end
+							countDay(player, "crashes")
 							Net.fire(player, "Notify", "crash", { damage = true, crashes = v.tele.crashes })
 						elseif (math.abs(dv) > 10 or (sideways > 13 and speed > 15) or bumpY > 9) and os.clock() - v.harshAt > 1.2 then
 							v.tele.harsh += 1
 							v.harshAt = os.clock()
+							countDay(player, "harsh")
 							local kind = math.abs(dv) > 10 and (dv < 0 and "brake" or "gas") or (sideways > 13 and "turn" or "bump")
 							Net.fire(player, "Notify", "harsh", { kind = kind, harsh = v.tele.harsh, crashes = v.tele.crashes })
 						end
@@ -570,7 +587,10 @@ function Service.start(w, deps)
 						if d then
 							local metres = v.distAcc * Util.METRES
 							d.stats.distance += metres
-							Data.touch(player, "stats", "vehicles")
+							-- (2026-11-19) today's distance for the day recap (client/Recap)
+							Economy.rollDay(d)
+							d.daily.dist = (tonumber(d.daily.dist) or 0) + metres
+							Data.touch(player, "stats", "vehicles", "daily")
 							missions.progress(player, "distance", metres)
 						end
 						v.distAcc = 0

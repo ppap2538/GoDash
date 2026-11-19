@@ -524,6 +524,75 @@ function Factory.style(model: Model, def, owned, ownerId: number?)
 			decorate(gui(strip, Enum.NormalId.Back, 50))
 		end
 	end
+
+	-- delivery-box skin (2026-11-19, viral pack; Config/Vehicles.BOXES): the box (or bag) and lid take the skin's
+	-- colours, plus its own touches: watermelon stripes, cat ears and a face, a pha khao ma plaid, a shark fin and teeth
+	local box = model:FindFirstChild("DeliveryBox") or model:FindFirstChild("Bag")
+	local lid = model:FindFirstChild("BoxLid")
+	if bike and box and box:IsA("BasePart") then
+		if box:GetAttribute("BaseColor") == nil then box:SetAttribute("BaseColor", box.Color) end
+		if lid and lid:IsA("BasePart") and lid:GetAttribute("BaseColor") == nil then lid:SetAttribute("BaseColor", lid.Color) end
+		local skin = Vehicles.BOXES[st.box or 0]
+		box.Color = skin and skin.color or box:GetAttribute("BaseColor")
+		if lid and lid:IsA("BasePart") then lid.Color = skin and skin.lid or lid:GetAttribute("BaseColor") end
+		if skin then
+			local bcf = body.CFrame:ToObjectSpace(box.CFrame)
+			local s = box.Size
+			local top = s.Y / 2 + ((lid and lid:IsA("BasePart")) and lid.Size.Y or 0)
+			local function band(size: Vector3, at: Vector3, color: Color3)
+				part("Style_Box", size, bcf * CF(at.X, at.Y, at.Z), color)
+			end
+			local function wedge(size: Vector3, cf: CFrame, color: Color3)
+				local w = Instance.new("WedgePart")
+				w.Name = "Style_Box"
+				w.Size = size
+				w.Color = color
+				w.Material = M.SmoothPlastic
+				w.CanCollide, w.CanTouch, w.CanQuery, w.Massless, w.CastShadow = false, false, false, true, false
+				w.CFrame = body.CFrame * bcf * cf
+				local wc = Instance.new("WeldConstraint")
+				wc.Part0, wc.Part1 = body, w
+				wc.Parent = w
+				w.Parent = model
+			end
+			local function ball(d: number, at: Vector3, color: Color3)
+				local b = part("Style_Box", V3(d, d, d), bcf * CF(at.X, at.Y, at.Z), color)
+				b.Shape = Enum.PartType.Ball
+			end
+			if skin.stripes then
+				for _, i in ipairs({ -1, 0, 1 }) do
+					band(V3(0.14, s.Y + 0.02, s.Z + 0.04), V3(i * s.X / 3.2, 0, 0), skin.stripes)
+					band(V3(s.X + 0.04, s.Y + 0.02, 0.14), V3(0, 0, i * s.Z / 3.2), skin.stripes)
+				end
+			elseif skin.plaid then
+				-- red cloth with yellow and green checks and white bands, like the everyday Thai pha khao ma
+				for _, i in ipairs({ -1, 1 }) do
+					band(V3(0.12, s.Y + 0.02, s.Z + 0.04), V3(i * s.X / 4, 0, 0), Color3.fromRGB(240, 220, 110))
+					band(V3(s.X + 0.04, s.Y + 0.02, 0.12), V3(0, 0, i * s.Z / 4), Color3.fromRGB(46, 128, 76))
+					band(V3(s.X + 0.04, 0.1, s.Z + 0.04), V3(0, i * s.Y / 4, 0), Color3.fromRGB(246, 244, 236))
+				end
+				band(V3(s.X + 0.05, 0.06, s.Z + 0.05), V3(0, 0, 0), Color3.fromRGB(40, 80, 170))
+			elseif skin.cat then
+				-- ears on the top, a face on the back (the chase camera's view)
+				for _, sx in ipairs({ -1, 1 }) do
+					wedge(V3(0.18, 0.62, 0.62), CF(sx * s.X * 0.28, top + 0.3, 0) * CFrame.Angles(0, sx * math.rad(90), 0), skin.color)
+					ball(0.3, V3(sx * s.X * 0.2, s.Y * 0.12, s.Z / 2 + 0.06), Color3.fromRGB(30, 30, 34))
+					for k = -1, 1, 2 do -- whiskers
+						band(V3(s.X * 0.22, 0.04, 0.04), V3(sx * s.X * 0.33, -s.Y * 0.08 + k * 0.1, s.Z / 2 + 0.04), Color3.fromRGB(60, 50, 44))
+					end
+				end
+				ball(0.2, V3(0, -s.Y * 0.04, s.Z / 2 + 0.06), Color3.fromRGB(240, 120, 140))
+			elseif skin.shark then
+				wedge(V3(0.16, 0.9, 1.0), CF(0, top + 0.45, s.Z * 0.1) * CFrame.Angles(0, math.rad(180), 0), skin.color) -- the fin
+				band(V3(s.X + 0.04, s.Y * 0.38, s.Z + 0.04), V3(0, -s.Y * 0.31, 0), Color3.fromRGB(238, 240, 242)) -- white belly
+				band(V3(s.X * 0.7, 0.3, 0.04), V3(0, -s.Y * 0.06, s.Z / 2 + 0.04), Color3.fromRGB(70, 20, 30)) -- the mouth
+				for k = -2, 2 do
+					wedge(V3(0.04, 0.16, 0.16), CF(k * s.X * 0.13, 0.03, s.Z / 2 + 0.06) * CFrame.Angles(math.rad(180), math.rad(90), 0), Color3.new(1, 1, 1))
+				end
+				for _, sx in ipairs({ -1, 1 }) do ball(0.24, V3(sx * s.X * 0.26, s.Y * 0.2, s.Z / 2 + 0.06), Color3.fromRGB(20, 20, 24)) end
+			end
+		end
+	end
 end
 
 -- cf = where the chassis centre goes. owned = the player's saved state for this vehicle.

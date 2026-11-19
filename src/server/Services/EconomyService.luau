@@ -13,7 +13,9 @@ local levelHooks = {}
 local function rollDay(d)
 	local day = Util.dayNumber()
 	if d.daily.day ~= day then
-		d.daily = { day = day, income = 0, jobs = 0, safeBonus = 0, merit = 0, interest = 0 }
+		-- (2026-11-19) dist / crashes / harsh / dogs / drops / scams / fines feed the day recap (client/Recap)
+		d.daily = { day = day, income = 0, jobs = 0, safeBonus = 0, merit = 0, interest = 0,
+			dist = 0, crashes = 0, harsh = 0, dogs = 0, drops = 0, scams = 0, fines = 0 }
 	end
 end
 Economy.rollDay = rollDay

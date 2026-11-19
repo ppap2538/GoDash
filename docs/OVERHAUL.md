@@ -575,6 +575,23 @@ mild fear), the maturity questionnaire, the refundable 1,000 R$ fee (ask the own
 **Owner steps:** type the Thai name and description in Localization; create the game's Roblox Community (free) and
 send its id (turns on `Store.GROUP_ID`); add "ลอยกระทงบึงแก่นนคร 24 พ.ย." under Events; create a notification template.
 
+## 20. Viral pack + a calmer, prettier look (2026-11-19, owner: "ทำได้เลยทั้งหมด และปรับกราฟฟิคเกมส์ให้สวยงามเหมาะแก่การดูเพลินๆด้วยนะ")
+
+Done just before: in-game clip recording (fffed1c: client/Capture, ClipMode ⏺, "keep this moment", UI.scrim).
+
+| # | What | State |
+|---|---|---|
+| 51 | Creator codes (`Store.CREATORS`, `StoreService` supportCreator, d.creator): typed in the same code box, once per rider, ฿1,000 gift, uses counted in OrderedDataStore GoDash_Creators; owner code CREATORS shows the top ten. Three new reward codes CLIP / BIGLOAD / JABPO | PASS: GODASHTH -> gift, again -> "already support", CREATORS -> "GODASHTH 1" (Studio store) |
+| 52 | Big loads (`Jobs.bigload` + `Jobs.BIGLOADS`, DeliveryService bigLoad, JobService "Cargo" attribute, VehicleService "CargoDrop", `client/Cargo`): fridge / mattress / durian basket / potted palm / water cases / fans, real textured models made with Studio's mesh generator (ReplicatedStorage.GoDashModels.Cargo, saved in the place; part-built fallback); wobble spring, falls off in a crash and is strapped back on, −30 % and the customer's "dented" line | PASS: real offer -> pick-up put the palm on; all six seen on the scooter; a crash threw the palm off. QA hook QaJobType |
+| 53 | Fake-injury scammer (`client/Accident` runScam, Peds.near records `p.scam`, AccidentService scam ≤3 a day ฿80-150, Cutscene "scam" scene + card): someone runs off the kerb and dives in front of the bike; CCTV replay in slow motion; "จับโป๊ะ!" card, +฿ | PASS: the CCTV replay shows the runner diving in, caption + card + stamp. QA hook QaScam (brings the nearest person to the kerb ahead) |
+| 54 | Day recap (`client/Recap`, phone app 📊, after the sleep scene; d.daily dist/crashes/harsh/dogs/drops/scams/fines): title of the day + nine numbers; 🎬 today's highlights = the kept moments chained in ONE clip (Replay external/chain); 📸 share the card (screenshot capture) | PASS: card, title "ไรเดอร์ขนของบิน", reel of two moments with REC running through. Share NOT TESTED (Studio) |
+| 55 | Meme NPCs: the auntie's lines on a late delivery (`customer_late`), funnier reviews, a "dog" review tag (soi dogs already chase) | compiles; NOT TESTED in a real late delivery |
+| 56 | Tune horns (La Cucaracha = public-domain folk tune, Isan bounce, duck), five delivery-box skins (`Vehicles.BOXES`: watermelon, cat, pha khao ma plaid, shark, pastel pink), 12 more plate words | PASS: bought through the Garage remote; cat, plaid, shark, pink seen. Horn sound NOT heard (muted test) |
+| — | Helmets removed (owner: "เอาหมวกกันนอคออกเลย"): `Gear.HELMETS = false` (no helmet drawn, no checkpoint surcharge, no injury change, Gear app section gone), paid helmets refunded once on load | PASS: rider shows no helmet |
+| — | Vehicles sinking and jittering (owner: "รถยังดูกระตุกๆวาปๆจมดิน"): `client/Drive` springs are now VectorForces the solver applies every physics step (was one impulse a frame with dt capped at 1/30) | PASS: ride height 1.95-2.05 at 60 and at 40 fps; the old code sagged to 1.28-1.76 at 40 fps |
+| 57 | Player traffic police (role play): a rider can sign on as traffic police and stop players who REALLY broke a rule in the last minutes (red light, zebra, speeding zone, no helmet); the fine goes through Fines.charge, the officer earns a city bounty | TODO |
+| 58 | Calmer look to watch (`client/Nature`, Env): a breeze (GlobalWind, the clouds drift), trees near the camera sway (tag "Sway" from Scenery), flocks of birds by day, film-camera focus in clip mode (State.clipFocus), a little more low-sun rays. Colour grade untouched (owner's "bright, no glare") | compiles and runs (299 trees tagged); birds/sway NOT seen yet (Studio fell to Perf tier 1, which turns them off) |
+
 ## 4. Tools and test hooks
 
 - `python -I tools/plan_streets.py [preview.png]` — regenerate the street graph with lanes and `KhonKaenData/Plan.luau`.

@@ -17,6 +17,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local IS_STUDIO = game:GetService("RunService"):IsStudio()
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Sounds = require(Shared.Config.Sounds)
+local VehiclesCfg = require(Shared.Config.Vehicles)
 local Feedback = require(script.Parent.Feedback)
 
 local EngineSound = {}
@@ -322,6 +323,12 @@ function EngineSound:horn()
 	-- the horn the owner fitted (Styling app): 2 deep, 3 air horn, 4 beep-beep, 5 bell
 	local style = self.chassis.Parent and self.chassis.Parent:GetAttribute("Horn") or 1
 	local base = self.def.class == "car" and (self.p.pitch >= 1 and 1.05 or 0.92) or 1.38
+	-- (2026-11-19) the tune horns (Config/Vehicles.HORNS "tune" = { { pitch, at seconds }, ... })
+	local h = VehiclesCfg.HORNS[style]
+	if h and h.tune and self.p.kind ~= "pedal" then
+		for _, n in ipairs(h.tune) do task.delay(n[2], function() oneShot(self.chassis, Sounds.horn, n[3] or 0.42, base * n[1] * 0.8) end) end
+		return
+	end
 	if style == 5 or self.p.kind == "pedal" then
 		oneShot(self.chassis, Sounds.bell, 0.45, 1)
 	elseif style == 2 then

@@ -63,10 +63,40 @@ local offered = {} -- [UserId] = { last pick-up offered, the one before }
 -- (owner, 2026-11-16: "jobs should start from the nearest area".) The order comes from the kitchen
 -- closest to the rider; the last two offered (and not taken) step aside for the next closest, so
 -- declining walks outwards from where the rider is.
+-- (2026-11-19) a big load (Jobs.BIGLOADS): from the nearest open shop of a fitting kind (the mall counts) to a home
+local function bigLoad(root: Vector3, def, ctx, list)
+	local load = Jobs.BIGLOADS[ctx.rng:NextInteger(1, #Jobs.BIGLOADS)]
+	local best, bd
+	local function consider(kind: string, pos: Vector3, name: string, thai: string?)
+		if not table.find(load.from, kind) then return end
+		local dd = (pos - root).Magnitude
+		if not bd or dd < bd then best, bd = { pos = pos, name = name, thai = thai }, dd end
+	end
+	for _, k in ipairs(list) do consider(k.kind, k.pos, k.name, k.thai) end
+	for _, p in pairs(ctx.world.pois) do
+		if p.door and p.kind == "mall" then consider("mall", p.door, p.name, p.thai) end
+	end
+	if not best then return nil end
+	local drop
+	for _ = 1, 60 do
+		local a = ctx.world.addresses[ctx.rng:NextInteger(1, #ctx.world.addresses)]
+		local dd = (a.pos - best.pos).Magnitude
+		if dd >= def.minDist * 0.75 and dd <= def.maxDist * 0.8 then drop = a break end
+	end
+	if not drop then return nil end
+	return {
+		pickup = best,
+		dropoff = { pos = drop.pos, name = drop.name or (drop.kind == "house" and "Home" or "Shop house") },
+		item = load.en, cargo = load.id,
+		customer = FIRST[ctx.rng:NextInteger(1, #FIRST)],
+	}
+end
+
 function Delivery.targets(player: Player, root: Vector3, def, ctx)
 	local world = ctx.world
 	local list = openKitchens(world, ctx.time.clock())
 	if def.civic then return Civic.targets(player, root, def, ctx, list) end
+	if def.absurd then return bigLoad(root, def, ctx, list) end
 	if #list == 0 then return nil end
 	local sorted = table.clone(list)
 	table.sort(sorted, function(a, b) return (a.pos - root).Magnitude < (b.pos - root).Magnitude end)
@@ -138,6 +168,8 @@ end
 function Delivery.onDropoff(player: Player, job, stars: number, ctx)
 	local key = stars >= 4.5 and "customer_good" or (stars >= 3 and "customer_ok" or "customer_bad")
 	if stars >= 4 and ctx.weather.isRaining() then key = "customer_rain" end
+	if (job.lateRatio or 0) > 1.5 then key = "customer_late" end -- (2026-11-19) the auntie gives you an earful
+	if job.cargo then key = job.cargoDropped and "customer_bigload_dropped" or "customer_bigload" end
 	if job.regularLine then
 		-- a regular's own words at this point of their story (JobService set it)
 		local r = RegularsCfg.BY_ID[job.regular]

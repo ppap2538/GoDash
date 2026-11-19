@@ -13,6 +13,18 @@ Dialogue.en = {
 	customer_ok = { "Thanks.", "Okay, thank you.", "A bit late, but fine.", "Got it, thanks." },
 	customer_bad = { "It's cold...", "What took you so long?", "My soup is spilled!", "Not happy about this." },
 	customer_rain = { "It's raining! Drive carefully!", "You came in this rain? Here's a tip.", "Thank you for braving the storm!" },
+	-- (2026-11-19, viral pack) a late delivery: the auntie at the door gives you an earful
+	customer_late = {
+		"So late, dear! My rice went cold an hour ago!", "I waited so long I had a nap and woke up again!",
+		"Is this food delivery or the post office?!", "A tortoise from my street would have been faster!",
+		"Tsk tsk tsk. Next time I'll walk to the shop myself.",
+	},
+	-- (2026-11-19) the big loads (Jobs.BIGLOADS): delivered whole, or after it fell off on the way
+	customer_bigload = {
+		"You brought that... on a motorbike?!", "Legend! I didn't think it would fit.", "The whole street was filming you, haha!",
+		"Five stars just for the courage!", "My neighbour owes me 100 baht now. He said you'd never make it.",
+	},
+	customer_bigload_dropped = { "Why does it have a dent...?", "Did it... fall off on the way?", "It still works. Probably.", "I saw the clip online already..." },
 	passenger_pickup = {
 		"Hi! Let's go.", "Hurry up! I'm late for class!", "To the destination, please.",
 		"Nice ride!", "Sawasdee! Thanks for coming.", "Can you take the quick way?",

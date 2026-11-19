@@ -41,7 +41,7 @@ Regulars.LIST = {
 		en = "Dr. Beer (night shift)", th = "หมอเบียร์ เวรดึก",
 		lines = {
 			[1] = { "Coffee, at last. Long night in the ward.", "กาแฟมาแล้ว คืนนี้เวรยาวเลย" },
-			[3] = { "You again. Wear your helmet, I see too many crashes.", "คนเดิมอีกแล้ว ใส่หมวกกันน็อกด้วยนะ หมอเห็นคนเจ็บเยอะ" },
+			[3] = { "You again. Ride slowly, I see too many crashes.", "คนเดิมอีกแล้ว ขี่ช้าๆ หน่อยนะ หมอเห็นคนเจ็บเยอะ" },
 			[7] = { "The nurses call you 'our rider' now.", "พยาบาลเรียกน้องว่าไรเดอร์ประจำวอร์ดแล้วนะ" },
 			[12] = { "Take care of yourself out there. Really.", "ดูแลตัวเองด้วยนะ หมอพูดจริง" },
 		} },

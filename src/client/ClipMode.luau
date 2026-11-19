@@ -259,6 +259,9 @@ local function step(dt: number)
 	local cam = Workspace.CurrentCamera
 	local m = MODES[mode].id
 	Drive.cameraBusy = m ~= "follow" and not State.cutscene -- Drive leaves the lens alone then
+	-- (client/Env focuses on the rider: the street behind goes softly out of focus, like a film camera)
+	local s0 = subject()
+	State.clipFocus = (s0 and not State.cutscene) and (cam.CFrame.Position - s0).Magnitude or nil
 	if m == "follow" or State.cutscene then return end
 	local s, fwd, speed = subject()
 	if not s then return end
@@ -330,6 +333,7 @@ end
 function Clip.close()
 	if not Clip.active then return end
 	Clip.active = false
+	State.clipFocus = nil
 	if Capture.state == "rec" then Capture.stop() end -- the clip ends with clip mode
 	if help then help:Destroy(); help = nil end
 	Drive.cameraBusy = false

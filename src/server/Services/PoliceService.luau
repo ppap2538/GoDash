@@ -267,7 +267,8 @@ function Police.start(world, deps)
 								local class = v.def.class == "car" and "car" or "bike"
 								local noLicence = d ~= nil and d.licence ~= nil and d.licence[class] ~= true
 								-- (2026-11-19) a motorbike without a helmet (Config/Gear): half a fine more
-								local noHelmet = class == "bike" and d ~= nil and Gear.worn(d.gear, "helmet") == nil
+								-- (helmets were taken out of the game 2026-11-19: Gear.HELMETS = false, no surcharge then)
+								local noHelmet = Gear.HELMETS and class == "bike" and d ~= nil and Gear.worn(d.gear, "helmet") == nil
 								local fine = Police.FINE * ((noLicence and 2 or 1) + (noHelmet and 0.5 or 0))
 								-- (2026-11-19) the daily limit: past it the officers only warn (server/FineService)
 								local ok, amount, why, n, limit = Fines.charge(player, "ticket", fine, "checkpoint")
