@@ -81,9 +81,12 @@ function Twists.onAccept(player: Player, job)
 		local m = memos[rng:NextInteger(1, #memos)]
 		task.delay(1.2, toast, player, "📝 " .. who(job) .. ": " .. m[1], "📝 " .. who(job) .. ": " .. m[2])
 	end
-	if rng:NextNumber() > CHANCE then return end
+	-- QA hook (Studio only): Workspace QaTwist = a twist id ("noanswer", "wrongpin", ...) -> every job gets it
+	local qa = game:GetService("RunService"):IsStudio() and workspace:GetAttribute("QaTwist")
+	if type(qa) ~= "string" and rng:NextNumber() > CHANCE then return end
 	local pool = POOL[job.mode]
 	if not pool then return end
+	if type(qa) == "string" then pool = { { qa, 1 } } end
 	local total = 0
 	for _, e in ipairs(pool) do total += e[2] end
 	local r = rng:NextNumber() * total
@@ -106,6 +109,11 @@ function Twists.onAccept(player: Player, job)
 			end
 		end
 		if not job.realDrop then job.twist = nil end
+	end
+	-- (2026-11-19, owner: "the customer stands downstairs but won't take it") nobody waits at the door when they
+	-- won't pick up, or when the pin is on the wrong soi: they come out when they answer / at the real door
+	if (job.twist == "noanswer" or job.twist == "wrongpin") and job.module and job.module.hideCustomer then
+		job.module.hideCustomer(job, ctx)
 	end
 end
 
@@ -213,6 +221,7 @@ function Twists.beforeDropoff(player: Player, job): boolean
 		job.dropoff = job.realDrop
 		job.realDrop = nil
 		job.parSeconds += 60
+		if job.module and job.module.spawnCustomer then job.module.spawnCustomer(job, ctx) end -- waiting at the real door
 		toast(player, "📞 " .. who(job) .. ": 'Oh, not there! I'm one soi over, opposite the tyre shop. Sending the pin again!'",
 			"📞 " .. who(job) .. ": 'อ้าว ไม่ใช่ตรงนั้นค่ะ! อยู่อีกซอยนึง ตรงข้ามร้านยาง เดี๋ยวส่งหมุดใหม่ให้นะ'", true)
 		feed(player, "twist_wrongpin")
@@ -221,8 +230,17 @@ function Twists.beforeDropoff(player: Player, job): boolean
 	end
 	if job.twist == "noanswer" and (job.calls or 0) < 2 then
 		job.calls = (job.calls or 0) + 1
-		toast(player, "📞 Ring... ring... no answer. Press again to call back.", "📞 ตู๊ด... ตู๊ด... ลูกค้าไม่รับสาย กดอีกครั้งเพื่อโทรใหม่", true)
+		-- (2026-11-19, owner: "a cutscene when the customer doesn't pick up") the call scene: ringing, no answer
+		Net.fire(player, "Notify", "scene", { kind = "call", outcome = "noanswer", n = job.calls, name = who(job) })
 		return true
+	end
+	if job.twist == "noanswer" and not job.callAnswered then
+		-- the third call: they pick up, and come down to the door a few seconds later
+		job.callAnswered = true
+		Net.fire(player, "Notify", "scene", { kind = "call", outcome = "answer", name = who(job) })
+		task.delay(4, function()
+			if job.module and job.module.spawnCustomer and not job.npc then job.module.spawnCustomer(job, ctx) end
+		end)
 	end
 	if (job.twist == "late" and job.mode == "food") or job.twist == "noanswer" then
 		if waitAtDoor(player, job, job.twist == "noanswer" and 6 or rng:NextInteger(9, 14),

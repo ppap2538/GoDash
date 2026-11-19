@@ -36,8 +36,19 @@ local player = Players.LocalPlayer
 -- how many people this device shows (phones and tablets fewer). 2026-11-17 owner: "too few, and they
 -- run; I want them walking normally": more people in a tighter ring around the player, and the walk
 -- animation now plays at the pace they really move.
-local COUNT = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled and 30 or 60
-local SPAWN_MIN, SPAWN_RADIUS, DESPAWN = 60, 300, 420
+-- (2026-11-19, owner: "too many cars and people on the street, they walk all over, hard to get past"; "people
+-- and cars suddenly warp") fewer people (60 -> 40, phones 30 -> 20), and nobody appears or vanishes where you
+-- can see it: they start beyond SPAWN_MIN and off screen, and are only taken away once out of view
+local COUNT = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled and 20 or 40
+local SPAWN_MIN, SPAWN_RADIUS, DESPAWN = 140, 320, 420
+-- on screen and within `within` studs of the camera?
+local function inView(pos: Vector3, within: number): boolean
+	local cam = Workspace.CurrentCamera
+	if not cam then return false end
+	if (pos - cam.CFrame.Position).Magnitude > within then return false end
+	local _, on = cam:WorldToViewportPoint(pos + Vector3.new(0, 2.5, 0))
+	return on
+end
 -- Roblox's current R15 walk: its steps match about 6.4 studs/s at normal height. (The old 507777826
 -- walk, sped up, made the legs go about twice as fast as the body moved, which read as jogging.)
 local WALK_ANIM = "rbxassetid://913402848"
@@ -877,17 +888,18 @@ local function spawnAny(p, me: Vector3, list): boolean
 		for _, q in ipairs(list) do if q.active and q.role == "jog" then n += 1 end end
 		if n < jogMax() and spawnJogger(p, me) then return true end
 	end
-	if not p.sporty and rng:NextNumber() < 0.35 then
+	-- (2026-11-19: fewer people out on the road itself: at most 2 crossing at a time, was 5)
+	if not p.sporty and rng:NextNumber() < 0.2 then
 		local n = 0
 		for _, q in ipairs(list) do if q.active and q.role == "cross" then n += 1 end end
-		if n < 5 and spawnCrosser(p, me) then return true end
+		if n < 2 and spawnCrosser(p, me) then return true end
 	end
 	return spawnAt(p, me)
 end
 
 -- still the right thing to be doing at this hour? (a runner after dusk goes home once out of view)
 local function retired(p, h: number, camPos: Vector3?): boolean
-	local far = not camPos or (p.pos - camPos).Magnitude > 90
+	local far = not camPos or not inView(p.pos, 300) -- (out of view, not just 90 studs away)
 	if p.role == "jog" then return far and not jogHours(h) end
 	if p.role == "cross" then return far and (h < 6 or h > 21.5) end
 	return false
@@ -990,11 +1002,18 @@ local function startAvatars(templates: { Model })
 			if p.scripted then
 				-- a cutscene has this person now (client/Cutscene, client/Replay): it moves them
 				continue
-			elseif i > want then
+			elseif i > want and (not p.active or not inView(p.pos, 300)) then
+				-- fewer wanted (night, a slow frame rate): taken away only once out of view
 				if p.active then p.active = false; release(p); p.dodge = nil; p.model.Parent = nil end
 			elseif not p.active or (p.pos - me).Magnitude > DESPAWN or retired(p, h, camPos) then
 				p.dodge, p.lookFirst = nil, nil
-				if spawnAny(p, me, list) then
+				-- (someone far behind you is moved; someone you can see stays where they are)
+				local ok = spawnAny(p, me, list)
+				if ok and inView(p.pos, 260) then
+					release(p)
+					ok = false -- that spot is in view: try again next frame
+				end
+				if ok then
 					p.active = true
 					p.root.CFrame = CFrame.lookAt(p.pos + Vector3.new(0, p.height, 0), p.pos + Vector3.new(0, p.height, 0) + p.look)
 					p.model.Parent = folder

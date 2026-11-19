@@ -102,9 +102,19 @@ local signalsById = nil :: any
 local ACCEL, BRAKE = 9, 34 -- studs/s²
 local player = Players.LocalPlayer
 local rng = Random.new()
-local LOCAL_COUNT = (UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled) and 12 or 22
-local LOCAL_NEAR, LOCAL_FAR, LOCAL_DROP = 130, 520, 660
+-- (2026-11-19, owner: "too many cars and people on the street, hard to get past"; "cars suddenly warp") fewer
+-- local cars (22 -> 14, phones 12 -> 8) and a milder rush hour; a car starts beyond LOCAL_NEAR and off screen,
+-- and is only taken away (too many, stuck) once out of view
+local LOCAL_COUNT = (UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled) and 8 or 14
+local LOCAL_NEAR, LOCAL_FAR, LOCAL_DROP = 230, 560, 660
 local localFolder
+local function inView(pos: Vector3, within: number): boolean
+	local cam = Workspace.CurrentCamera
+	if not cam then return false end
+	if (pos - cam.CFrame.Position).Magnitude > within then return false end
+	local _, on = cam:WorldToViewportPoint(pos + Vector3.new(0, 2, 0))
+	return on
+end
 
 local function lamps(model: Model)
 	local brakes, signals = {}, {}
@@ -344,7 +354,7 @@ end
 local function busy(): number -- how full the streets are right now (rush hours, quiet nights)
 	local ct = Lighting.ClockTime
 	-- (2026-11-19, owner: "รถติดชั่วโมงเร่งด่วน") morning and evening rush: many more cars, crawling (see moveCars)
-	if (ct >= 7 and ct < 9.5) or (ct >= 16.5 and ct < 19.5) then return 1.7 end
+	if (ct >= 7 and ct < 9.5) or (ct >= 16.5 and ct < 19.5) then return 1.35 end -- (was 1.7: too crowded to ride through)
 	if ct >= 22.5 or ct < 5 then return 0.45 end
 	return 1
 end
@@ -376,8 +386,9 @@ local function spawnLocal(c, around: Vector3, obstacles): boolean
 		local margin = math.min(c.e.len * 0.35, 24) -- never inside a junction
 		c.s = rng:NextNumber(margin, c.e.len - margin)
 		local here = laneOf(c)
-		local free = true
+		local free = not inView(here, LOCAL_FAR) -- never pop up where the rider can see it
 		for _, o in ipairs(obstacles) do
+			if not free then break end
 			if o.owner ~= c and (Vector3.new(o.pos.X, 0, o.pos.Z) - here).Magnitude < 34 then free = false break end
 		end
 		if free then
@@ -582,10 +593,11 @@ local function moveCars(t: number, dt: number, camPos: Vector3)
 		local want = math.floor(LOCAL_COUNT * busy() * Perf.scale * Perf.limit("locals") + 0.5)
 		local slow = busy() > 1.2 and 0.66 or 1
 		for i, c in ipairs(locals) do
-			if i > want then
+			if i > want and (not c.active or not c.at or not inView(c.at, 600)) then
+				-- fewer wanted: taken away only once out of view
 				if c.active then c.active = false; c.at = nil; c.model.Parent = nil end
 			elseif not c.active or (c.at and (c.at - me).Magnitude > LOCAL_DROP)
-				or ((c.stillFor or 0) > 20 and c.at and (c.at - camPos).Magnitude > 70) then -- hopelessly stuck, out of view: start again elsewhere
+				or ((c.stillFor or 0) > 20 and c.at and not inView(c.at, 600)) then -- hopelessly stuck, out of view: start again elsewhere
 				if spawnLocal(c, me, obstacles) then
 					c.active = true
 					c.model.Parent = localFolder

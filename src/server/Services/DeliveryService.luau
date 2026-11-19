@@ -143,14 +143,26 @@ function Delivery.canAccept(player: Player, def, ctx): (boolean, string?)
 	return true
 end
 
--- Customer waits at the drop-off as soon as the job is accepted.
-function Delivery.onAccept(player: Player, job, ctx)
+-- The customer at the drop-off door, facing the street.
+function Delivery.spawnCustomer(job, ctx)
+	if job.npc then return end
 	local pos = job.dropoff.pos
 	local e, p = ctx.world.graph:nearest(pos)
 	local face = p and (Vector3.new(p.X, pos.Y, p.Z) - pos) or Vector3.new(0, 0, -1)
 	if face.Magnitude < 0.1 then face = Vector3.new(0, 0, -1) end
 	local at = Vector3.new(pos.X, 0.5, pos.Z) - face.Unit * 1.5
 	job.npc = ctx.npc.spawnTemp(CFrame.lookAt(at, at + face.Unit), nil, true)
+end
+
+-- (2026-11-19, owner: "the customer stands downstairs but won't take it") not at the door yet: a customer
+-- who doesn't pick up (twist "noanswer") or is at another soi (twist "wrongpin") comes out later
+function Delivery.hideCustomer(job, ctx)
+	if job.npc then ctx.npc.despawn(job.npc); job.npc = nil end
+end
+
+-- Customer waits at the drop-off as soon as the job is accepted.
+function Delivery.onAccept(player: Player, job, ctx)
+	Delivery.spawnCustomer(job, ctx)
 end
 
 function Delivery.canPickup(player: Player, job, ctx): (boolean, string?)

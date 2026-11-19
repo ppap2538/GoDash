@@ -1884,8 +1884,145 @@ local function treatScene(info: any)
 end
 
 -- kind: "eat" | "drink" | "pickup" | "deliver" | "rest" | "sleep" | "board" | "alight" | "fine" | "crash" | "treat"
+-- (2026-11-19, owner: "a cutscene when the customer doesn't pick up; now they stand downstairs and won't take it")
+-- Calling the customer at the door (server/TwistService "noanswer"): a close shot of the rider, a phone call card
+-- ringing, then "no answer" (press again to call back) or "picked up: coming down". The customer is not at the
+-- door until they pick up (DeliveryService.hideCustomer / spawnCustomer).
+local function callScene(info)
+	local char = player.Character
+	local root = char and char:FindFirstChild("HumanoidRootPart") :: BasePart?
+	local cam = Workspace.CurrentCamera
+	if not root or not cam then return end
+	if not gui then buildGui() end
+	playing = true
+	State.cutscene = true
+	local huds = {}
+	for _, g in ipairs(player.PlayerGui:GetChildren()) do
+		if g:IsA("ScreenGui") and g.Enabled and g ~= gui and g.Name:sub(1, 6) == "GoDash" then
+			g.Enabled = false
+			table.insert(huds, g)
+		end
+	end
+	local oldFov = cam.FieldOfView
+	local look = Vector3.new(root.CFrame.LookVector.X, 0, root.CFrame.LookVector.Z)
+	look = look.Magnitude > 0.1 and look.Unit or Vector3.zAxis
+	local right = look:Cross(Vector3.yAxis)
+	local focus = root.Position + Vector3.new(0, 1.6, 0)
+	local ignore = { char }
+	local vehicles = Workspace:FindFirstChild("Vehicles")
+	if vehicles then table.insert(ignore, vehicles) end
+	-- (a play test: 5.5 studs out the shoulder filled the picture; now the rider from the waist up, a little above)
+	local eye = focus + look * 8 + right * 4.5 + Vector3.new(0, 1.6, 0)
+	if not clear(focus, eye, ignore) then eye = focus + look * 7 - right * 4.5 + Vector3.new(0, 1.8, 0) end
+	local camCf = CFrame.lookAt(eye, focus + Vector3.new(0, 0.2, 0))
+	RunService:BindToRenderStep("GoDashCutscene", Enum.RenderPriority.Last.Value + 2, function()
+		cam.CameraType = Enum.CameraType.Scriptable
+		cam.CFrame = camCf
+		cam.FieldOfView = 46
+	end)
+	gui.Enabled = true
+	fade.BackgroundTransparency = 1
+	tween(barTop, 0.25, { Size = UDim2.fromScale(1, 0.09) })
+	tween(barBottom, 0.25, { Size = UDim2.fromScale(1, 0.11) })
+	caption.Text = L("📞 Calling the customer...", "📞 โทรหาลูกค้า...")
+	caption.TextTransparency = 0
+
+	-- the call card, like the phone's own call screen
+	local card = Instance.new("Frame")
+	card.AnchorPoint = Vector2.new(0.5, 0.5)
+	card.Position = UDim2.fromScale(0.5, 0.42)
+	card.Size = UDim2.fromOffset(270, 190)
+	card.BackgroundColor3 = Color3.fromRGB(20, 24, 32)
+	card.BackgroundTransparency = 0.04
+	card.ZIndex = 4
+	local cc = Instance.new("UICorner"); cc.CornerRadius = UDim.new(0, 22); cc.Parent = card
+	local function label(text: string, y: number, size: number, color: Color3, font: Enum.Font): TextLabel
+		local t = Instance.new("TextLabel")
+		t.BackgroundTransparency = 1
+		t.Position = UDim2.fromOffset(10, y)
+		t.Size = UDim2.new(1, -20, 0, size + 8)
+		t.Font = font
+		t.TextSize = size
+		t.TextColor3 = color
+		t.TextWrapped = true
+		t.Text = text
+		t.ZIndex = 5
+		t.Parent = card
+		return t
+	end
+	local avatar = Instance.new("TextLabel")
+	avatar.AnchorPoint = Vector2.new(0.5, 0)
+	avatar.Position = UDim2.new(0.5, 0, 0, 16)
+	avatar.Size = UDim2.fromOffset(62, 62)
+	avatar.BackgroundColor3 = Color3.fromRGB(28, 168, 84)
+	avatar.Text = "👤"
+	avatar.TextSize = 34
+	avatar.ZIndex = 5
+	local ac = Instance.new("UICorner"); ac.CornerRadius = UDim.new(1, 0); ac.Parent = avatar
+	avatar.Parent = card
+	local who = info and info.name or "Customer"
+	label(who, 84, 18, Color3.new(1, 1, 1), Enum.Font.GothamBlack)
+	local status = label("", 110, 15, Color3.fromRGB(190, 200, 214), Enum.Font.GothamBold)
+	local quote = label("", 134, 13, Color3.fromRGB(230, 232, 236), Enum.Font.GothamMedium)
+	card:SetAttribute("NoTranslate", true)
+	card.Parent = gui
+	Feedback.play("phoneRing", 0.3, 0.8, 0)
+
+	local t0 = os.clock()
+	while os.clock() - t0 < 2.4 do
+		local e = os.clock() - t0
+		status.Text = L("Ringing", "กำลังโทร") .. string.rep(".", 1 + math.floor(e * 2.5) % 3)
+		local pulse = 62 + math.sin(e * 9) * 4
+		avatar.Size = UDim2.fromOffset(pulse, pulse)
+		RunService.RenderStepped:Wait()
+	end
+	avatar.Size = UDim2.fromOffset(62, 62)
+	local n = tonumber(info and info.n) or 1
+	if info and info.outcome == "answer" then
+		status.Text = L("✅ Picked up!", "✅ รับสายแล้ว!")
+		status.TextColor3 = Color3.fromRGB(90, 230, 140)
+		quote.Text = L("'Sorry! Coming down now!'", "'ขอโทษค่ะ! รอแป๊บนะคะ ลงไปแล้วๆ'")
+		caption.Text = L("📞 They picked up: coming down now", "📞 ลูกค้ารับสายแล้ว กำลังเดินลงมา")
+		Feedback.good()
+	else
+		status.Text = L("❌ No answer", "❌ ไม่รับสาย")
+		status.TextColor3 = Color3.fromRGB(255, 110, 100)
+		quote.Text = L(("Press deliver again to call back (%d/2)"):format(n), ("กดส่งของอีกครั้งเพื่อโทรใหม่ (%d/2)"):format(n))
+		caption.Text = n >= 2 and L("📞 No answer again... one more try", "📞 ไม่รับอีกแล้ว... ลองอีกครั้งนะ")
+			or L("📞 Ring... ring... no answer", "📞 ตู๊ด... ตู๊ด... ลูกค้าไม่รับสาย")
+		Feedback.bad()
+	end
+	local t1 = os.clock()
+	while os.clock() - t1 < 1.8 do RunService.RenderStepped:Wait() end
+	card:Destroy()
+	tween(barTop, 0.25, { Size = UDim2.fromScale(1, 0) })
+	tween(barBottom, 0.25, { Size = UDim2.fromScale(1, 0) })
+	tween(caption, 0.25, { TextTransparency = 1 })
+	task.wait(0.28)
+	RunService:UnbindFromRenderStep("GoDashCutscene")
+	gui.Enabled = false
+	cam.FieldOfView = oldFov
+	cam.CameraType = Enum.CameraType.Custom
+	for _, g in ipairs(huds) do if g.Parent then g.Enabled = true end end
+	playing = false
+	State.cutscene = false
+end
+
 function Cutscene.play(kind: string, info: any)
 	if playing then return end
+	if kind == "call" then
+		local ok, err = pcall(callScene, info)
+		if not ok then
+			warn("[Cutscene] " .. tostring(err))
+			RunService:UnbindFromRenderStep("GoDashCutscene")
+			playing = false
+			State.cutscene = false
+			if gui then gui.Enabled = false end
+			local cam = Workspace.CurrentCamera
+			if cam then cam.CameraType = Enum.CameraType.Custom end
+		end
+		return
+	end
 	if kind == "crash" then
 		local ok, err = pcall(crashScene, info)
 		if not ok then

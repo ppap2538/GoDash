@@ -15,7 +15,7 @@ local Factory = require(script.Parent.Parent.World.VehicleFactory)
 
 local Service = {}
 local RED_GRACE = 1.5 -- seconds after a light turns red in which entering still counts as the yellow
-local CARS = 70 -- (30 until the map became the whole tambon, 2026-11-18) route cars; each client adds its own local traffic around the player (client/Street) -- AI vehicles on the road (2026-11-16: was 14, the streets looked empty; half of them two-wheelers, as in any Thai town)
+local CARS = 46 -- (2026-11-19, owner: "too many cars": was 70; 30 until the map became the whole tambon, 2026-11-18) route cars; each client adds its own local traffic around the player (client/Street) -- AI vehicles on the road (2026-11-16: was 14, the streets looked empty; half of them two-wheelers, as in any Thai town)
 local CELL = 512
 
 function Service.start(world, deps)
