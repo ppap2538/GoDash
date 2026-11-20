@@ -210,7 +210,15 @@ function Feedback.reward(r)
 	card.InputBegan:Connect(function(i)
 		if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then close() end
 	end)
-	task.delay(5.5, close)
+	-- (2026-11-20, owner: "Popup ตอนส่งเสร็จค้างนานเกิน เสียเวลาไปรับงานต่อ") up for 2.5 s instead of 5.5, and any key or
+	-- gamepad button (pressing W to ride off) closes it at once, like the hand-over scene before it
+	local keyConn
+	keyConn = game:GetService("UserInputService").InputBegan:Connect(function(i)
+		local ty = i.UserInputType
+		if ty == Enum.UserInputType.Keyboard or ty == Enum.UserInputType.Gamepad1 then close() end
+	end)
+	card.Destroying:Connect(function() if keyConn then keyConn:Disconnect() end end)
+	task.delay(2.5, close)
 end
 
 function Feedback.banner(title: string, text: string, icon: string?, color: Color3?)

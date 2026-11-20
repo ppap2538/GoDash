@@ -30,9 +30,11 @@ local function who(job): string
 	return job.customer or "Customer"
 end
 
+-- (2026-11-20, owner: "เอารอลูกค้าออกเลย มาถึงส่งได้เลย") no more waiting at the door: "late" and "noanswer" are out of
+-- the pool (their code below stays, unused). Was food late 25 / noanswer 20, ride late 30.
 local POOL = {
-	food = { { "wrongpin", 25 }, { "late", 25 }, { "noanswer", 20 }, { "addon", 30 } },
-	ride = { { "late", 30 }, { "wrongpin", 25 }, { "influencer", 45 } },
+	food = { { "wrongpin", 25 }, { "addon", 30 } },
+	ride = { { "wrongpin", 25 }, { "influencer", 45 } },
 }
 
 function Twists.init(c) ctx = c end
