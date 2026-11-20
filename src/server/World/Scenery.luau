@@ -5,6 +5,8 @@ local Assets = require(script.Parent.Assets)
 local Solid = require(script.Parent.Solid)
 local PlantDefs = require(game:GetService("ReplicatedStorage").Shared.Config.Plants)
 local Bricks = require(game:GetService("ReplicatedStorage").Shared.Bricks)
+-- (2026-11-20 evening, owner: "พวกต้นไม้ด้วยนะขอสมจริง") the realistic plant library again; the brick trees stay available
+local BRICK_TREES = require(game:GetService("ReplicatedStorage").Shared.Config.Look).BRICK_TREES == true
 local M = Kit.M
 local C = Kit.COLORS
 local V3 = Vector3.new
@@ -320,7 +322,7 @@ function S.tree(parent: Instance, base: CFrame, rng: Random, kind: string?, opts
 	-- the vegetation library (Config/Plants): several species, each with its own models; an invisible
 	-- trunk keeps the big ones solid. Falls back to the part-built trees below when it is not in the place.
 	local plan = S.PLANTS[k] or S.PLANTS.small
-	if Bricks.ON and k ~= "palm" and k ~= "royal" and k ~= "banana" then
+	if Bricks.ON and BRICK_TREES and k ~= "palm" and k ~= "royal" and k ~= "banana" then
 		brickTree(parent, base, rng, k, plan, opts and opts.maxR)
 		return
 	end

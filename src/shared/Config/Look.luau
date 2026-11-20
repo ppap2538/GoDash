@@ -12,4 +12,11 @@ local Look = {}
 
 Look.BRICKS = true
 
+-- The same evening, after playing it, the owner wanted some things real again: "เปลี่ยนรถเป็นรถแบบสมจริงหน่อย",
+-- "คนก็ขอเป็นสมจริงเหมือนเดิมนะ", "พวกต้นไม้ด้วยนะขอสมจริง". So with BRICKS the city itself (roads, ground, buildings,
+-- street furniture) is bricks, while vehicles, people, their cargo and all plants keep the realistic models.
+Look.REAL_KINDS = { vehicle = true, npc = true, tree = true } -- Config/Models kinds kept
+Look.REAL_NAMES = { plant = true, shrub = true } -- single Config/Models entries kept (potted plant, shrub)
+Look.BRICK_TREES = false -- true = World/Scenery's studded block trees instead of the plant library
+
 return Look
