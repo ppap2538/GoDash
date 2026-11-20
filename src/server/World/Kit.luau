@@ -1,12 +1,15 @@
 -- Part helpers for the procedural world. Everything is anchored and never touch-sensitive.
 local MaterialService = game:GetService("MaterialService")
 local Materials = require(game:GetService("ReplicatedStorage").Shared.Config.Materials)
+local Bricks = require(game:GetService("ReplicatedStorage").Shared.Bricks)
 
 local Kit = {}
 
 local M = Enum.Material
 Kit.M = M
-local VARIANT = Materials.DEFAULT
+-- (2026-11-20) toy-brick look (Config/Look): no photo-scanned variants; each part becomes a brick before it is
+-- parented, so it reaches the clients once, already done
+local VARIANT = Bricks.ON and {} or Materials.DEFAULT
 
 -- The PBR MaterialVariants are written into the place file by tools/build_place.py, because game
 -- scripts are not allowed to create them. This only fills in missing ones when it is run with
@@ -110,6 +113,7 @@ function Kit.part(parent: Instance, size: Vector3, cf: CFrame, color: Color3, ma
 			p.CastShadow = opts.shadow == true
 		end
 	end
+	if Bricks.ON then Bricks.part(p) end
 	p.Parent = parent
 	return p
 end
@@ -125,6 +129,7 @@ function Kit.wedge(parent: Instance, size: Vector3, cf: CFrame, color: Color3, m
 	local variant = (opts and opts.variant) or VARIANT[p.Material]
 	if variant then p.MaterialVariant = variant end
 	if opts and opts.decor then p.CanCollide = false; p.CanQuery = false end
+	if Bricks.ON then Bricks.part(p) end
 	p.Parent = parent
 	return p
 end

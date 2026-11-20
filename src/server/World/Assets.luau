@@ -36,6 +36,12 @@ end
 function Assets.load()
 	if loaded then return end
 	loaded = true
+	-- (2026-11-20) toy-brick look: the realistic meshes are not used at all; every builder draws its own
+	-- part-built version, which Shared/Bricks turns into bricks
+	if require(ReplicatedStorage.Shared.Config.Look).BRICKS then
+		print("[Assets] toy-brick look (Config/Look.BRICKS): realistic mesh models and plants skipped")
+		return
+	end
 	local n, failed = 0, 0
 	local pending = 0
 	for name, def in pairs(Models) do

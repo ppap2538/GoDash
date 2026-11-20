@@ -9,6 +9,8 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Sounds = require(Shared.Config.Sounds)
+-- (2026-11-20) toy-brick look: a clear, bright Roblox day (default sky, light air, no film grade or far blur)
+local BRICKS = require(Shared.Config.Look).BRICKS == true
 local State = require(script.Parent.State)
 local Feedback = require(script.Parent.Feedback)
 
@@ -151,9 +153,16 @@ function Env.start()
 	-- a clear humid-sky gradient (our own image, assets/textures/sky_*.png); the clouds in front of it
 	-- are Roblox's live Terrain clouds, so there are no painted cartoon clouds any more
 	local SIDE, UP, DOWN = "rbxassetid://102196248176522", "rbxassetid://122010862183021", "rbxassetid://112916264686066"
+	if BRICKS then -- Roblox's own default sky
+		SIDE, UP, DOWN = "rbxassetid://6444884337", "rbxassetid://6412503613", "rbxassetid://6444884785"
+		Lighting.EnvironmentDiffuseScale = 1
+		Lighting.EnvironmentSpecularScale = 1
+		bloom.Intensity = 0.6; bloom.Size = 24; bloom.Threshold = 2
+		dof.FarIntensity = 0
+	end
 	sky.SkyboxBk, sky.SkyboxFt, sky.SkyboxLf, sky.SkyboxRt = SIDE, SIDE, SIDE, SIDE
 	sky.SkyboxUp, sky.SkyboxDn = UP, DOWN
-	sky.SunAngularSize = 12
+	sky.SunAngularSize = BRICKS and 21 or 12
 	sky.MoonAngularSize = 9
 	sky.StarCount = 2200
 	local terrain = Workspace:FindFirstChildOfClass("Terrain")
@@ -240,6 +249,27 @@ function Env.start()
 		atmosphere.Decay = lerpC(lerpC(Color3.fromRGB(46, 52, 80), Color3.fromRGB(156, 178, 204), dayK), Color3.fromRGB(104, 110, 120), gloom)
 		atmosphere.Glare = (0.02 + golden * 0.14) * (1 - gloom)
 		dof.FarIntensity = lerp(0.08, 0.18, gloom)
+		if BRICKS then
+			-- a bright toy-box day: neutral white sun, grey-white fill, crisp shadows, clean colours, light air;
+			-- sunsets still go orange, rain still goes grey, nights stay lamp-lit and readable
+			Lighting.Brightness = lerp(1.2, 2.4, dayK) * (1 - gloom * 0.3)
+			Lighting.Ambient = lerpC(Color3.fromRGB(112, 110, 130), Color3.fromRGB(90, 90, 92), dayK)
+			Lighting.OutdoorAmbient = lerpC(Color3.fromRGB(122, 122, 146), Color3.fromRGB(118, 120, 126), dayK)
+			Lighting.ColorShift_Top = lerpC(lerpC(Color3.fromRGB(44, 50, 78), Color3.new(0, 0, 0), dayK), Color3.fromRGB(255, 170, 96), golden * (1 - gloom))
+			Lighting.ColorShift_Bottom = Color3.new(0, 0, 0)
+			Lighting.ExposureCompensation = lerp(0.25, -0.08, dayK) + gloom * 0.15
+			Lighting.ShadowSoftness = 0.2 + gloom * 0.4
+			cc.TintColor = lerpC(lerpC(Color3.fromRGB(236, 238, 255), Color3.new(1, 1, 1), dayK), Color3.fromRGB(255, 232, 205), golden * (1 - gloom))
+			cc.Saturation = lerp(0.2, -0.05, gloom) - (1 - dayK) * 0.08
+			cc.Contrast = 0.08
+			atmosphere.Density = lerp(0.24, 0.45, gloom)
+			atmosphere.Offset = 0.1
+			atmosphere.Haze = lerp(0, 2.4, gloom) + golden * 0.5
+			atmosphere.Color = lerpC(lerpC(lerpC(Color3.fromRGB(70, 80, 110), Color3.fromRGB(178, 204, 232), dayK), Color3.fromRGB(255, 200, 150), golden), Color3.fromRGB(160, 166, 174), gloom)
+			atmosphere.Decay = lerpC(lerpC(Color3.fromRGB(46, 52, 80), Color3.fromRGB(100, 128, 170), dayK), Color3.fromRGB(104, 110, 120), gloom)
+			atmosphere.Glare = 0
+			dof.FarIntensity = 0
+		end
 		-- (2026-11-19) clip mode (client/ClipMode sets State.clipFocus = studs to the rider): a film-camera focus,
 		-- the rider sharp and the street behind softly out of focus
 		local focus = State.clipFocus

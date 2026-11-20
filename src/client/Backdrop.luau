@@ -9,6 +9,7 @@ local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Net = require(ReplicatedStorage:WaitForChild("Shared").Net)
+local Bricks = require(ReplicatedStorage:WaitForChild("Shared").Bricks)
 local Perf = require(script.Parent.Perf)
 
 local Backdrop = {}
@@ -66,6 +67,7 @@ local function part(size: Vector3, cf: CFrame, color: Color3, shape: Enum.PartTy
 	p.Size = size
 	p.CFrame = cf
 	p.Color = color
+	if Bricks.ON then Bricks.part(p) end -- (2026-11-20) the same toy palette as the streamed city
 	p.Parent = folder
 	return p
 end

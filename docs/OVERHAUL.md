@@ -599,6 +599,21 @@ Done just before: in-game clip recording (fffed1c: client/Capture, ClipMode ⏺,
 | 57 | Player traffic police (`server/TrafficPoliceService`, `client/TrafficPolice`, phone app 🚔, FineService policeHook): an officer on duty near a red light / zebra / pavement offence turns the camera ticket into a one-minute chase (Wanted / WantedUntil, 🚨 over the rider, flashing light bar over the officer); within 16 studs "🚔 Pull over" (or U) tickets them through Fines.charge (daily limits kept), ฿100 bounty when money was taken, 10 a day; got away = forgotten; on duty = no orders | PASS (one player): sign on/off, officer card, wanted card + 🚨 marker. The two-player chase and the pull-over NOT TESTED (needs a second player) |
 | 58 | Calmer look to watch (`client/Nature`, Env): a breeze (GlobalWind, the clouds drift), trees near the camera sway (tag "Sway" from Scenery), flocks of birds by day, film-camera focus in clip mode (State.clipFocus), a little more low-sun rays. Colour grade untouched (owner's "bright, no glare") | PASS: two flocks seen over the Rider Hub (QaTier 3; Studio itself falls to tier 1, which turns birds and sway off); 299 trees tagged. Sway and the clip focus NOT judged by eye yet |
 
+## 21. Toy-brick look for the whole game (2026-11-20, owner: "ภาพสวยเกินไป ... อยากได้ฟิลตัวต่อเหมือนเกมดังๆของ Roblox", "พวกบ้านก็ด้วย Asset ต่างๆด้วย", "ทุกอย่างเลยเอาจริงๆ", "UX/UI ขอน่ารักๆ สดใส เน้นเล่นง่าย ภาพหน้าปกก็เปลี่ยนด้วย")
+
+Replaces the realistic direction of 16-19 Nov (PBR scans, generated meshes). One switch: `Config/Look.BRICKS` (false = the
+realistic look exactly as before). Store thumbnails stay text-free. Never use the word LEGO in the game or the store.
+
+| # | What | State |
+|---|---|---|
+| 59 | Batch 1, surfaces + light. `Shared/Bricks`: every part becomes Plastic (the only material Roblox draws studs on), studs on the face that points up, inlet underneath, no MaterialVariant, colour moved to our own toy palette (greys/creams stay neutral; other paint +50 % saturation; roads 66,66,70, pavements 163,162,165, lawns bright green). `World/Kit` converts each part before it is parented; `Main` watches Workspace.Map (2 ms a frame) for parts builders make by hand, and Plots/Farms keeping the owner's paint. `World/Assets` skips every realistic mesh (props, vehicles, trees, plants, NPCs), so the builders' own part-built versions are drawn; vehicles get studs but keep the paint the owner picked. `client/Peds` + traffic riders use the block figures; `client/Cargo` the part-built loads; `client/Backdrop` the same palette. `client/Env`: Roblox's default sky, a bright neutral day (no film grade, no far blur, light blue air), sunsets/rain/nights as before | PASS (Studio): 82,283 of 82,744 map parts Plastic, 61,786 with studs on top, the rest Glass/Neon; street + aerial shots look like a Roblox city (studded dark roads, light pavements, bold roofs, round part-built trees, block people); no errors in the output. Phone frame rate NOT measured |
+| 60 | Batch 2, houses: toy windows/doors/balconies instead of the drawn facade pictures (`Kit.facade`, Blocks, Shophouse, Places) | TODO |
+| 61 | Batch 3, trees and street props as stacked bricks (Scenery part-built trees, StreetLife, plants on farms) | TODO |
+| 62 | Batch 4, vehicles: the part-built bodies tidied into brick cars and bikes (VehicleFactory buildCar / buildBike) | TODO |
+| 63 | Batch 5, people: Roblox avatars (HumanoidDescription with free Roblox clothes / hair) for pedestrians, staff, customers, traffic riders | TODO |
+| 64 | Batch 6, UI: cute, bright, easy (UI/Core/Theme, HUD, phone) | TODO |
+| 65 | Batch 7, store thumbnails + icon re-shot in the brick look (no text) | TODO |
+
 ## 4. Tools and test hooks
 
 - `python -I tools/plan_streets.py [preview.png]` — regenerate the street graph with lanes and `KhonKaenData/Plan.luau`.

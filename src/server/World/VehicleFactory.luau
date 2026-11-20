@@ -9,6 +9,7 @@ local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
 local Assets = require(script.Parent.Assets)
 local Rig = require(ReplicatedStorage.Shared.Rig)
 local RiderPose = require(ReplicatedStorage.Shared.RiderPose)
+local Bricks = require(ReplicatedStorage.Shared.Bricks)
 
 local Factory = {}
 
@@ -681,6 +682,8 @@ function Factory.build(def, owned, cf: CFrame, ownerId: number?): Model
 	model:SetAttribute("Signal", 0)
 	if owned and type(owned.style) == "table" and type(owned.style.plate) == "string" then model:SetAttribute("PlateText", owned.style.plate) end
 	pcall(Factory.style, model, def, owned, ownerId)
+	-- (2026-11-20) toy-brick look: plastic with studs, but the paint the owner picked stays exactly as picked
+	Bricks.tree(model, true)
 	model:AddTag("GoDashVehicle")
 	return model
 end
@@ -722,7 +725,7 @@ function Factory.traffic(def, cf: CFrame, colorIndex: number?, seed: number?): M
 		local rider: Model? = nil
 		local store = ReplicatedStorage:FindFirstChild("GoDashModels")
 		local peds = {}
-		if store then
+		if store and not Bricks.ON then -- (toy-brick look: the block figure, not the realistic avatars)
 			for _, p in ipairs(store:GetChildren()) do
 				if p:IsA("Model") and p.Name:sub(1, 3) == "Ped" then table.insert(peds, p) end
 			end

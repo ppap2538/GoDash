@@ -12,6 +12,7 @@ local Workspace = game:GetService("Workspace")
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Vehicles = require(ReplicatedStorage:WaitForChild("Shared").Config.Vehicles)
+local Bricks = require(ReplicatedStorage:WaitForChild("Shared").Bricks)
 local Lang = require(script.Parent.Lang)
 local State = require(script.Parent.State)
 local Feedback = require(script.Parent.Feedback)
@@ -36,6 +37,7 @@ local function newPart(m: Model, size: Vector3, cf: CFrame, color: Color3, mater
 	p.Transparency = transparency or 0
 	p.TopSurface, p.BottomSurface = Enum.SurfaceType.Smooth, Enum.SurfaceType.Smooth
 	p.Anchored, p.CanCollide, p.CanQuery, p.CanTouch, p.Massless = false, false, false, false, true
+	if Bricks.ON then Bricks.part(p) end -- (2026-11-20) toy-brick look
 	p.Parent = m
 	return p
 end
@@ -197,6 +199,7 @@ local MESH = {
 }
 
 local function fromMesh(m: Model, kind: string)
+	if Bricks.ON then return nil end -- (toy-brick look: the part-built loads, not the realistic meshes)
 	local store = ReplicatedStorage:FindFirstChild("GoDashModels")
 	local folder = store and store:FindFirstChild("Cargo")
 	local tpl = folder and folder:FindFirstChild(kind)

@@ -36,6 +36,14 @@ for _, name in ipairs({ "Places", "Chunks" }) do
 	if f then Solid.area(f) end
 end
 if baked then Solid.area(Workspace.Map) end
+-- (2026-11-20) toy-brick look (Config/Look): Kit makes its parts bricks already; this catches every part a
+-- builder made by itself, now and as chunks stream in. Players' homes and farms keep the paint they picked.
+local Bricks = require(Shared.Bricks)
+Bricks.watch(Workspace.Map)
+for _, name in ipairs({ "Plots", "Farms" }) do
+	local f = Workspace:FindFirstChild(name)
+	if f then Bricks.watch(f, true) end
+end
 world.radius = Game.TRAFFIC_RADIUS -- AI traffic and street dogs stay within this distance of the centre
 
 local Data = require(Services.PlayerDataService)
