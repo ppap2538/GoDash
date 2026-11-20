@@ -1106,12 +1106,13 @@ screens.settings = function()
 	end
 	section("SOUND")
 	toggle("🔊", "Sound effects", "Engines, rain, UI", "sfx")
-	row("🎶", "Background music", "Upbeat songs while you ride (Radio app: station, volume)", s.bgm ~= false and "ON" or "OFF", function()
-		local on = s.bgm == false
+	-- (2026-11-20) off unless the rider switched it on (client/Radio)
+	row("🎶", "Background music", "Upbeat songs while you ride (Radio app: station, volume)", s.bgm == true and "ON" or "OFF", function()
+		local on = s.bgm ~= true
 		Radio.play(on and (Radio.station or Radio.DEFAULT) or nil)
 		Radio.remember(on)
 		render()
-	end, { btnWidth = 60, btnColor = s.bgm ~= false and C.green or Color3.fromRGB(150, 158, 170) })
+	end, { btnWidth = 60, btnColor = s.bgm == true and C.green or Color3.fromRGB(150, 158, 170) })
 	toggle("🎵", "City ambience", "Birds, traffic and night sounds", "music")
 	section("LANGUAGE")
 	local langRow = UI.new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 42), Parent = content })

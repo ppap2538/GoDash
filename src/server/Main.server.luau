@@ -47,6 +47,15 @@ end
 world.radius = Game.TRAFFIC_RADIUS -- AI traffic and street dogs stay within this distance of the centre
 
 local Data = require(Services.PlayerDataService)
+-- (2026-11-20, owner: "เอาเพลงประกอบออกได้มั้ย หรือทำฟังก์ชันให้ปิดก็ได้") background songs are off by default now;
+-- every profile saved before that had bgm = true, so switch it off once (a rider can turn it back on in Settings)
+Data.onLoaded(function(player, d)
+	if type(d.settings) == "table" and d.settings.bgmOff1120 == nil then
+		d.settings.bgm = false
+		d.settings.bgmOff1120 = true
+		Data.touch(player, "settings")
+	end
+end)
 local Economy = require(Services.EconomyService)
 local Inventory = require(Services.InventoryService)
 local Lifestyle = require(Services.LifestyleService)

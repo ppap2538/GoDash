@@ -107,13 +107,15 @@ function Radio.start()
 			if Radio.station and not sound.IsPlaying and sound.TimePosition == 0 then Radio.next() end
 		end
 	end)
-	-- background music on by default
+	-- (2026-11-20, owner: "เอาเพลงประกอบออกได้มั้ย หรือทำฟังก์ชันให้ปิดก็ได้") background music is OFF by default
+	-- now: it only starts by itself for a rider who switched it on (Phone > Settings > Background music, or a
+	-- station in the Radio app). Was on unless switched off.
 	task.spawn(function()
 		local t0 = os.clock()
 		while not State.data and os.clock() - t0 < 60 do task.wait(0.5) end
 		task.wait(2.5)
 		local s = State.data and State.data.settings
-		if Radio.station == nil and not (s and s.bgm == false) then Radio.play(Radio.DEFAULT) end
+		if Radio.station == nil and s and s.bgm == true then Radio.play(Radio.DEFAULT) end
 	end)
 end
 

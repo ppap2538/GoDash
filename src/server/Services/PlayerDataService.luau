@@ -35,7 +35,9 @@ local function template()
 		buffs = {},
 		missions = { day = 0, daily = {}, career = {} },
 		dailyReward = { day = 0, streak = 0 },
-		settings = { steer = 1, assist = true, music = true, sfx = true, bgm = true, lang = "th", rideAlong = "friends" }, -- music = city ambience, bgm = background songs; rideAlong = who may ride with you
+		-- music = city ambience, bgm = background songs (off by default since 2026-11-20, owner); rideAlong = who may ride with you
+		-- (no bgmOff1120 here on purpose: Util.reconcile would give it to old profiles before Main's one-time switch-off)
+		settings = { steer = 1, assist = true, music = true, sfx = true, bgm = false, lang = "th", rideAlong = "friends" },
 		win = false, -- member of the motorbike-taxi stands (server/StreetService)
 		licence = { bike = false, car = false }, -- driving licences (server/LicenseService)
 		loans = {}, -- [vehicleId] = { left, each, due, missed } (server/FinanceService)
