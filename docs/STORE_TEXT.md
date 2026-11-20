@@ -55,6 +55,16 @@ Map © OpenStreetMap contributors
 
 ## Images
 
+**v4 (set 2026-11-20 afternoon, the toy-brick look; owner: "ภาพหน้าปกก็เปลี่ยนด้วยนะ" ... "ทำต่อให้จบเลย")**: still no text
+at all (for the shots every SurfaceGui / BillboardGui was hidden on the client, so shop signs, plates and the pet's
+name tag show as plain coloured boards), real Studio Play frames, the Roblox top-bar buttons painted out
+(`finish.py`), rider in a plain green shirt with the dog in the basket. Order: 101583340839655 (Loy Krathong night:
+fireworks over the lake, krathongs, lamp-lit toy facades), 138134277192738 (riding with the dog on a studded street,
+golden afternoon), 104306683443945 (the brick city at sunset from above), 134539346335506 (a fridge on the scooter).
+Icon 101418508997653 (the rider and the dog, square crop of the ride frame). All moderation Approved; read back with
+`GET /assets/v1/assets/72947456721898?readMask=previews,icon`. Sources `assets/models/page_v4_*.jpg`,
+`assets/models/page_icon_v4.png`. Rollback = the v3 list below + icon 109867011608612.
+
 **v3 (set 2026-11-20, owner: "เอาตัวหนังสือออก ... ดูไม่ใช่เกมโปรๆ")**: no text at all, real in-game frames shot in
 Studio Play at quality Level21 (viewport 1920x1033, 16:9 window, the Roblox top-bar buttons painted out, a light
 grade), rider in a plain green shirt (the avatar's football shirt and the win vest taken off for the shot). Order:
