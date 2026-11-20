@@ -85,7 +85,9 @@ local TOY_GLASS = Color3.fromRGB(128, 187, 219)
 -- Roblox draws no studs on a cylinder, so the round junction pads (and other flat discs: roundabouts, plazas) were
 -- smooth grey circles in the studded road (owner 2026-11-20, screenshot). A tiled stud picture on the face that points
 -- up fills them in (assets/textures/facade/toy_stud.png, one stud per stud like the surface studs).
-local STUD_TEX = "rbxassetid://93821885681967"
+-- (v2 2026-11-20: rounded-square studs with a light top-left rim like Roblox's own surface studs, toy_stud2.png;
+-- v1 93821885681967 had big round dots that did not match the road around them)
+local STUD_TEX = "rbxassetid://118382824673093"
 
 local function discStuds(p: Part)
 	local r = p.CFrame.RightVector.Y -- a cylinder's axis is its local X
