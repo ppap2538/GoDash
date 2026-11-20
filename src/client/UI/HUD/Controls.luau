@@ -54,7 +54,7 @@ end
 
 local function render()
 	local list = open and keysNow() or {}
-	local sig = (open and "o" or "c") .. Lang.code
+	local sig = (open and "o" or "c") .. Lang.code .. (Drive.info.driving and "d" or "w")
 	for _, k in ipairs(list) do sig ..= k[1] .. k[2] end
 	if sig == lastKey then return end
 	lastKey = sig
@@ -70,6 +70,7 @@ local function render()
 		kl:SetAttribute("NoTranslate", true)
 		tl:SetAttribute("NoTranslate", true)
 	end
+	if refs.exit then refs.exit.Visible = Drive.info.driving == true end
 	refs.head.Text = open and L("⌨  Controls   [K] hide", "⌨  ปุ่มควบคุม   [K] ซ่อน") or L("⌨  Controls  [K]", "⌨  ปุ่มควบคุม  [K]")
 	local h = 26 + (#list > 0 and (#list * (ROW_H + 3) + 6) or 0)
 	refs.panel.Size = UDim2.fromOffset(open and WIDTH or 150, h)
@@ -77,6 +78,14 @@ end
 
 -- region = the HUD's BottomLeft region.
 function Controls.build(region: Frame)
+	-- (2026-11-20, owner: "กดลงรถไม่ได้") a big "get off" button while driving: on a computer the only way off was
+	-- E, which nobody found (and a shop prompt in range used to take E)
+	refs.exit = UI.button(region, L("🚶  Get off  [E]", "🚶  ลงรถ  [E]"), {
+		Name = "GetOff", LayoutOrder = 0, Size = UDim2.fromOffset(150, 40), Visible = false,
+		BackgroundColor3 = C.orange, TextSize = 16, Font = F.black,
+	}, function() Drive.leave() end)
+	refs.exit:SetAttribute("NoTranslate", true)
+	UI.stroke(refs.exit, C.white, 2, 0.2)
 	local panel = UI.panel(region, { Name = "Controls", LayoutOrder = 1, Size = UDim2.fromOffset(WIDTH, 26), BackgroundTransparency = 0.3 }, 12)
 	refs.panel = panel
 	refs.head = UI.label(panel, "", 11, C.textDim, F.bold, { Position = UDim2.fromOffset(10, 4), Size = UDim2.new(1, -20, 0, 18) })

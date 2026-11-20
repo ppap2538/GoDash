@@ -477,6 +477,19 @@ function Service.start(w, deps)
 		if (v.model:GetAttribute("Stunt") or 0) ~= stunt then v.model:SetAttribute("Stunt", stunt) end
 	end, 12)
 
+	-- (2026-11-20, owner: "กดลงรถไม่ได้") client/Drive asks when its own Sit = false has not freed the rider
+	-- within a moment: the seat weld is the server's, so the server lets go
+	Net.on("LeaveSeat", {}, function(player)
+		local char = player.Character
+		local hum = char and char:FindFirstChildOfClass("Humanoid")
+		local seat = hum and hum.SeatPart
+		if not (char and seat) then return end
+		for _, w in ipairs(seat:GetChildren()) do
+			if w.Name == "SeatWeld" and w:IsA("JointInstance") and (w :: JointInstance).Part1 and ((w :: JointInstance).Part1 :: BasePart):IsDescendantOf(char) then w:Destroy() end
+		end
+		hum.Sit = false
+	end, 2)
+
 	-- the driver's client reports going down (thrown off in a crash, a speed bump at full speed) or a
 	-- hard landing; speed = studs/s at the moment. The rider is hurt too (server/HealthService).
 	Net.on("VehicleFall", { "number?" }, function(player, speed)

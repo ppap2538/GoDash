@@ -8,7 +8,7 @@ local Players = game:GetService("Players")
 local Net = {}
 
 -- client -> server (fire and forget)
-local EVENTS_UP = { "JobSetOnline", "JobRespond", "JobAction", "JobCancel", "VehicleState", "VehicleFall", "ClientReady", "JobChoice", "Social", "ZebraRun" }
+local EVENTS_UP = { "JobSetOnline", "JobRespond", "JobAction", "JobCancel", "VehicleState", "VehicleFall", "ClientReady", "JobChoice", "Social", "ZebraRun", "LeaveSeat" }
 -- server -> client
 local EVENTS_DOWN = { "DataSync", "Notify", "JobOffer", "JobUpdate", "Dialogue", "Reward", "OpenUI", "PlotSync", "FarmSync", "JobEvent" }
 -- client -> server with an answer {ok, message, extra}

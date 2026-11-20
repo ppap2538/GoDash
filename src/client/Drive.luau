@@ -119,36 +119,63 @@ end
 
 -- Get off: step down beside the vehicle on the seat's side (left on a motorbike, the way Thai
 -- riders get off; the driver's door side in a car) instead of hopping into the air (2026-11-18).
+-- (2026-11-20, owner: "กดลงรถไม่ได้") Two faults fixed: (1) Sit = false alone left the rider welded on a
+-- live server (Jumping is off while driving, GettingUp was no longer called), and the step-down move ran while
+-- the server's SeatWeld still held the rider, so it shoved the whole vehicle 2.3 studs sideways with the rider
+-- still on it. Now: GettingUp as well, wait until the weld is really gone (ask the server to drop it after
+-- 0.4 s), and only then step down. (2) E was shared with the "use" prompts (shops, stalls, the pump) and a
+-- prompt in range took it: while driving, E is bound above the prompts (enter, below) and the HUD shows a
+-- "get off" button on a computer too (UI/HUD/Controls).
+local leaving = false
+local function seatWeld(seat: BasePart, char: Model): Instance?
+	for _, w in ipairs(seat:GetChildren()) do
+		if w.Name == "SeatWeld" and w:IsA("JointInstance") and w.Part1 and w.Part1:IsDescendantOf(char) then return w end
+	end
+	return nil
+end
 local function leave()
 	local char = player.Character
 	local hum = char and char:FindFirstChildOfClass("Humanoid")
 	local root = char and char:FindFirstChild("HumanoidRootPart") :: BasePart?
-	if not hum then return end
+	if not (char and hum) or leaving then return end
 	local seat = hum.SeatPart
 	local model = seat and seat.Parent
 	local chassis = model and model:IsA("Model") and model.PrimaryPart
-	hum.Sit = false
-	if not (seat and chassis and root) then
-		hum:ChangeState(Enum.HumanoidStateType.GettingUp)
-		return
+	-- where to stand, worked out while the vehicle is still where the rider sees it
+	local stand: CFrame? = nil
+	if seat and chassis and root then
+		local def = Vehicles.ById[model:GetAttribute("VehicleId")]
+		local lx = chassis.CFrame:PointToObjectSpace(seat.Position).X
+		local sideSign = (def and def.class == "car") and (lx >= 0 and 1 or -1) or -1
+		local out = (def and def.class == "car") and ((def.wid or 6) / 2 + 1.6) or 2.3
+		local look = Vector3.new(chassis.CFrame.LookVector.X, 0, chassis.CFrame.LookVector.Z)
+		if look.Magnitude < 0.1 then look = Vector3.new(0, 0, -1) end
+		local spot = (chassis.CFrame * CFrame.new(sideSign * out, 0, 0)).Position
+		local params = RaycastParams.new()
+		params.FilterType = Enum.RaycastFilterType.Exclude
+		params.FilterDescendantsInstances = { model, char }
+		local g = Workspace:Raycast(spot + Vector3.new(0, 6, 0), Vector3.new(0, -14, 0), params)
+		local y = (g and g.Position.Y or spot.Y) + hum.HipHeight + root.Size.Y / 2
+		stand = CFrame.lookAt(Vector3.new(spot.X, y, spot.Z), Vector3.new(spot.X, y, spot.Z) + look.Unit)
 	end
-	local def = Vehicles.ById[model:GetAttribute("VehicleId")]
-	local lx = chassis.CFrame:PointToObjectSpace(seat.Position).X
-	local sideSign = (def and def.class == "car") and (lx >= 0 and 1 or -1) or -1
-	local out = (def and def.class == "car") and ((def.wid or 6) / 2 + 1.6) or 2.3
-	local look = Vector3.new(chassis.CFrame.LookVector.X, 0, chassis.CFrame.LookVector.Z)
-	if look.Magnitude < 0.1 then look = Vector3.new(0, 0, -1) end
-	local spot = (chassis.CFrame * CFrame.new(sideSign * out, 0, 0)).Position
-	local params = RaycastParams.new()
-	params.FilterType = Enum.RaycastFilterType.Exclude
-	params.FilterDescendantsInstances = { model, char }
-	local g = Workspace:Raycast(spot + Vector3.new(0, 6, 0), Vector3.new(0, -14, 0), params)
-	local y = (g and g.Position.Y or spot.Y) + hum.HipHeight + root.Size.Y / 2
-	task.defer(function()
-		if root.Parent then
-			root.AssemblyLinearVelocity = Vector3.zero
-			root.CFrame = CFrame.lookAt(Vector3.new(spot.X, y, spot.Z), Vector3.new(spot.X, y, spot.Z) + look.Unit)
+	hum.Sit = false
+	hum:ChangeState(Enum.HumanoidStateType.GettingUp)
+	if not seat then return end
+	leaving = true
+	task.spawn(function()
+		local t0 = os.clock()
+		local asked = false
+		while char.Parent and seatWeld(seat, char) and os.clock() - t0 < 2.5 do
+			if not asked and os.clock() - t0 > 0.4 then
+				asked = true
+				Net.send("LeaveSeat")
+			end
+			task.wait()
 		end
+		leaving = false
+		if not (stand and root and root.Parent) or seatWeld(seat, char) then return end
+		root.AssemblyLinearVelocity = Vector3.zero
+		root.CFrame = stand
 	end)
 end
 Drive.leave = leave
@@ -257,7 +284,8 @@ local function enter(model: Model, seat: VehicleSeat)
 	local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
 	if hum then hum:SetStateEnabled(Enum.HumanoidStateType.Jumping, false) end -- Space is the handbrake
 
-	ContextActionService:BindAction("GoDashDriveKeys", function(_, state, input)
+	-- (above the "use" prompts, which also want E; below photo mode's own binding at High + 50)
+	ContextActionService:BindActionAtPriority("GoDashDriveKeys", function(_, state, input)
 		if state ~= Enum.UserInputState.Begin or not cur then return Enum.ContextActionResult.Pass end
 		local k = input.KeyCode
 		if k == Enum.KeyCode.E then leave()
@@ -270,7 +298,7 @@ local function enter(model: Model, seat: VehicleSeat)
 			if Drive.onHorn then Drive.onHorn() end -- client/StreetLife: the live-streamer steps back
 		end
 		return Enum.ContextActionResult.Sink
-	end, false, Enum.KeyCode.E, Enum.KeyCode.F, Enum.KeyCode.Z, Enum.KeyCode.C, Enum.KeyCode.X, Enum.KeyCode.H)
+	end, false, Enum.ContextActionPriority.High.Value + 20, Enum.KeyCode.E, Enum.KeyCode.F, Enum.KeyCode.Z, Enum.KeyCode.C, Enum.KeyCode.X, Enum.KeyCode.H)
 
 	cur = c
 	Drive.info.driving = true
