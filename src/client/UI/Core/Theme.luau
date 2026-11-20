@@ -53,7 +53,7 @@ Theme.STROKE_W = 1 -- edge thickness of panels
 Theme.CUTE = false
 
 -- (2026-11-20, owner: "พวก UX/UI ต่างๆ ก็ขอน่ารักๆ สดใสด้วยนะ เน้นเล่นง่าย") with the toy-brick look
--- (Config/Look.BRICKS) the HUD is candy coloured instead of near-black glass: a friendly indigo panel
+-- (Config/Look.BRICKS) the HUD is candy styled instead of near-black glass: a plum-charcoal panel (indigo for a few hours)
 -- with a bold white edge, rounder corners, the rounded Fredoka face for headings and numbers (Thai letters
 -- fall back to Roblox's Thai face), slightly bigger text. White text on the panels stays readable.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -68,10 +68,12 @@ if Look.BRICKS then
 	C.line = Color3.fromRGB(228, 226, 246)
 	C.text = Color3.fromRGB(40, 36, 72)
 	C.sub = Color3.fromRGB(120, 116, 156)
-	C.dark = Color3.fromRGB(40, 48, 120)
-	C.glass = Color3.fromRGB(52, 62, 150)
-	C.chip = Color3.fromRGB(88, 104, 198)
-	C.textDim = Color3.fromRGB(222, 228, 255)
+	-- (later the same day, owner: "UI มันสีกลืนกับถนนเกิน": the indigo sat right on the studded road's blue) panels
+	-- are a deep plum-charcoal now: darker and far less blue than the road and the sky, still warm, with the white rim
+	C.dark = Color3.fromRGB(26, 23, 36)
+	C.glass = Color3.fromRGB(38, 33, 50)
+	C.chip = Color3.fromRGB(76, 68, 100)
+	C.textDim = Color3.fromRGB(226, 222, 238)
 	C.red = Color3.fromRGB(255, 92, 102)
 	C.orange = Color3.fromRGB(255, 160, 52)
 	C.yellow = Color3.fromRGB(255, 206, 60)

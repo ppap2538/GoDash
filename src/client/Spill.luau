@@ -81,18 +81,24 @@ local function colour(v: number): Color3
 	return Color3.fromRGB(230, 70, 60)
 end
 
+-- (2026-11-20, owner: "UI ... มันเยอะเกินเหตุ") the card no longer sits on screen for the whole trip: it shows for
+-- 4 s at the pick-up, for 5 s after anything knocks the order, and all the time once the order is damaged
+local flashUntil, lastV = 0, 1
 local function refresh()
 	local j = carrying()
-	card.Visible = j ~= nil and not State.cutscene
-	if not j then return end
+	if not j or State.cutscene then card.Visible = false return end
 	local k = tostring(j.id) .. ":" .. tostring(j.stage)
 	if k ~= key then
 		-- a new order picked up: the server reset its count at the pick-up
 		key = k
 		harsh, crashes = 0, 0
 		shown = 1
+		flashUntil, lastV = os.clock() + 4, 1
 	end
 	local v = condition(j)
+	if v < lastV - 0.001 then flashUntil = os.clock() + 5 end
+	lastV = v
+	card.Visible = v < 0.95 or os.clock() < flashUntil
 	icon.Text = j.mode == "ride" and (v >= 0.8 and "🙂" or (v >= 0.55 and "😵" or "🤢")) or (v >= 0.8 and "🍜" or (v >= 0.55 and "🥣" or "💦"))
 	title.Text = words(j, v)
 	shown += (v - shown) * 0.25

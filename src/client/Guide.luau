@@ -477,9 +477,12 @@ local function buildCard(parent: Instance)
 	end)
 	UI.fitText(refs.button, 14, 10)
 	for _, l in ipairs({ refs.icon, refs.tag, refs.title, refs.detail, refs.dist, refs.button, refs.arrow }) do l:SetAttribute("NoTranslate", true) end
-	UIState.onChange(function()
-		card.Visible = not UIState.get("build") and not UIState.get("modal")
-	end)
+	-- (2026-11-20, owner: "UI ... มันเยอะเกินเหตุ") while riding, a plain "go to X" card is hidden: the turn card at the
+	-- top and the minimap already lead the way. A warning or a button still shows it.
+	refs.applyVis = function()
+		card.Visible = not UIState.get("build") and not UIState.get("modal") and not refs.ridingHidden
+	end
+	UIState.onChange(refs.applyVis)
 	-- the height follows what is shown: title row, detail line(s), button
 	local function size()
 		local o = current
@@ -557,6 +560,11 @@ function Guide.start()
 			if ok and o then
 				-- riding: the card slims to its title (plus the compass or a smaller button; J still works)
 				local wantSlim = Drive.info.driving == true and (Drive.info.speed or 0) > 10 and not o.warn
+				local hide = wantSlim and o.button == nil
+				if hide ~= (refs.ridingHidden == true) then
+					refs.ridingHidden = hide
+					if refs.applyVis then refs.applyVis() end
+				end
 				if wantSlim ~= slim and refs.resize then
 					slim = wantSlim
 					refs.tag.Visible = not slim

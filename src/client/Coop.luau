@@ -38,12 +38,23 @@ function Coop.start()
 	local f = ReplicatedStorage:WaitForChild("GoDashCoop", 300)
 	if not f then return end
 	local acc = 0
+	-- (2026-11-20, owner: "UI ... มันเยอะเกินเหตุ") the card stayed up for every rider for as long as an order was open.
+	-- Now: always while you are in the team; otherwise only for 12 s when a new order opens, and only if you are
+	-- not already on a job (the toast still announces every order)
+	local seen, showUntil = nil, 0
 	RunService.Heartbeat:Connect(function(dt)
 		acc += dt
 		if acc < 0.3 then return end
 		acc = 0
 		local mine = player:GetAttribute("Coop")
+		local ends = f:GetAttribute("EndsAt")
+		if f:GetAttribute("Active") == true and ends ~= seen then
+			seen = ends
+			if f:GetAttribute("Stage") == "gather" then showUntil = os.clock() + 12 end
+		end
+		local busy = State.job ~= nil and State.job.job ~= nil
 		local on = f:GetAttribute("Active") == true and mine ~= "delivered" and not State.cutscene
+			and (mine == "joined" or (os.clock() < showUntil and not busy))
 		card.Visible = on
 		if not on then return end
 		local th = Lang.code == "th"

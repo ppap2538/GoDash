@@ -201,16 +201,50 @@ local function drawRibbon(path: { Vector3 }?, from: Vector3)
 	for i = ribbonUsed + 1, #ribbonPool do ribbonPool[i].beam.Enabled = false end
 end
 
+-- (2026-11-20, owner: "เส้นภารกิจสีเขียวเป็นขาวๆ เหมือนมันลอยอยู่" ... "มันควรเป็นวงแสงกว้างๆ") the destination mark is a
+-- wide ring of light on the ground: a glowing rim, a soft light wall rising a few studs from it and a faint floor,
+-- instead of the thin 110-stud pillar that started 25 studs up in the air and bloomed to white.
+local RING_R = 12 -- well inside the interaction range (Game.INTERACT_RANGE 26): inside the ring = close enough
+local RING_GREEN = Color3.fromRGB(0, 230, 120)
+local ringParts = {} :: { { part: BasePart, at: CFrame } }
+local ringAt: Vector3? = nil
+local function ringPart(parent: Instance, size: Vector3, at: CFrame, transparency: number, shape: Enum.PartType?)
+	local p = Instance.new("Part")
+	p.Anchored, p.CanCollide, p.CanQuery, p.CanTouch, p.CastShadow = true, false, false, false, false
+	p.Material = Enum.Material.Neon
+	p.Color = RING_GREEN
+	p.Transparency = transparency
+	if shape then p.Shape = shape end
+	p.Size = size
+	p.Parent = parent
+	table.insert(ringParts, { part = p, at = at })
+	return p
+end
+local function placeRing(ground: Vector3)
+	if ringAt and (ringAt - ground).Magnitude < 0.05 then return end
+	ringAt = ground
+	local base = CFrame.new(ground)
+	for _, r in ipairs(ringParts) do r.part.CFrame = base * r.at end
+end
+
 local function ensureBeacon()
 	if beacon then return end
 	beacon = Instance.new("Part")
 	beacon.Name = "Beacon"
 	beacon.Anchored = true; beacon.CanCollide = false; beacon.CanQuery = false; beacon.CanTouch = false; beacon.CastShadow = false
-	beacon.Shape = Enum.PartType.Cylinder
-	beacon.Material = Enum.Material.Neon
-	beacon.Color = Color3.fromRGB(0, 220, 120)
-	beacon.Transparency = 0.7
-	beacon.Size = Vector3.new(110, 3, 3)
+	beacon.Transparency = 1 -- only an anchor for the name card; the light is the ring below
+	beacon.Size = Vector3.new(1, 1, 1)
+	local up = CFrame.Angles(0, 0, math.rad(90)) -- a cylinder's axis is its X: stand it up
+	-- the rim: short glowing bars all the way round
+	local n = 36
+	local seg = 2 * math.pi * RING_R / n * 1.08
+	for i = 0, n - 1 do
+		local a = i / n * math.pi * 2
+		ringPart(beacon, Vector3.new(seg, 0.35, 0.7), CFrame.Angles(0, -a, 0) * CFrame.new(0, 0.2, -RING_R), 0.15)
+	end
+	-- a soft light wall rising from the rim, fading out, and a faint floor
+	ringPart(beacon, Vector3.new(7, RING_R * 2, RING_R * 2), CFrame.new(0, 3.5, 0) * up, 0.9, Enum.PartType.Cylinder)
+	ringPart(beacon, Vector3.new(0.1, RING_R * 2, RING_R * 2), CFrame.new(0, 0.1, 0) * up, 0.8, Enum.PartType.Cylinder)
 	-- the name card over the pin (2026-11-18, owner: on a phone it covered the road ahead): smaller on
 	-- touch screens, a little see-through, and only shown when you are close (BEACON_LABEL_NEAR); from
 	-- far away the light pillar, the route arrows and the minimap show the way
@@ -225,16 +259,20 @@ local function ensureBeacon()
 	UI.corner(card, TOUCH and 12 or 16)
 	UI.stroke(card, C.white, TOUCH and 1.5 or 2)
 	beaconLabel = UI.label(card, "", TOUCH and 12 or 15, C.white, F.bold, { Size = UDim2.new(1, -12, 1, 0), Position = UDim2.fromOffset(6, 0), TextXAlignment = Enum.TextXAlignment.Center, TextWrapped = true })
-	-- a disc on the ground shows the interaction range
-	local ring = Instance.new("Part")
-	ring.Name = "Ring"
-	ring.Anchored = true; ring.CanCollide = false; ring.CanQuery = false; ring.CanTouch = false; ring.CastShadow = false
-	ring.Shape = Enum.PartType.Cylinder
-	ring.Material = Enum.Material.SmoothPlastic
-	ring.Color = Color3.fromRGB(0, 220, 120)
-	ring.Transparency = 0.82
-	ring.Size = Vector3.new(0.12, Game.INTERACT_RANGE * 2, Game.INTERACT_RANGE * 2)
-	ring.Parent = beacon
+end
+
+-- the ground under a target (roads, pavements, yards), so the ring lies on it instead of floating
+local groundParams = RaycastParams.new()
+groundParams.FilterType = Enum.RaycastFilterType.Include
+local function groundAt(p: Vector3): Vector3
+	local map = Workspace:FindFirstChild("Map")
+	if map then
+		groundParams.FilterDescendantsInstances = { map }
+		-- (from just above the target, so an awning or a roof over a shop door is not taken for the ground)
+		local r = Workspace:Raycast(Vector3.new(p.X, p.Y + 4, p.Z), Vector3.new(0, -30, 0), groundParams)
+		if r then return r.Position end
+	end
+	return Vector3.new(p.X, 0.4, p.Z)
 end
 
 ---------------------------------------------------------------------------------------------------
@@ -388,8 +426,11 @@ function GPS.start()
 						mm.routeDirty = true
 					end
 					ensureBeacon()
-					beacon.CFrame = CFrame.new(t.pos.X, 80, t.pos.Z) * CFrame.Angles(0, 0, math.rad(90))
-					beacon.Ring.CFrame = CFrame.new(t.pos.X, 0.5, t.pos.Z) * CFrame.Angles(0, 0, math.rad(90))
+					if not ringAt or Util.flatDist(ringAt, t.pos) > 0.5 then
+						local g = groundAt(t.pos)
+						beacon.CFrame = CFrame.new(g)
+						placeRing(g)
+					end
 					local away = Util.flatDist(pos, t.pos)
 					beaconLabel.Text = (t.label or Lang.t(t.name)) .. "\n" .. Lang.t(Util.dist(away))
 					beacon.Label.Enabled = away < (TOUCH and 260 or 520)

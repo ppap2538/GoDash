@@ -15,6 +15,7 @@ local Workspace = game:GetService("Workspace")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Kit = require(script.Parent.Kit)
+local Bricks = require(ReplicatedStorage.Shared.Bricks)
 local S = require(script.Parent.Scenery)
 local Places = require(script.Parent.Places)
 local RoadGraph = require(ReplicatedStorage.Shared.RoadGraph)
@@ -399,7 +400,11 @@ function Builder.build(map, opts)
 				top = math.max(top, l.edge.def.y)
 				if l.edge.def.id < best then best = l.edge.def.id; col = ROAD_COL[l.edge.type]; variant = ROAD_VARIANT[l.edge.type] end
 			end
-			Kit.cyl(fRoads, n.r * 2, 0.4, CF(n.x, top - 0.18, n.z), col, M.Asphalt, { name = "Junction", variant = variant }):AddTag("Road")
+			-- (2026-11-20, owner: "รอยต่อตรงถนนทำไมเป็นกลมๆ ไม่ต่อกัน") with the toy-brick look the pad sits just under the
+			-- road tops, so the studded road ends show over it and only the corner fillets between them are the pad
+			-- (it used to sit 0.02 above every road and covered the whole junction with one round patch)
+			local padY = Bricks.ON and top - 0.25 or top - 0.18
+			Kit.cyl(fRoads, n.r * 2, 0.4, CF(n.x, padY, n.z), col, M.Asphalt, { name = "Junction", variant = variant }):AddTag("Road")
 			if n.walked >= 3 then
 				-- dropped-kerb apron fills the corners between sidewalks
 				Kit.cyl(fRoads, (n.r + n.walk + 5) * 2, 0.3, CF(n.x, 0.02, n.z), Color3.fromRGB(170, 168, 160), M.Concrete, { name = "Apron" })
