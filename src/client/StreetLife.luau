@@ -1,7 +1,7 @@
 -- Thai street life drawn by this client (owner, 2026-11-17: "reflect Thai society, satire, funny"):
 --   potholes     on streets and sois; ride over one and the vehicle jolts (bump, camera kick)
---   floods       heavy rain fills the low spots of some streets; riding through slows you and can kill a
---                small bike's engine for a few seconds ("water in the exhaust")
+--   floods       (OFF since 2026-11-20, owner: FLOODS below) heavy rain filled the low spots of some streets;
+--                riding through slowed you and could kill a small bike's engine for a few seconds
 --   live-streamer someone on the road edge filming "hi everyone, like and share!"; honk and they step back
 --   wrong-way rider a motorbike coming at you along the kerb on your side of the road
 --   party truck  a pickup with a wall of speakers, lights and dancers, blasting mor lam through the soi
@@ -180,7 +180,10 @@ end
 ---------------------------------------------------------------------------------------------------
 local floods = {}
 local depth = 0
+-- (2026-11-20, owner: "ขับๆไปรถหยุดเองก็มี เอาน้ำขังออกเลย") floods are off: no standing water, no drag, no dead engine
+local FLOODS = false
 local function buildFloods(graph)
+	if not FLOODS then return end
 	local hubPos = Vector3.zero
 	for _, p in ipairs(State.world and State.world.pois or {}) do
 		if p.kind == "hub" then hubPos = p.pos end
