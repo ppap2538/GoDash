@@ -55,7 +55,47 @@ Map © OpenStreetMap contributors
 
 ## Images
 
-Icon 97841633896740; previews 105822105345048 (Loy Krathong), 78906189388680 (ride), 76079295322715 (styling),
-135989347837853 (night radio), 118277502747835 (rewards, older). Sources in `assets/models/page_*v2*.png`; the compose
-script is kept in the owner's promo folder notes. New images must get open use before they can be set
-(`PATCH /asset-permissions-api/v1/assets/permissions`, subjectType All, action Use).
+**v3 (set 2026-11-20, owner: "เอาตัวหนังสือออก ... ดูไม่ใช่เกมโปรๆ")**: no text at all, real in-game frames shot in
+Studio Play at quality Level21 (viewport 1920x1033, 16:9 window, the Roblox top-bar buttons painted out, a light
+grade), rider in a plain green shirt (the avatar's football shirt and the win vest taken off for the shot). Order:
+108967661385379 (Loy Krathong night: pier, krathongs, fireworks), 110155452432243 (riding at golden hour, the dog in
+the basket), 133804722882969 (big load: a fridge on the scooter), 84198689857352 (riding into the sunset; was still
+in moderation review when set). Sources `assets/models/page_v3_*.jpg`. Uploaded with
+`creationContext.assetPrivacy = OpenUse`, so no separate permission call.
+
+Before v3 (for a rollback, `PATCH /assets/v1/assets/72947456721898?updateMask=previews`): 105822105345048 (Loy
+Krathong), 78906189388680 (ride), 76079295322715 (styling), 135989347837853 (night radio), 118277502747835 (rewards).
+Icon 97841633896740 → later 109867011608612 (icon v3, 2026-11-19). v2 sources `assets/models/page_*v2*.png`.
+
+## Description v3 (2026-11-20, NOT SET: the owner pastes it)
+
+On 2026-11-20 the place and universe description read `hagame lemon pillow brave` (changed 2026-11-19 by someone
+other than this repo's sessions; Thai players saw it machine-translated as "หมอนมะนาวฮากาเมะที่กล้าหาญ"), and the name
+had become `GoDash Rider Thailand`. Setting the description through Open Cloud was refused by the Assistant's safety
+check, so the owner pastes this in Creator Dashboard > the experience > Places > the start place > Basic Settings >
+Description (704 characters; limit 1000):
+
+```
+🛵 ขี่มอไซค์ส่งอาหารทั่วขอนแก่น เมืองจริงขนาด 1:1!
+
+🏮 อีเวนต์ลอยกระทง บึงแก่นนคร 20–30 พ.ย. ลอยกระทงได้จริง มีพลุทุกคืน
+
+📦 รับออเดอร์ ซิ่งไปส่ง เก็บทิปและรีวิว 5 ดาว
+🧊 ออเดอร์ของใหญ่สุดฮา: ตู้เย็น ฟูก ทุเรียน ขนบนสกู๊ตเตอร์!
+🧍 รับส่งผู้โดยสาร ทั้งมอไซค์และรถยนต์
+🔧 แต่งรถ: ไฟใต้ท้อง ป้ายทะเบียน สติกเกอร์ แตรเพลง ท่อ
+🏍️ รถ 12 คัน ตั้งแต่จักรยานถึงซูเปอร์คาร์
+🐶 พาหมาซ้อนตะกร้าหน้ารถไปส่งของด้วยกัน
+🚔 สมัครเป็นตำรวจจราจร ไล่จับคนฝ่าไฟแดง
+🎥 โหมดอัดคลิปแนวตั้งในเกม แชร์ลง TikTok ได้เลย
+
+⏰ ชั่วโมงเร่งด่วนทุกต้นชั่วโมง ค่าส่ง +50%
+👥 ชวนเพื่อน: เพื่อนได้ ฿500 คุณได้ ฿1,000
+🎁 โค้ด: GODASH
+
+👍 กดไลก์ + ⭐ กดติดตาม เพื่อรับอัปเดตใหม่ก่อนใคร!
+เล่นได้ทั้ง PC · มือถือ · แท็บเล็ต
+แผนที่ © OpenStreetMap contributors
+```
+
+After 30 Nov: delete the 🏮 line and move the Loy Krathong thumbnail to the end (or drop it).
