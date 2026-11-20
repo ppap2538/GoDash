@@ -82,6 +82,22 @@ local function upFace(cf: CFrame): string?
 end
 
 local TOY_GLASS = Color3.fromRGB(128, 187, 219)
+-- Roblox draws no studs on a cylinder, so the round junction pads (and other flat discs: roundabouts, plazas) were
+-- smooth grey circles in the studded road (owner 2026-11-20, screenshot). A tiled stud picture on the face that points
+-- up fills them in (assets/textures/facade/toy_stud.png, one stud per stud like the surface studs).
+local STUD_TEX = "rbxassetid://0"
+
+local function discStuds(p: Part)
+	local r = p.CFrame.RightVector.Y -- a cylinder's axis is its local X
+	if math.abs(r) < 0.97 or p.Size.Y < 4 or p.Size.X > p.Size.Y * 0.5 then return end
+	if p.Transparency >= 1 or STUD_TEX == "rbxassetid://0" or p:FindFirstChild("BrickStuds") then return end
+	local t = Instance.new("Texture")
+	t.Name = "BrickStuds"
+	t.Texture = STUD_TEX
+	t.Face = r > 0 and Enum.NormalId.Right or Enum.NormalId.Left
+	t.StudsPerTileU, t.StudsPerTileV = 1, 1
+	t.Parent = p
+end
 
 function Bricks.part(p: BasePart, keepColor: boolean?)
 	if p:IsA("MeshPart") then return end
@@ -101,6 +117,7 @@ function Bricks.part(p: BasePart, keepColor: boolean?)
 		if p:GetAttribute("DayMaterial") then p:SetAttribute("DayMaterial", "Plastic") end -- client/Env night glow
 	end
 	if not keepColor and p.Transparency < 1 then p.Color = FIXED[mat] or Bricks.color(p.Color) end
+	if p:IsA("Part") and p.Shape == Enum.PartType.Cylinder then discStuds(p) end
 	if p:IsA("Part") and p.Shape == Enum.PartType.Block then
 		local f = upFace(p.CFrame)
 		if f then

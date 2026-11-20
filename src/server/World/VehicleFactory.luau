@@ -682,8 +682,9 @@ function Factory.build(def, owned, cf: CFrame, ownerId: number?): Model
 	model:SetAttribute("Signal", 0)
 	if owned and type(owned.style) == "table" and type(owned.style.plate) == "string" then model:SetAttribute("PlateText", owned.style.plate) end
 	pcall(Factory.style, model, def, owned, ownerId)
-	-- (2026-11-20) toy-brick look: plastic with studs, but the paint the owner picked stays exactly as picked
-	Bricks.tree(model, true)
+	-- (2026-11-20) toy-brick look: a part-built body becomes plastic with studs (the paint the owner picked stays
+	-- exactly as picked); the real textured models are left as they are (owner: vehicles stay realistic)
+	if not info.mesh then Bricks.tree(model, true) end
 	model:AddTag("GoDashVehicle")
 	return model
 end
@@ -725,7 +726,7 @@ function Factory.traffic(def, cf: CFrame, colorIndex: number?, seed: number?): M
 		local rider: Model? = nil
 		local store = ReplicatedStorage:FindFirstChild("GoDashModels")
 		local peds = {}
-		if store and not Bricks.ON then -- (toy-brick look: the block figure, not the realistic avatars)
+		if store then -- (the realistic riders stay with the toy-brick look too, owner 11-20)
 			for _, p in ipairs(store:GetChildren()) do
 				if p:IsA("Model") and p.Name:sub(1, 3) == "Ped" then table.insert(peds, p) end
 			end

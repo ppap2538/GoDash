@@ -36,15 +36,15 @@ end
 function Assets.load()
 	if loaded then return end
 	loaded = true
-	-- (2026-11-20) toy-brick look: the realistic meshes are not used at all; every builder draws its own
-	-- part-built version, which Shared/Bricks turns into bricks
-	if require(ReplicatedStorage.Shared.Config.Look).BRICKS then
-		print("[Assets] toy-brick look (Config/Look.BRICKS): realistic mesh models and plants skipped")
-		return
-	end
+	-- (2026-11-20) toy-brick look: the realistic meshes are not used; every builder draws its own part-built
+	-- version, which Shared/Bricks turns into bricks. EXCEPT vehicles and people (owner, the same evening: "เปลี่ยนรถ
+	-- เป็นรถแบบสมจริงหน่อย", "คนก็ขอเป็นสมจริงเหมือนเดิมนะ"): they keep their real textured models.
+	local bricks = require(ReplicatedStorage.Shared.Config.Look).BRICKS
+	if bricks then print("[Assets] toy-brick look (Config/Look.BRICKS): realistic props, trees and plants skipped; vehicles and people kept") end
 	local n, failed = 0, 0
 	local pending = 0
 	for name, def in pairs(Models) do
+		if bricks and def.kind ~= "vehicle" and def.kind ~= "npc" then continue end -- (people stay realistic too, owner 11-20)
 		pending += 1
 		task.spawn(function()
 			local ok, res = pcall(function() return InsertService:LoadAsset(def.id) end)
@@ -68,7 +68,7 @@ function Assets.load()
 	while pending > 0 and os.clock() - t0 < 25 do task.wait(0.1) end
 	-- the vegetation library is prepared in Studio (tools/setup_plants.luau) and kept in the place
 	local plants = 0
-	local folder = game:GetService("ServerStorage"):FindFirstChild("GoDashPlants")
+	local folder = not bricks and game:GetService("ServerStorage"):FindFirstChild("GoDashPlants") or nil
 	if folder then
 		for _, m in ipairs(folder:GetChildren()) do
 			if m:IsA("Model") then

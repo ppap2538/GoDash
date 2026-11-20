@@ -199,7 +199,7 @@ local MESH = {
 }
 
 local function fromMesh(m: Model, kind: string)
-	if Bricks.ON then return nil end -- (toy-brick look: the part-built loads, not the realistic meshes)
+	-- (the realistic loads stay with the toy-brick look: they ride on the realistic vehicles, owner 11-20)
 	local store = ReplicatedStorage:FindFirstChild("GoDashModels")
 	local folder = store and store:FindFirstChild("Cargo")
 	local tpl = folder and folder:FindFirstChild(kind)

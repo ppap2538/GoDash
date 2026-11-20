@@ -598,14 +598,13 @@ function Service.start(w, deps)
 						local hardTurn = sideways > turnCap and speed > 15
 						-- a crash: more than brake + handbrake can stop it (a fast car's emergency stop is not a wall)
 						local crashCap = math.max(24, (st.brake * 1.72 + roll) * span + 4)
+						-- (2026-11-20, owner, twice: "ขับรถยังไม่ชนอะไรเลยได้รับความเสียหายแล้ว" ... "ตัดความเสียหายเรื่องนี้ออกไป
+						-- เลย") a sudden drop seen only in these quarter-second server samples no longer counts as a crash
+						-- or damages anything: the samples also catch network hiccups and road seams. A real crash is
+						-- still caught where it happens, on the driver's client (client/Drive: the hit throws the rider
+						-- off and sends VehicleFall, which does the damage).
 						if dv < -crashCap then
-							-- a wall, not a brake pedal
-							v.tele.crashes += 1
-							v.owned.condition = math.max(5, v.owned.condition - math.min(18, -dv / 3) / v.stats.crashResist)
-							v.stats = Vehicles.computeStats(v.def, v.owned)
-							if v.model:GetAttribute("Cargo") then v.model:SetAttribute("CargoDrop", workspace:GetServerTimeNow()); countDay(player, "drops") end
-							countDay(player, "crashes")
-							Net.fire(player, "Notify", "crash", { damage = true, crashes = v.tele.crashes })
+							-- (nothing: not a crash, and not a jolt either)
 						elseif (hardLon or hardTurn or bumpY > 9) and os.clock() - v.harshAt > 1.2 then
 							v.tele.harsh += 1
 							v.harshAt = os.clock()

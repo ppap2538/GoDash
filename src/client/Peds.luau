@@ -1178,8 +1178,8 @@ function Peds.start()
 	folder = Instance.new("Folder")
 	folder.Name = "GoDashPedestrians"
 	folder.Parent = Workspace
-	-- (2026-11-20) toy-brick look (Config/Look): block figures, not the realistic avatars
-	local store = not require(Shared.Config.Look).BRICKS and ReplicatedStorage:WaitForChild("GoDashModels", 6) or nil
+	-- (2026-11-20: block figures with the toy-brick look for a few hours; the owner wanted the realistic people back)
+	local store = ReplicatedStorage:WaitForChild("GoDashModels", 6)
 	local templates = {}
 	if store then
 		for _, m in ipairs(store:GetChildren()) do
