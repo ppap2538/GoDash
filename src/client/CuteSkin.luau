@@ -17,13 +17,21 @@ local HEAVY = { [Enum.Font.GothamBlack] = true, [Enum.Font.GothamBold] = true, [
 -- REGULAR (content/fonts has no other Thai file), whatever face or weight a label asks for, so Thai always came out
 -- thin. A 1 px text outline in the text's own colour makes every letter heavier, Thai included. Labels that already
 -- have an outline of their own (TextStroke) keep it; the outline fades with the text.
-local WEIGHT = 0.3 -- outline transparency: 0 = very heavy, 1 = off
+-- (first try, 70 % opaque on every label, turned small text into blobs: "486 / 1868 EXP", "ลงรถ [E]". Now only
+-- text from 15 px up, and lighter: 15-17 px 25 % opaque, 18 px and up 45 %.)
+local function weightFor(t: any): number
+	local px = t.TextScaled and t.AbsoluteSize.Y * 0.8 or t.TextSize
+	if px >= 18 then return 0.55 end
+	if px >= 15 then return 0.75 end
+	return 1
+end
 local function heavier(t: any)
 	if t.TextStrokeTransparency < 1 or t:GetAttribute("CuteWeight") then return end
+	if weightFor(t) >= 1 then return end
 	t:SetAttribute("CuteWeight", true)
 	local function sync()
 		t.TextStrokeColor3 = t.TextColor3
-		t.TextStrokeTransparency = math.max(WEIGHT, t.TextTransparency)
+		t.TextStrokeTransparency = math.max(weightFor(t), t.TextTransparency)
 	end
 	sync()
 	t:GetPropertyChangedSignal("TextColor3"):Connect(sync)

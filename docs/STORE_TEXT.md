@@ -55,6 +55,13 @@ Map © OpenStreetMap contributors
 
 ## Images
 
+**v5 (set 2026-11-20 evening, owner: "เปลี่ยนรูป Thumbnail ให้ด้วยนะ" after vehicles, people and trees went realistic
+again in the brick city)**: no text (every SurfaceGui / BillboardGui and the GPS beams hidden for the shots). Order:
+93758132217518 (Loy Krathong night, fireworks; was still in moderation review when set), 79582808929901 (riding the
+realistic white scooter with the dog, a realistic car beside it, studded street), 87917745918236 (the brick city at
+sunset with realistic trees), 104882509596532 (the realistic fridge on the scooter). Icon 111493686288788. Sources
+`assets/models/page_v5_*.jpg`, `assets/models/page_icon_v5.png`. Rollback = v4 below.
+
 **v4 (set 2026-11-20 afternoon, the toy-brick look; owner: "ภาพหน้าปกก็เปลี่ยนด้วยนะ" ... "ทำต่อให้จบเลย")**: still no text
 at all (for the shots every SurfaceGui / BillboardGui was hidden on the client, so shop signs, plates and the pet's
 name tag show as plain coloured boards), real Studio Play frames, the Roblox top-bar buttons painted out
