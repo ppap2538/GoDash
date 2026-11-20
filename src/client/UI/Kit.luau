@@ -111,7 +111,7 @@ end
 
 function UI.card(parent: Instance?, props: { [string]: any }?): Frame
 	local f = UI.new("Frame", { BackgroundColor3 = UI.C.card, Size = UDim2.new(1, 0, 0, 60) })
-	UI.corner(f, 14)
+	UI.corner(f, Theme.CUTE and 18 or 14)
 	if props then
 		for k, v in pairs(props) do (f :: any)[k] = v end
 	end
@@ -122,8 +122,8 @@ end
 -- HUD surface: dark translucent glass with a 1 px light edge.
 function UI.panel(parent: Instance?, props: { [string]: any }?, radius: number?): Frame
 	local f = UI.new("Frame", { BackgroundColor3 = UI.C.glass, BackgroundTransparency = Theme.GLASS_ALPHA })
-	UI.corner(f, radius or Theme.R.lg)
-	UI.stroke(f, UI.C.white, 1, Theme.STROKE_ALPHA)
+	UI.corner(f, Theme.CUTE and math.max(radius or 0, Theme.R.md) or (radius or Theme.R.lg))
+	UI.stroke(f, UI.C.white, Theme.STROKE_W, Theme.STROKE_ALPHA)
 	if props then
 		for k, v in pairs(props) do (f :: any)[k] = v end
 	end
@@ -137,7 +137,9 @@ function UI.button(parent: Instance?, text: string, props: { [string]: any }?, o
 		Text = text, Font = UI.F.bold, TextSize = 15, TextColor3 = UI.C.white, BackgroundColor3 = UI.C.green,
 		AutoButtonColor = false, Size = UDim2.new(1, 0, 0, 42),
 	})
-	UI.corner(b, 12)
+	UI.corner(b, Theme.CUTE and 16 or 12)
+	-- (cute look: a candy button with a bold white rim)
+	if Theme.CUTE then UI.stroke(b, UI.C.white, 2, 0.1) end
 	if props then
 		for k, v in pairs(props) do (b :: any)[k] = v end
 	end

@@ -81,10 +81,20 @@ local function upFace(cf: CFrame): string?
 	return best
 end
 
+local TOY_GLASS = Color3.fromRGB(128, 187, 219)
+
 function Bricks.part(p: BasePart, keepColor: boolean?)
 	if p:IsA("MeshPart") then return end
 	local mat = p.Material
+	if mat == M.Glass then
+		-- toy windows: light see-through blue (vehicle cabins showed a dark navy block)
+		p.Color = TOY_GLASS
+		if p.Transparency < 0.25 then p.Transparency = 0.25 end
+		p.Reflectance = 0.05
+		return
+	end
 	if KEEP[mat] then return end
+	if p.Reflectance > 0 then p.Reflectance = 0 end -- matte toy plastic (client/Env still wets the roads)
 	if p.MaterialVariant ~= "" then p.MaterialVariant = "" end
 	if mat ~= M.Plastic then
 		p.Material = M.Plastic

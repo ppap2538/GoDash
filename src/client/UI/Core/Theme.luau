@@ -49,5 +49,41 @@ Theme.S = { xs = 4, sm = 8, md = 12, lg = 16 }
 Theme.GLASS_ALPHA = 0.2 -- BackgroundTransparency of a HUD panel
 Theme.STROKE_ALPHA = 0.86 -- Transparency of the 1 px white edge
 Theme.TRACK_ALPHA = 0.8 -- Transparency of a bar track on glass
+Theme.STROKE_W = 1 -- edge thickness of panels
+Theme.CUTE = false
+
+-- (2026-11-20, owner: "พวก UX/UI ต่างๆ ก็ขอน่ารักๆ สดใสด้วยนะ เน้นเล่นง่าย") with the toy-brick look
+-- (Config/Look.BRICKS) the HUD is candy coloured instead of near-black glass: a friendly indigo panel
+-- with a bold white edge, rounder corners, the rounded Fredoka face for headings and numbers (Thai letters
+-- fall back to Roblox's Thai face), slightly bigger text. White text on the panels stays readable.
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Look = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Config"):WaitForChild("Look"))
+if Look.BRICKS then
+	Theme.CUTE = true
+	local C = Theme.C
+	C.green = Color3.fromRGB(16, 196, 104)
+	C.greenDark = Color3.fromRGB(8, 150, 80)
+	C.greenSoft = Color3.fromRGB(214, 248, 228)
+	C.bg = Color3.fromRGB(246, 245, 255)
+	C.line = Color3.fromRGB(228, 226, 246)
+	C.text = Color3.fromRGB(40, 36, 72)
+	C.sub = Color3.fromRGB(120, 116, 156)
+	C.dark = Color3.fromRGB(40, 48, 120)
+	C.glass = Color3.fromRGB(52, 62, 150)
+	C.chip = Color3.fromRGB(88, 104, 198)
+	C.textDim = Color3.fromRGB(222, 228, 255)
+	C.red = Color3.fromRGB(255, 92, 102)
+	C.orange = Color3.fromRGB(255, 160, 52)
+	C.yellow = Color3.fromRGB(255, 206, 60)
+	C.blue = Color3.fromRGB(64, 150, 255)
+	C.purple = Color3.fromRGB(156, 110, 240)
+	C.pink = Color3.fromRGB(255, 120, 180)
+	Theme.F.black = Enum.Font.FredokaOne
+	Theme.F.bold = Enum.Font.FredokaOne
+	Theme.R = { sm = 10, md = 16, lg = 20, pill = 999 }
+	Theme.GLASS_ALPHA = 0.06
+	Theme.STROKE_ALPHA = 0.15
+	Theme.STROKE_W = 2
+end
 
 return Theme
