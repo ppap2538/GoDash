@@ -4,6 +4,7 @@ local Kit = require(script.Parent.Kit)
 local Assets = require(script.Parent.Assets)
 local Solid = require(script.Parent.Solid)
 local PlantDefs = require(game:GetService("ReplicatedStorage").Shared.Config.Plants)
+local Bricks = require(game:GetService("ReplicatedStorage").Shared.Bricks)
 local M = Kit.M
 local C = Kit.COLORS
 local V3 = Vector3.new
@@ -263,6 +264,48 @@ function S.sugarPalm(parent: Instance, base: CFrame, rng: Random)
 	return m
 end
 
+-- (2026-11-20) toy-brick trees (Config/Look.BRICKS): a square trunk and a canopy of stacked studded green
+-- blocks, each a little smaller and turned, like a tree built from a box of bricks. Street trees keep their
+-- canopy above the chase camera (plan.clear). Bushes are two blocks; flowerbeds get bright flower studs.
+local LEAVES = { Color3.fromRGB(75, 151, 75), Color3.fromRGB(40, 127, 71), Color3.fromRGB(164, 189, 71), Color3.fromRGB(124, 156, 107) }
+local BLOOMS = { Color3.fromRGB(255, 152, 220), Color3.fromRGB(245, 205, 48), Color3.fromRGB(196, 40, 28), Color3.fromRGB(242, 243, 243) }
+local function brickTree(parent: Instance, base: CFrame, rng: Random, k: string, plan, maxR: number?)
+	local m = Kit.model(parent, "Tree")
+	local d = { decor = true, shadow = true }
+	local function green(): Color3 return LEAVES[rng:NextInteger(1, #LEAVES)] end
+	local function turn(): CFrame return CFrame.Angles(0, rad(rng:NextNumber(-14, 14)), 0) end
+	if k == "grass" then
+		Kit.part(m, V3(rng:NextNumber(1.6, 2.6), 0.6, rng:NextNumber(1.6, 2.6)), base * CF(0, 0.3, 0) * turn(), green(), M.Plastic, d)
+		return
+	end
+	if k == "bush" or k == "flower" then
+		local w = rng:NextNumber(3.6, 5.4)
+		Kit.part(m, V3(w, 2.4, w * rng:NextNumber(0.8, 1.15)), base * CF(0, 1.2, 0), green(), M.Plastic, d)
+		Kit.part(m, V3(w * 0.62, 1.6, w * 0.62), base * CF(rng:NextNumber(-0.4, 0.4), 3.2, rng:NextNumber(-0.4, 0.4)) * turn(), green(), M.Plastic, d)
+		if k == "flower" or rng:NextNumber() < 0.35 then
+			for _ = 1, rng:NextInteger(3, 6) do
+				Kit.part(m, V3(0.8, 0.8, 0.8), base * CF(rng:NextNumber(-w * 0.4, w * 0.4), 2.8, rng:NextNumber(-w * 0.4, w * 0.4)), BLOOMS[rng:NextInteger(1, #BLOOMS)], M.Plastic, d)
+			end
+		end
+		Solid.body(m, 0.7, 4) -- hedges: a walker goes round them (World/Solid)
+		return
+	end
+	local wide = k == "rain"
+	local trunkH = math.max(plan and plan.clear or 0, wide and rng:NextNumber(9, 12) or rng:NextNumber(6, 9))
+	local spread = wide and rng:NextNumber(16, 22) or rng:NextNumber(9, 13)
+	if maxR then spread = math.min(spread, math.max(4, maxR * 2)) end -- (a tree in a small traffic island stays inside it)
+	local tw = wide and 2.4 or 1.6
+	Kit.part(m, V3(tw, trunkH + 1.5, tw), base * CF(0, (trunkH + 1.5) / 2, 0), Color3.fromRGB(124, 92, 70), M.Plastic, { name = "Trunk" })
+	local y = trunkH
+	for i, t in ipairs({ { 1, 0.34 }, { 0.72, 0.3 }, { 0.44, 0.26 } }) do
+		local w = spread * t[1]
+		local h = spread * t[2] * (wide and 0.75 or 1)
+		local tilt = (i == 2 and rng:NextNumber() < 0.5) and CFrame.Angles(0, rad(45), 0) or CFrame.identity
+		Kit.part(m, V3(w, h, w * rng:NextNumber(0.85, 1)), base * CF(0, y + h / 2, 0) * tilt * turn(), green(), M.Plastic, d)
+		y += h
+	end
+end
+
 function S.tree(parent: Instance, base: CFrame, rng: Random, kind: string?, opts: { maxR: number? }?)
 	local k = kind or "small"
 	if k == "sugarpalm" then
@@ -277,6 +320,10 @@ function S.tree(parent: Instance, base: CFrame, rng: Random, kind: string?, opts
 	-- the vegetation library (Config/Plants): several species, each with its own models; an invisible
 	-- trunk keeps the big ones solid. Falls back to the part-built trees below when it is not in the place.
 	local plan = S.PLANTS[k] or S.PLANTS.small
+	if Bricks.ON and k ~= "palm" and k ~= "royal" and k ~= "banana" then
+		brickTree(parent, base, rng, k, plan, opts and opts.maxR)
+		return
+	end
 	local roll = rng:NextNumber() * plan.total
 	local pickKind = plan[1][1]
 	for _, it in ipairs(plan) do
