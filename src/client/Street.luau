@@ -243,26 +243,42 @@ end
 --     oncoming traffic is kept apart by the junction lock below instead
 --   * a person blocks only when they are really in front of the car, not walking along the kerb
 --   * a car held up by AI traffic for 8 s stops looking at AI traffic for 3 s (deadlock breaker)
+--   * (2026-11-20, owner screenshot "รถบัค": a car stood half inside a parked bike, and the car queued behind it
+--     had driven into its back) a player's vehicle is measured as the box it is, turned the way it stands, not
+--     as a dot: a bike left across the lane reaches ~3 studs sideways, and cars passed it by its middle
+--     only. And the deadlock breaker no longer drives into the back of a car going the same way (a queue
+--     behind someone waiting is not a deadlock); it still slips past one that is beside it
 local function lookAhead(c, here: Vector3, dir: Vector3, left: Vector3, target: number, obstacles, t: number): (number, boolean, boolean)
 	local byPlayer, byAI = false, false
 	local ghost = t < (c.ghostUntil or 0)
 	for _, o in ipairs(obstacles) do
 		local skip = o.owner == c
+		local sameWay = false
 		if not skip and o.owner then
 			local ol = o.owner.look
-			skip = ghost or (ol ~= nil and ol:Dot(dir) < 0.4)
+			sameWay = ol ~= nil and ol:Dot(dir) > 0.9
+			skip = (ghost and not sameWay) or (ol ~= nil and ol:Dot(dir) < 0.4)
 		end
 		if not skip then
 			local rel = Vector3.new(o.pos.X - here.X, 0, o.pos.Z - here.Z)
 			local along, side = rel:Dot(dir), math.abs(rel:Dot(left))
-			local gap = c.len / 2 + o.half + 3 + c.v * 0.55
-			local reach = c.wid / 2 + (o.half <= 1 and 0.8 or 1.8)
+			local alongHalf, sideHalf = o.half, nil
+			if o.box then
+				local cf, e = o.box, o.ext
+				local R, U, L = cf.RightVector, cf.UpVector, cf.LookVector
+				alongHalf = math.abs(R:Dot(dir)) * e.X + math.abs(U:Dot(dir)) * e.Y + math.abs(L:Dot(dir)) * e.Z
+				sideHalf = math.abs(R:Dot(left)) * e.X + math.abs(U:Dot(left)) * e.Y + math.abs(L:Dot(left)) * e.Z
+			end
+			local gap = c.len / 2 + alongHalf + 3 + c.v * 0.55
+			local reach = sideHalf and (c.wid / 2 + sideHalf + 0.3) or (c.wid / 2 + (o.half <= 1 and 0.8 or 1.8))
 			-- (2026-11-19) a motorbike filters past cars and pickups on the kerb side, the Thai way
 			if c.bike and o.owner and not o.owner.bike then reach = c.wid / 2 + 0.4 end
+			-- deadlock breaker: a same-way car beside this one (not in front of it) may be slipped past
+			if ghost and sameWay and along < (c.len / 2 + alongHalf) * 0.8 then reach = -1 end
 			if along > 0 and along < gap and side < reach then
 				if o.person then byPlayer = true end
 				if o.owner then byAI = true end
-				target = math.min(target, math.max(0, (along - c.len / 2 - o.half - 2.5) * 1.4))
+				target = math.min(target, math.max(0, (along - c.len / 2 - alongHalf - 2.5) * 1.4))
 			end
 			-- your vehicle inside this car's box at speed: that was a crash
 			if o.mine and o.part and math.abs(along) < c.len / 2 + 1.2 and side < c.wid / 2 + 1.2 then
@@ -514,6 +530,24 @@ local function startLocals()
 	end
 end
 
+-- A player's vehicle as a box: its bounding box (turned like its chassis), measured again every few seconds
+-- because cargo and paint jobs can change it. Returns the box's centre CFrame and half size.
+local boxes = setmetatable({}, { __mode = "k" }) :: any
+local function footprint(m: Model, pp: BasePart, _t: number): (CFrame, Vector3)
+	local now = os.clock()
+	local b = boxes[m]
+	if not b or now > b.at then
+		local ok, cf, size = pcall(m.GetBoundingBox, m)
+		if ok then
+			b = { off = pp.CFrame:ToObjectSpace(cf), ext = size / 2, at = now + 3 }
+		else
+			b = { off = CFrame.new(), ext = pp.Size / 2, at = now + 3 }
+		end
+		boxes[m] = b
+	end
+	return pp.CFrame * b.off, b.ext
+end
+
 ---------------------------------------------------------------------------------------------------
 local function moveCars(t: number, dt: number, camPos: Vector3)
 	-- everything a car has to look out for this frame
@@ -522,7 +556,10 @@ local function moveCars(t: number, dt: number, camPos: Vector3)
 	if folder then
 		for _, m in ipairs(folder:GetChildren()) do
 			local p = m:IsA("Model") and m.PrimaryPart
-			if p then table.insert(obstacles, { pos = p.Position, half = 3, mine = m:GetAttribute("Owner") == player.UserId, part = p, person = true }) end
+			if p then
+				local box, ext = footprint(m, p, t)
+				table.insert(obstacles, { pos = box.Position, half = 3, box = box, ext = ext, mine = m:GetAttribute("Owner") == player.UserId, part = p, person = true })
+			end
 		end
 	end
 	local me: Vector3? = nil
