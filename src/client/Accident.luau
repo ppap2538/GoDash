@@ -66,6 +66,8 @@ local function claim(kind: string, speed: number, extra: any?)
 	end
 	local amount = type(res) == "table" and tonumber(res.amount) or 0
 	local waived = type(res) == "table" and res.waived == true
+	-- (2026-11-20) they hit you: their driver gets out, says sorry and pays you (server/AccidentService "bythem")
+	local theirs = kind == "bythem"
 	-- a hard crash may have thrown you off first: the claim comes when that scene is over
 	local t0 = os.clock()
 	while State.cutscene and os.clock() - t0 < 15 do task.wait(0.2) end
@@ -74,7 +76,7 @@ local function claim(kind: string, speed: number, extra: any?)
 	local played = false
 	if hum and hum.Health > 0 and not State.cutscene then
 		task.spawn(Cutscene.play, "fine", {
-			reason = kind == "ped" and "hit_ped" or "hit_car", amount = amount, waived = waived,
+			reason = theirs and "hit_bythem" or (kind == "ped" and "hit_ped" or "hit_car"), amount = amount, waived = waived,
 			claimant = extra and extra.template, ped = extra and extra.ped, carModel = extra and extra.model,
 			holdCar = Street.hold, hitAt = hitAt,
 			insured = type(res) == "table" and tonumber(res.insured) or nil, -- (2026-11-19) the insurer's share: the surveyor comes
@@ -83,7 +85,9 @@ local function claim(kind: string, speed: number, extra: any?)
 		played = State.cutscene -- the scene starts synchronously; false = it could not run here
 	end
 	if not played then
-		if waived then
+		if theirs then
+			Feedback.toast(L(("🚗 They hit you! Their fault: +฿%d for the damage"):format(amount), ("🚗 โดนชน! คู่กรณีเป็นฝ่ายผิด ได้ค่าเสียหาย +฿%d"):format(amount)), "good")
+		elseif waived then
 			Feedback.toast(L("🤝 They let it go this time. Ride carefully!", "🤝 คู่กรณีไม่เอาเรื่อง ครั้งหน้าระวังนะ"), "good")
 		else
 			Feedback.toast(kind == "ped" and L(("🚑 You hit a pedestrian: hospital bill ฿%d"):format(amount), ("🚑 ชนคนเดินถนน: ค่ารักษา ฿%d"):format(amount))
@@ -92,8 +96,35 @@ local function claim(kind: string, speed: number, extra: any?)
 	end
 	local t1 = os.clock()
 	while State.cutscene and os.clock() - t1 < 40 do task.wait(0.25) end
-	if not waived then Feed.post(kind == "ped" and "accident_ped" or "accident_car", { amount = amount }, true) end
+	if not waived and not theirs then Feed.post(kind == "ped" and "accident_ped" or "accident_car", { amount = amount }, true) end
 	busy = false
+end
+
+-- (2026-11-20, owner: "อุบัติเหตุบางกรณีที่เราไม่ใช่คนผิดเราต้องได้ค่าเสียหายนะ ไม่ใช่เราผิดทุกอย่าง") who hit whom.
+-- d = the direction from you to them. You were at fault when you closed in on them at least as fast as they closed
+-- in on you (you ran into their back or side); they were when they came at you faster (they ran into your back or
+-- side, or you were standing still). A head-on at equal speeds stays yours.
+local function theyHitMe(myPos: Vector3, myVel: Vector3, theirPos: Vector3, theirVel: Vector3): boolean
+	local to = Vector3.new(theirPos.X - myPos.X, 0, theirPos.Z - myPos.Z)
+	if to.Magnitude < 0.1 then return false end
+	local d = to.Unit
+	local mine = Vector3.new(myVel.X, 0, myVel.Z)
+	local closeMine = mine:Dot(d)
+	local closeTheirs = Vector3.new(theirVel.X, 0, theirVel.Z):Dot(-d)
+	return (mine.Magnitude < 3 and closeTheirs > 4) or closeTheirs > closeMine + 4
+end
+Accident.theyHitMe = theyHitMe
+
+-- a car the server or another client moves by CFrame has no physics velocity: measure it over one frame
+local function velocityOf(m: Model): Vector3
+	local root = m.PrimaryPart or m:FindFirstChildWhichIsA("BasePart", true)
+	if not root then return Vector3.zero end
+	local v = root.AssemblyLinearVelocity
+	if v.Magnitude > 0.5 then return v end
+	local p0, t0 = m:GetPivot().Position, os.clock()
+	RunService.Heartbeat:Wait()
+	local dt = math.max(os.clock() - t0, 1 / 120)
+	return (m:GetPivot().Position - p0) / dt
 end
 
 -- The fake-injury scammer (2026-11-19, viral pack): every few minutes of riding through town at a modest speed,
@@ -201,8 +232,12 @@ function Accident.start()
 		end
 	end)
 	-- AI traffic: its driver gets out of that very car
-	Street.onCrash = function(model, rv)
-		if Drive.current() then claim("car", rv, { model = model }) end
+	Street.onCrash = function(model, rv, theirVel, theirPos)
+		local c = Drive.current()
+		if not c then return end
+		local mineV = c.chassis.AssemblyLinearVelocity
+		local them = theirVel and theirPos and theyHitMe(c.chassis.Position, mineV, theirPos, theirVel)
+		claim(them and "bythem" or "car", rv, { model = model })
 	end
 	-- other players' vehicles (and the server's route cars)
 	Drive.onHit = function(info)
@@ -215,7 +250,12 @@ function Accident.start()
 		if m and m ~= info.model then
 			-- (a route car's driver gets out of it; another player's vehicle has a real person in it, so a
 			-- stranger walks up instead of someone climbing out of their car)
-			claim("car", info.dv, { model = (m:HasTag("TrafficCar") or m.Name == "LocalCar") and m or nil })
+			-- (2026-11-20) who hit whom: our velocity from just before the hit, theirs measured now
+			local c = Drive.current()
+			local mineV = (c and c.lastVel) or (info.model and info.model.PrimaryPart and info.model.PrimaryPart.AssemblyLinearVelocity) or Vector3.zero
+			local myPos = info.model and info.model:GetPivot().Position or info.at
+			local them = theyHitMe(myPos, mineV, m:GetPivot().Position, velocityOf(m))
+			claim(them and "bythem" or "car", info.dv, { model = (m:HasTag("TrafficCar") or m.Name == "LocalCar") and m or nil })
 		end
 	end
 end

@@ -27,6 +27,24 @@ Service.SHARE = 0.25
 Service.SCAM = { min = 80, max = 150 }
 Service.SCAM_DAY = 3
 local lastScam = {} :: { [Player]: number }
+-- (2026-11-20, owner: "อุบัติเหตุบางกรณีที่เราไม่ใช่คนผิดเราต้องได้ค่าเสียหายนะ") another vehicle ran into you
+-- (client/Accident theyHitMe: they came at you faster than you at them, or you stood still): their side pays your
+-- repair, on the same scale as a bill you would pay. The client decides who hit whom and the server can't check it,
+-- so it is capped like the scammer: BYTHEM_DAY a real day, one every 15 s (shared with the bills).
+Service.BYTHEM_DAY = 5
+
+local function byThem(player: Player, d, speed: number)
+	local Economy = require(script.Parent.EconomyService)
+	Economy.rollDay(d)
+	local n = tonumber(d.daily.bythem) or 0
+	if n >= Service.BYTHEM_DAY then return true, "", { amount = 0, theirs = true } end
+	d.daily.bythem = n + 1
+	local t = Service.CAR
+	local amount = math.min(t.cap, math.floor((t.base + t.perSpeed * math.clamp(speed, 0, 200)) / 10 + 0.5) * 10)
+	Economy.add(player, amount, "accident_comp")
+	Data.touch(player, "daily")
+	return true, "", { amount = amount, theirs = true }
+end
 
 local function scam(player: Player, d)
 	if os.clock() - (lastScam[player] or -1e9) < 60 then return false, "" end
@@ -50,9 +68,10 @@ function Service.start()
 		local kind, s = arg:match("^(%a+):(%d+)$")
 		local speed = tonumber(s)
 		if kind == "scam" and speed then return scam(player, d) end
-		if (kind ~= "ped" and kind ~= "car") or not speed then return false, "" end
+		if (kind ~= "ped" and kind ~= "car" and kind ~= "bythem") or not speed then return false, "" end
 		if os.clock() - (last[player] or -1e9) < 15 then return false, "" end
 		last[player] = os.clock()
+		if kind == "bythem" then return byThem(player, d, speed) end
 		local t = kind == "ped" and Service.PED or Service.CAR
 		local amount = math.min(t.cap, math.floor((t.base + t.perSpeed * math.clamp(speed, 0, 200)) / 10 + 0.5) * 10)
 		local cash = math.max(0, math.floor(d.money))

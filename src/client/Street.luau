@@ -22,7 +22,7 @@ local Feedback = require(script.Parent.Feedback)
 local Perf = require(script.Parent.Perf)
 
 local Street = {}
-Street.onCrash = nil :: ((Model, number) -> ())? -- client/Accident
+Street.onCrash = nil :: ((Model, number, Vector3?, Vector3?) -> ())? -- client/Accident (model, relative speed, its velocity, its position)
 
 -- Keep a crashed AI car standing (hazards on) a while longer: its driver is out talking to you in the
 -- claim scene (client/Cutscene). Defined below, once the car lists exist.
@@ -272,7 +272,8 @@ local function lookAhead(c, here: Vector3, dir: Vector3, left: Vector3, target: 
 					c.v = 0
 					c.crashHonkAt = t + 1.1
 					target = 0
-					if Street.onCrash then task.spawn(Street.onCrash, c.model, rv) end -- client/Accident: the damage claim
+					-- client/Accident: the damage claim (with this car's own velocity and position, to tell who hit whom)
+					if Street.onCrash then task.spawn(Street.onCrash, c.model, rv, dir * c.v, here) end
 				end
 			end
 		end

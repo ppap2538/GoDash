@@ -814,11 +814,13 @@ local function ticketCard(reason: string, amount: number, n: number?, limit: num
 	card.ZIndex = 4
 	local corner = Instance.new("UICorner"); corner.CornerRadius = UDim.new(0, 10); corner.Parent = card
 	local scam = reason == "scam" -- (2026-11-19) the fake-injury scammer, caught on CCTV: they pay you
+	local theirs = reason == "hit_bythem" -- (2026-11-20) they ran into you: they pay your repair
+	local good = scam or theirs
 	local claim = reason:sub(1, 4) == "hit_" or scam -- a damage claim after an accident (client/Accident), not a police ticket
 	local GOOD = Color3.fromRGB(20, 140, 100)
 	local band = Instance.new("Frame")
 	band.Size = UDim2.new(1, 0, 0, 40)
-	band.BackgroundColor3 = scam and GOOD or (waived and Color3.fromRGB(40, 150, 80) or (ins and Color3.fromRGB(30, 100, 190)) or (claim and Color3.fromRGB(214, 110, 20) or Color3.fromRGB(190, 28, 36)))
+	band.BackgroundColor3 = good and GOOD or (waived and Color3.fromRGB(40, 150, 80) or (ins and Color3.fromRGB(30, 100, 190)) or (claim and Color3.fromRGB(214, 110, 20) or Color3.fromRGB(190, 28, 36)))
 	band.ZIndex = 4
 	band.Parent = card
 	local bc = Instance.new("UICorner"); bc.CornerRadius = UDim.new(0, 10); bc.Parent = band
@@ -837,19 +839,20 @@ local function ticketCard(reason: string, amount: number, n: number?, limit: num
 		t.Parent = parent
 		return t
 	end
-	text(band, scam and L("🎥 CAUGHT ON CCTV", "🎥 จับโป๊ะ! กล้องวงจรปิด") or (waived and L("🤝 THEY LET IT GO", "🤝 คู่กรณีไม่เอาเรื่อง") or (ins and L("🛡 INSURANCE CLAIM", "🛡 เคลมประกัน")) or (claim and L("🧾 DAMAGE CLAIM", "🧾 ใบเรียกค่าเสียหาย") or L("🚔 TRAFFIC TICKET", "🚔 ใบสั่ง · TRAFFIC TICKET"))), 0, 40, 18, Color3.new(1, 1, 1), Enum.Font.GothamBlack)
+	text(band, theirs and L("🚗 THEIR FAULT", "🚗 คู่กรณีเป็นฝ่ายผิด") or scam and L("🎥 CAUGHT ON CCTV", "🎥 จับโป๊ะ! กล้องวงจรปิด") or (waived and L("🤝 THEY LET IT GO", "🤝 คู่กรณีไม่เอาเรื่อง") or (ins and L("🛡 INSURANCE CLAIM", "🛡 เคลมประกัน")) or (claim and L("🧾 DAMAGE CLAIM", "🧾 ใบเรียกค่าเสียหาย") or L("🚔 TRAFFIC TICKET", "🚔 ใบสั่ง · TRAFFIC TICKET"))), 0, 40, 18, Color3.new(1, 1, 1), Enum.Font.GothamBlack)
 	local CHARGE = {
 		scam = L("They faked an injury for money", "แกล้งล้มเรียกค่าเสียหาย"),
 		redlight = L("Ran a red light", "ฝ่าสัญญาณไฟแดง"), sidewalk = L("Riding on the pavement", "ขับขี่บนทางเท้า"),
 		nolicence = L("No driving licence", "ไม่มีใบอนุญาตขับขี่"), nohelmet = L("Riding without a helmet", "ไม่สวมหมวกกันน็อก"),
 		hit_ped = L("Ran into a pedestrian", "ชนคนเดินถนน"), hit_car = L("Crashed into another vehicle", "ชนรถคันอื่น"),
+		hit_bythem = L("Another vehicle ran into you", "รถคันอื่นพุ่งชนคุณ"),
 		zebra = L("Didn't stop at a zebra crossing", "ไม่หยุดให้คนข้ามทางม้าลาย"),
 	}
 	local charge = CHARGE[reason] or L("Stopped at a police checkpoint", "ถูกเรียกตรวจที่ด่านตำรวจ")
 	text(card, claim and L("What happened", "เหตุ") or L("Charge", "ข้อหา"), 48, 16, 12, Color3.fromRGB(120, 120, 128), Enum.Font.GothamMedium)
 	text(card, charge, 64, 24, 18, Color3.fromRGB(30, 30, 36), Enum.Font.GothamBold)
-	text(card, scam and L("Their apology to you", "ค่าทำขวัญให้คุณ") or (reason == "hit_ped" and L("Hospital bill", "ค่ารักษา") or (claim and L("Repair bill", "ค่าซ่อม") or L("Fine", "ค่าปรับ"))), 96, 16, 12, Color3.fromRGB(120, 120, 128), Enum.Font.GothamMedium)
-	if scam then
+	text(card, theirs and L("Damages paid to you", "ค่าเสียหายที่คุณได้รับ") or scam and L("Their apology to you", "ค่าทำขวัญให้คุณ") or (reason == "hit_ped" and L("Hospital bill", "ค่ารักษา") or (claim and L("Repair bill", "ค่าซ่อม") or L("Fine", "ค่าปรับ"))), 96, 16, 12, Color3.fromRGB(120, 120, 128), Enum.Font.GothamMedium)
+	if good then
 		text(card, amount > 0 and ("+฿" .. amount) or L("Just a sorry (enough for today)", "แค่คำขอโทษ (วันนี้ได้ครบแล้ว)"), 110, 34, amount > 0 and 30 or 18, GOOD, Enum.Font.GothamBlack)
 	elseif waived then
 		text(card, L("฿0 · settled, no bill", "฿0 · ยอมความ ไม่ต้องจ่าย"), 110, 34, 24, Color3.fromRGB(28, 120, 60), Enum.Font.GothamBlack)
@@ -866,6 +869,7 @@ local function ticketCard(reason: string, amount: number, n: number?, limit: num
 		nohelmet = L("Phone > Gear: the half helmet is free.", "มือถือ > อุปกรณ์ไรเดอร์ หมวกครึ่งใบใส่ได้ฟรี"),
 		hit_ped = L("Slow down where people walk: markets, shops, crossings.", "ย่านตลาด หน้าร้าน ทางม้าลาย ขับช้าๆ นะ"),
 		hit_car = L("Keep your distance and brake in time.", "เว้นระยะห่าง เบรกให้ทันนะ"),
+		hit_bythem = L("Not your fault: their side pays for it.", "ไม่ใช่ความผิดคุณ คู่กรณีรับผิดชอบเอง"),
 		zebra = L("Someone on the crossing? Stop and let them cross.", "มีคนอยู่บนทางม้าลาย ต้องหยุดให้ข้ามก่อนนะ"),
 	}
 	local tip = TIP[reason] or L("Next time, go round the checkpoint.", "ครั้งหน้าลองขับหลบด่านดูนะ")
@@ -885,7 +889,7 @@ local function ticketCard(reason: string, amount: number, n: number?, limit: num
 	stamp.Size = UDim2.fromOffset(110, 40)
 	stamp.Rotation = -14
 	if ins then stamp.Position = UDim2.fromScale(0.8, 0.86) end -- (below the two amounts, not over them)
-	stamp.Text = scam and L("CAUGHT", "จับได้!") or (waived and L("SETTLED", "ยอมความ") or (ins and L("CLAIMED", "เคลมแล้ว")) or (amount > 0 and L("PAID", "ชำระแล้ว") or L("NOTED", "บันทึกแล้ว")))
+	stamp.Text = theirs and L("PAID TO YOU", "ได้รับแล้ว") or scam and L("CAUGHT", "จับได้!") or (waived and L("SETTLED", "ยอมความ") or (ins and L("CLAIMED", "เคลมแล้ว")) or (amount > 0 and L("PAID", "ชำระแล้ว") or L("NOTED", "บันทึกแล้ว")))
 	stamp.TextSize = 24
 	stamp.Font = Enum.Font.GothamBlack
 	local stampColor = (scam or waived) and Color3.fromRGB(28, 130, 60) or (ins and Color3.fromRGB(30, 100, 190)) or Color3.fromRGB(190, 28, 36)
@@ -1026,7 +1030,8 @@ local function fineScene(info: any)
 	local car = def ~= nil and def.class == "car"
 	-- the very person who was hit: borrowed from client/Peds right away, so they stay down where they fell
 	local victim = (reason == "hit_ped" or scam) and info.ped and Peds.borrow(info.ped) or nil
-	local otherCar = claim and reason == "hit_car" and info.carModel and info.carModel.Parent and info.carModel or nil
+	local theirFault = reason == "hit_bythem" -- (2026-11-20) they ran into you: their driver gets out, says sorry, pays you
+	local otherCar = claim and (reason == "hit_car" or theirFault) and info.carModel and info.carModel.Parent and info.carModel or nil
 	if otherCar and info.holdCar then pcall(info.holdCar, otherCar, 30) end
 	local ignore: { Instance } = { char }
 	if vehicle then table.insert(ignore, vehicle) end
@@ -1099,6 +1104,7 @@ local function fineScene(info: any)
 				or L("😱 Someone jumped in front of you!", "😱 มีคนกระโดดตัดหน้า! ล้มลงไปแล้ว")))
 			or (reason == "hit_ped" and (waived and L("🤝 You hit someone... they say it's OK", "🤝 ชนคนเดินถนน... แต่เขาไม่เอาเรื่อง")
 				or L("🚑 You hit someone! They want the hospital bill", "🚑 ชนคนเดินถนน! เขาเดินมาเรียกค่ารักษา")))
+			or (theirFault and L("🚗 They hit you! Their fault: they pay you", "🚗 โดนชน! คู่กรณีเป็นฝ่ายผิด จ่ายค่าเสียหายให้คุณ"))
 			or (reason == "hit_car" and (waived and L("🤝 Crash! The other driver lets it go", "🤝 ชนรถคันอื่น! แต่คู่กรณีไม่เอาเรื่อง")
 				or L("💥 Crash! The other driver wants the repair bill", "💥 ชนรถคันอื่น! คู่กรณีลงมาเรียกค่าซ่อม")))
 			or (reason == "redlight" and L("🚦 Pulled over: you ran a red light", "🚦 ตำรวจเรียกจอด: ฝ่าไฟแดง"))
@@ -1410,7 +1416,14 @@ local function fineScene(info: any)
 		-- 4. what they say
 		if claim then
 			local lines
-			if scam then
+			if theirFault then
+				lines = {
+					L("Sorry, sorry! My fault, I wasn't looking.", "ขอโทษครับๆ ผมผิดเอง มัวแต่ไม่ได้ดู"),
+					L("Are you OK? I'll pay for your bike, here.", "เป็นอะไรไหมครับ เดี๋ยวผมจ่ายค่าซ่อมให้นะ"),
+					L("My brakes were late, I'm so sorry!", "เบรกไม่ทันจริงๆ ขอโทษด้วยนะครับ!"),
+					L("It's on me. Take this for the repair.", "ผมรับผิดชอบเองครับ เอานี่ไปซ่อมรถ"),
+				}
+			elseif scam then
 				lines = {
 					L("Heh... there was a camera? Sorry, sorry!", "แหะๆ... มีกล้องด้วยเหรอ ขอโทษครับๆ"),
 					L("OK, OK, I fell over... on purpose. Here, for your trouble.", "โอเคๆ ล้มเอง... ตั้งใจล้มเอง เอานี่ไปค่าเสียเวลา"),
