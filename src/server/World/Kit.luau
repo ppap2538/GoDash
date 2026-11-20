@@ -221,17 +221,30 @@ Kit.FACADE = {
 	apartment = "rbxassetid://78721160464576", tower = "rbxassetid://110147880334075", town = "rbxassetid://75616827941027",
 	ground = "rbxassetid://75857554954134", home = "rbxassetid://92320337126512",
 }
+-- (2026-11-20) toy-brick look: the same five tiles drawn as toy bricks (tools/make_facades_toy.py: chunky white
+-- frames, glossy glass, red doors, studded ledges); the glass shows toy blue by day, warm lamp light at night
+local TOY_GLASS = Color3.fromRGB(82, 124, 174)
+if Bricks.ON then
+	Kit.FACADE = {
+		apartment = "rbxassetid://123920669844778", tower = "rbxassetid://138392514143695", town = "rbxassetid://108156039104114",
+		ground = "rbxassetid://98934742307983", home = "rbxassetid://108489925890995",
+	}
+end
 -- cf = centre of the wall face, its front (-Z) looking out. nu x nv tiles across the face.
 function Kit.facade(m: Instance, cf: CFrame, w: number, h: number, tex: string, nu: number, nv: number, tint: Color3, glow: boolean?)
-	local p = Kit.part(m, Vector3.new(w, h, 0.3), cf, Kit.COLORS.glass, M.SmoothPlastic, { decor = true, name = "Facade" })
+	local p = Kit.part(m, Vector3.new(w, h, 0.3), cf, Bricks.ON and TOY_GLASS or Kit.COLORS.glass, M.SmoothPlastic, { decor = true, name = "Facade" })
 	local t = Instance.new("Texture")
 	t.Face = Enum.NormalId.Front
 	t.Texture = tex
 	t.StudsPerTileU = w / math.max(1, nu)
 	t.StudsPerTileV = h / math.max(1, nv)
-	t.Color3 = tint
+	t.Color3 = Bricks.ON and Bricks.color(tint) or tint
 	t.Parent = p
-	if glow then Kit.nightGlow(p) end
+	if glow then
+		-- (client/Env lights a window warm at night only when it knows the day colour; toy blue is not "dark")
+		if Bricks.ON then p:SetAttribute("DayColor", p.Color) end
+		Kit.nightGlow(p)
+	end
 	return p
 end
 
