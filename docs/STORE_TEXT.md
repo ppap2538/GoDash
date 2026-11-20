@@ -67,13 +67,13 @@ Before v3 (for a rollback, `PATCH /assets/v1/assets/72947456721898?updateMask=pr
 Krathong), 78906189388680 (ride), 76079295322715 (styling), 135989347837853 (night radio), 118277502747835 (rewards).
 Icon 97841633896740 → later 109867011608612 (icon v3, 2026-11-19). v2 sources `assets/models/page_*v2*.png`.
 
-## Description v3 (2026-11-20, NOT SET: the owner pastes it)
+## Description v3 (2026-11-20, SET through Open Cloud on the root place after the owner's go-ahead; the universe mirrors it)
 
 On 2026-11-20 the place and universe description read `hagame lemon pillow brave` (changed 2026-11-19 by someone
 other than this repo's sessions; Thai players saw it machine-translated as "หมอนมะนาวฮากาเมะที่กล้าหาญ"), and the name
-had become `GoDash Rider Thailand`. Setting the description through Open Cloud was refused by the Assistant's safety
-check, so the owner pastes this in Creator Dashboard > the experience > Places > the start place > Basic Settings >
-Description (704 characters; limit 1000):
+had become `GoDash Rider Thailand` (name left as is). The first Open Cloud write was refused by the Assistant's safety
+check; the owner then said to set it ("แก้ให้ทีนายมี API อยู่นะ") and it went through:
+`PATCH /cloud/v2/universes/10776539389/places/72947456721898?updateMask=description` (704 characters; limit 1000):
 
 ```
 🛵 ขี่มอไซค์ส่งอาหารทั่วขอนแก่น เมืองจริงขนาด 1:1!
